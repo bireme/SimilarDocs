@@ -37,7 +37,7 @@ class TopIndex(sdIndexPath: String,
   val simDocs = new SimilarDocs()
 
   def delRecord(psId:String): Unit = {
-    val topDocs = topSearcher.search(new TermQuery(new Term(psId)), 1)
+    val topDocs = topSearcher.search(new TermQuery(new Term("id", psId)), 1)
 
     if (topDocs.totalHits != 0) {
       val doc = topSearcher.doc(topDocs.scoreDocs(0).doc)
@@ -49,9 +49,15 @@ class TopIndex(sdIndexPath: String,
           if (topDocs.totalHits == 1) docIndex.deleteRecord(docId)
         }
       }
-      topWriter.deleteDocuments(new Term(psId))
+      topWriter.deleteDocuments(new Term("id", psId))
       topWriter.commit()
     }
+  }
+
+  def addWords(psId: String,
+               sentence: String): Unit = {
+    val words = simDocs.getWordsFromString(sentence)
+    addWords(psId, words)
   }
 
   def addWords(psId: String,
@@ -68,7 +74,7 @@ class TopIndex(sdIndexPath: String,
   def getSimDocs(psId: String,
                  outFlds: Set[String],
                  maxDocs: Int = 10): List[Map[String,List[String]]] = {
-    val topDocs = topSearcher.search(new TermQuery(new Term(psId)), 1)
+    val topDocs = topSearcher.search(new TermQuery(new Term("id", psId)), 1)
 
     if (topDocs.totalHits == 0) List() else {
       val doc = topSearcher.doc(topDocs.scoreDocs(0).doc)

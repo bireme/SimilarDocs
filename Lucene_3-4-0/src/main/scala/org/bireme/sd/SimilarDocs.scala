@@ -171,6 +171,10 @@ println(ts.getTime)
     keys
   }
 
+  def getWordsFromString(in: String): Set[String] =
+    uniformString(in.trim()).split(separators).toSet.
+                       filter(w => (w.length >= 3)).filterNot(w => stopwords(w))
+
   private def getIds(searcher: IndexSearcher,
                      parser: QueryParser,
                      in: List[TreeSet[String]],
