@@ -23,6 +23,12 @@ class DocsIndex(docIndex: String,
   val doc_searcher = new IndexSearcher(doc_directory)
   val simDocs = new SimilarDocs()
 
+  def close(): Unit = {
+    doc_writer.close()
+    doc_searcher.close()
+    doc_directory.close()
+  }
+
   def newRecord(id: String): Unit = {
     val doc = new Document()
 

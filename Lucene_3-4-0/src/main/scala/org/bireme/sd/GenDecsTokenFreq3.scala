@@ -9,14 +9,13 @@ import collection.JavaConverters._
 
 import org.apache.lucene.analysis.WhitespaceAnalyzer
 import org.apache.lucene.document.{Document,Field,NumericField}
-import org.apache.lucene.index.{IndexReader,IndexWriter,IndexWriterConfig}
+import org.apache.lucene.index.{IndexReader,IndexWriter,IndexWriterConfig,Term}
 import org.apache.lucene.store.FSDirectory
 import org.apache.lucene.util.Version
 
-import scala.collection.immutable.TreeMap
 import scala.io.Source
 
-object GenDecsTokenFreq2 extends App {
+object GenDecsTokenFreq3 extends App {
   val separators = """[\d\s\,\.\-;\"\=\<\>\$\&\:\+\%\*\@\?\!\~\^\(\)\[\]`'/¿#_]"""
 
   private def usage(): Unit = {
@@ -25,7 +24,7 @@ object GenDecsTokenFreq2 extends App {
       "fields, creates an frequency index associating each decs token to " +
       "the number of times it appears in the given index.")
     Console.err.println()
-    Console.err.println("usage: GenDecsTokenFreq2 <decsInFile> <decsEncoding> " +
+    Console.err.println("usage: GenDecsTokenFreq3 <decsInFile> <decsEncoding> " +
                         "<inIndexPath> <field1>,<fields2>,..,<fieldN> " +
                         "<freqIndexPath>")
     System.exit(1)
@@ -48,7 +47,6 @@ object GenDecsTokenFreq2 extends App {
     val inReader = IndexReader.open(inDir);
     val outDir = FSDirectory.open(new File(outIndex))
     val outWriter = new IndexWriter(outDir, config)
-    val freq = genDbFreq(inReader, fldNames)
     val set = in.getLines().zipWithIndex.
                                      foldLeft[Set[(String,String,Int)]](Set()) {
       case (st, (line,pos)) => {
@@ -59,7 +57,9 @@ object GenDecsTokenFreq2 extends App {
           case (st2, word) => {
             val word2 = word.trim
             if (word2.isEmpty) st2 else {
-              val qtt = freq.getOrElse(word2, 0)
+              val qtt = fldNames.foldLeft[Int](0) {
+                case (qt,fld) => qt + inReader.docFreq(new Term(fld, word2))
+              }
               st2 + ((split(1),word2,qtt))
             }
           }
@@ -86,41 +86,6 @@ object GenDecsTokenFreq2 extends App {
     in.close()
     inReader.close()
     inDir.close()
-  }
-
-
-  private def genDbFreq(reader: IndexReader,
-                         fldNames: Set[String]): Map[String,Int] = {
-    //val names = scala.collection.mutable.Set(fldNames.toArray:_*)
-    val last = reader.maxDoc() - 1
-    (0 to last).foldLeft[Map[String,Int]](TreeMap()) {
-      case(map,docID) => {
-        if (docID % 10000 == 0) println(s"db-$docID")
-        val doc = reader.document(docID)
-        genDbFreq(doc, fldNames, map)
-      }
-    }
-  }
-
-  private def genDbFreq(doc: Document,
-                         fldNames: Set[String],
-                         imap: Map[String,Int]): Map[String,Int] = {
-    fldNames.foldLeft[Map[String,Int]](imap) {
-      case(map,fname) => {
-        val fld = doc.get(fname)
-        if (fld == null) map else {
-          uniformString(fld).split(separators).foldLeft[Map[String,Int]](map) {
-            case (mp2, word) => {
-              val word2 = word.trim
-              if (word2.isEmpty) mp2 else {
-                val qtt = mp2.getOrElse(word2, 0)
-                mp2 + ((word2, qtt + 1))
-              }
-            }
-          }
-        }
-      }
-    }
   }
 
   private def uniformString(in: String): String = {

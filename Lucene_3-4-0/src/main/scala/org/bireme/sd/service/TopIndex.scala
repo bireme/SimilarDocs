@@ -54,6 +54,18 @@ class TopIndex(sdIndexPath: String,
     }
   }
 
+  def close(): Unit = {
+    sdSearcher.close()
+    freqSearcher.close()
+    topSearcher.close()
+    docSearcher.close()
+    topWriter.close()
+    sdDirectory.close()
+    freqDirectory.close()
+    topDirectory.close()
+    docDirectory.close()
+  }
+
   def addWords(psId: String,
                sentence: String): Unit = {
     val words = simDocs.getWordsFromString(sentence)
