@@ -20,16 +20,15 @@ class DocsIndex(docIndex: String,
   val doc_directory = FSDirectory.open(new File(docIndex))
   val doc_config = new IndexWriterConfig(Version.LUCENE_34, lc_analyzer)
   val doc_writer =  new IndexWriter(doc_directory, doc_config)
-  val doc_searcher = new IndexSearcher(doc_directory)
   val simDocs = new SimilarDocs()
 
   def close(): Unit = {
     doc_writer.close()
-    doc_searcher.close()
     doc_directory.close()
   }
 
   def newRecord(id: String): Unit = {
+    val doc_searcher = new IndexSearcher(doc_directory)
     val doc = new Document()
 
     doc.add(new Field("id", id, Field.Store.YES, Field.Index.ANALYZED))
@@ -40,6 +39,7 @@ class DocsIndex(docIndex: String,
       doc_writer.addDocument(doc)
       doc_writer.commit()
     }
+    doc_searcher.close()
   }
 
   def deleteRecord(id: String): Unit = {
@@ -48,15 +48,18 @@ class DocsIndex(docIndex: String,
   }
 
   def getDocIds(id: String): Set[Int] = {
+    val doc_searcher = new IndexSearcher(doc_directory)
     val topDocs = doc_searcher.search(new TermQuery(new Term("id", id)), 1)
 
-    if (topDocs.totalHits == 0) Set() else {
+    val retSet = if (topDocs.totalHits == 0) Set[Int]() else {
       val doc = doc_searcher.doc(topDocs.scoreDocs(0).doc)
 
       doc.getFieldables("sd_id").foldLeft[Set[Int]] (Set()) {
         case (set, fld) => set + fld.stringValue().toInt
       }
     }
+    doc_searcher.close()
+    retSet
   }
 
   def updateRecordDocs(id: String,
@@ -76,6 +79,7 @@ class DocsIndex(docIndex: String,
 
   def updateNewRecordDocs(minMatch: Int = 3,
                           maxDocs: Int = 10): Unit = {
+    val doc_searcher = new IndexSearcher(doc_directory)
     val topDocs = doc_searcher.search(
                              new TermQuery(new Term("is_new", "true")), 1000000)
 
@@ -87,15 +91,18 @@ class DocsIndex(docIndex: String,
         }
       )
     }
+    doc_searcher.close()
   }
 
   def updateAllRecordDocs(minMatch: Int = 3,
                           maxDocs: Int = 10): Unit = {
+    val doc_searcher = new IndexSearcher(doc_directory)
     val reader = doc_searcher.getIndexReader()
     val max = reader.maxDoc
     (0 to max).filterNot(reader.isDeleted(_)).foreach(
       id => updateRecordDocs(doc_searcher.doc(id).getFieldable("id").
                                               stringValue(),  minMatch, maxDocs)
     )
+    doc_searcher.close()
   }
 }
