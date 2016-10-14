@@ -30,13 +30,11 @@ class TopIndex(sdIndexPath: String,
   val topDirectory = FSDirectory.open(new File(topIndexPath))
   val topConfig = new IndexWriterConfig(Version.LUCENE_34, lcAnalyzer)
   val topWriter =  new IndexWriter(topDirectory, topConfig)
-  val topSearcher = new IndexSearcher(topDirectory)
-  val docDirectory = FSDirectory.open(new File(docIndexPath))
-  val docSearcher = new IndexSearcher(docDirectory)
-  val docIndex = new DocsIndex(sdIndexPath, docSearcher, freqSearcher, idxFldName)
+  val docIndex = new DocsIndex(docIndexPath, sdSearcher, freqSearcher, idxFldName)
   val simDocs = new SimilarDocs()
 
   def delRecord(psId:String): Unit = {
+    val topSearcher = new IndexSearcher(topDirectory)
     val topDocs = topSearcher.search(new TermQuery(new Term("id", psId)), 1)
 
     if (topDocs.totalHits != 0) {
@@ -52,18 +50,17 @@ class TopIndex(sdIndexPath: String,
       topWriter.deleteDocuments(new Term("id", psId))
       topWriter.commit()
     }
+    topSearcher.close()
   }
 
   def close(): Unit = {
     sdSearcher.close()
     freqSearcher.close()
-    topSearcher.close()
-    docSearcher.close()
     topWriter.close()
     sdDirectory.close()
     freqDirectory.close()
     topDirectory.close()
-    docDirectory.close()
+    docIndex.close()
   }
 
   def addWords(psId: String,
@@ -86,9 +83,10 @@ class TopIndex(sdIndexPath: String,
   def getSimDocs(psId: String,
                  outFlds: Set[String],
                  maxDocs: Int = 10): List[Map[String,List[String]]] = {
+    val topSearcher = new IndexSearcher(topDirectory)
     val topDocs = topSearcher.search(new TermQuery(new Term("id", psId)), 1)
 
-    if (topDocs.totalHits == 0) List() else {
+    val list = if (topDocs.totalHits == 0) List() else {
       val doc = topSearcher.doc(topDocs.scoreDocs(0).doc)
       val docs = doc.getFieldables("doc_id")
       val docIds = docs.foldLeft[List[Set[Int]]] (List()) {
@@ -105,6 +103,8 @@ class TopIndex(sdIndexPath: String,
         }
       }
     }
+    topSearcher.close()
+    list
   }
 
   def getSimDocsXml(psId: String,

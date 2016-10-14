@@ -33,9 +33,9 @@ object TopIndexTestService extends App {
   val getSimDocs = parameters.get("getSimDocs")
   val delPSRecord = parameters.get("delPSRecord")
   val docIndexPath = otherIndexPath +
-                    (if (otherIndexPath.endsWith("/")) "" else "\\") + "docIndex"
+                    (if (otherIndexPath.endsWith("/")) "" else "/") + "docIndex"
   val topIndexPath = otherIndexPath +
-                    (if (otherIndexPath.endsWith("/")) "" else "\\") + "topIndex"
+                    (if (otherIndexPath.endsWith("/")) "" else "/") + "topIndex"
   val topIndex = new TopIndex(sdIndexPath, docIndexPath, freqIndexPath,
                               topIndexPath, Set("ti", "ab"))
   addWords match {

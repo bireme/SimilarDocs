@@ -33,9 +33,9 @@ object UpdaterBatchService extends App {
   val otherIndexPath = parameters("otherIndexPath")
   val updAllDay = parameters("updAllDay").toInt
   val docIndexPath = otherIndexPath +
-                    (if (otherIndexPath.endsWith("/")) "" else "\\") + "docIndex"
+                    (if (otherIndexPath.endsWith("/")) "" else "/") + "docIndex"
   val topIndexPath = otherIndexPath +
-                    (if (otherIndexPath.endsWith("/")) "" else "\\") + "topIndex"
+                    (if (otherIndexPath.endsWith("/")) "" else "/") + "topIndex"
   val updateAll = (Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == updAllDay)
   val docDirectory = FSDirectory.open(new File(docIndexPath))
   val docSearcher = new IndexSearcher(docDirectory)
