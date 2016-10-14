@@ -107,6 +107,23 @@ class TopIndex(sdIndexPath: String,
     }
   }
 
+  def getSimDocsXml(psId: String,
+                    outFlds: String): String = {
+    val outFields = outFlds.trim().split(" *\\, *").toSet
+
+    getSimDocs(psId, outFields).foldLeft[String]("<documents>") {
+      case (str,map) => map.foldLeft[String](str) {
+        case (str2, (tag,lst)) => lst.size match {
+          case 0 => str2
+          case 1 => str2 + s"<$tag>${lst(0)}</$tag>"
+          case _ => str2 + s"<${tag}_list>" + lst.foldLeft[String](str2) {
+            case (str3,elem) => str3 + s"<$tag>$elem</$tag>"
+          } + s"</${tag}_list>"
+        }
+      }
+    } + "</documents>"
+  }
+
   private def limitDocs(docs: List[Set[Int]],
                         maxDocs: Int,
                         ids: List[Int]): List[Int] = {

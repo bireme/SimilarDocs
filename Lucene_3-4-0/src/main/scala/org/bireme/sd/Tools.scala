@@ -1,5 +1,6 @@
 package org.bireme.sd
 
+import scala.collection.JavaConversions._
 import java.io.File
 import org.apache.lucene.index.{CheckIndex,IndexReader,TermEnum}
 import org.apache.lucene.store.FSDirectory
@@ -14,17 +15,35 @@ object Tools extends App {
 
   showIndexInfo(args(0))
   showTerms(args(0))
+  showDocuments(args(0))
 
   def showTerms(indexName: String): Unit = {
     val directory = FSDirectory.open(new File(indexName))
-    val ireader = IndexReader.open(directory);
+    val ireader = IndexReader.open(directory)
     val terms = ireader.terms()
 
     if (terms != null) {
       showTerms(terms)
       terms.close()
     }
+    ireader.close()
     directory.close()
+  }
+
+  def showDocuments(indexName: String): Unit = {
+    val directory = FSDirectory.open(new File(indexName))
+    val ireader = IndexReader.open(directory)
+    val last = ireader.maxDoc() - 1
+
+    (1 until last).foreach{
+      id => if (! ireader.isDeleted(id)) {
+        println(s"======================= $id ========================")
+        val doc = ireader.document(id)
+        doc.getFields().foreach {
+          fld => println(s"${fld.name()}: ${fld.stringValue()}")
+        }
+      }
+    }
   }
 
   private def showIndexInfo(indexName: String): Unit = {
