@@ -71,9 +71,11 @@ class TopIndex(sdIndexPath: String,
 
   def addWords(psId: String,
                words: Set[String]): Unit = {
-    val wrds = simDocs.getWords(words, sdSearcher).mkString(" ").toLowerCase()
+    val wrds = TreeSet(simDocs.getWords(words, freqSearcher): _*).mkString(" ").
+                                                                   toLowerCase()
     val doc = new Document()
 
+    topWriter.deleteDocuments(new Term("id", psId))
     doc.add(new Field("id", psId, Field.Store.YES, Field.Index.NOT_ANALYZED))
     doc.add(new Field("doc_id", wrds, Field.Store.YES, Field.Index.NOT_ANALYZED))
     topWriter.addDocument(doc)

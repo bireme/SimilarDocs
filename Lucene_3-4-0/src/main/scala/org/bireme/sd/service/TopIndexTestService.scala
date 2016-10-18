@@ -42,7 +42,7 @@ object TopIndexTestService extends App {
     case Some(words) => topIndex.addWords(psId, words.trim().split(" *\\, *")
                                                                          .toSet)
     case None => getSimDocs match {
-      case Some(fields) => topIndex.getSimDocsXml(psId, fields.trim())
+      case Some(fields) => println("Docs=\n" + topIndex.getSimDocsXml(psId, fields.trim()))
       case None => delPSRecord match {
         case Some(_) => topIndex.delRecord(psId)
         case None => usage()
