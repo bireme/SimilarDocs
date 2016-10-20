@@ -75,11 +75,12 @@ class TopIndex(sdIndexPath: String,
                                                                    toLowerCase()
     val doc = new Document()
 
+    docIndex.newRecord(wrds)
     topWriter.deleteDocuments(new Term("id", psId))
     doc.add(new Field("id", psId, Field.Store.YES, Field.Index.NOT_ANALYZED))
     doc.add(new Field("doc_id", wrds, Field.Store.YES, Field.Index.NOT_ANALYZED))
     topWriter.addDocument(doc)
-    topWriter.commit()
+    topWriter.commit()    
   }
 
   def getSimDocs(psId: String,
@@ -97,11 +98,13 @@ class TopIndex(sdIndexPath: String,
           if (ids.isEmpty) lst else lst :+ ids
         }
       }
-      limitDocs(docIds, maxDocs, List()).
+      if (docIds.isEmpty) List() else {
+        limitDocs(docIds, maxDocs, List()).
                               foldLeft[List[Map[String,List[String]]]](List()) {
-        case (lst, id) => {
-          val fields = getDocFields(id, sdSearcher, outFlds)
-          if (fields.isEmpty) lst else lst :+ fields
+          case (lst, id) => {
+            val fields = getDocFields(id, sdSearcher, outFlds)
+            if (fields.isEmpty) lst else lst :+ fields
+          }
         }
       }
     }

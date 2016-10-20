@@ -10,8 +10,8 @@ object UpdaterBatchService extends App {
   private def usage(): Unit = {
     Console.err.println("usage: UpdateBatchService:\n" +
       "\n\t-sdIndexPath=<path>     : documents Lucene index path" +
+      "\n\t-docIndexPath=<path>    : doc indexes directory path" +
       "\n\t-freqIndexPath=<path>   : decs frequency Lucene index path" +
-      "\n\t-otherIndexPath=<path>  : other indexes directory path" +
       "\n\t-updAllDay=<day-number> : day to update all similar documents " +
                                        "index 1-sunday 7-saturday"
     )
@@ -27,23 +27,21 @@ object UpdaterBatchService extends App {
       else map + ((split(0).substring(2), ""))
     }
   }
+  val docIndexPath = parameters("docIndexPath")
 
   val sdIndexPath = parameters("sdIndexPath")
+  val sdDirectory = FSDirectory.open(new File(sdIndexPath))
+  val sdSearcher = new IndexSearcher(sdDirectory)
+
   val freqIndexPath = parameters("freqIndexPath")
-  val otherIndexPath = parameters("otherIndexPath")
-  val updAllDay = parameters("updAllDay").toInt
-  val docIndexPath = otherIndexPath +
-                    (if (otherIndexPath.endsWith("/")) "" else "/") + "docIndex"
-  val topIndexPath = otherIndexPath +
-                    (if (otherIndexPath.endsWith("/")) "" else "/") + "topIndex"
-  val updateAll = (Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == updAllDay)
-  val docDirectory = FSDirectory.open(new File(docIndexPath))
-  val docSearcher = new IndexSearcher(docDirectory)
   val freqDirectory = FSDirectory.open(new File(freqIndexPath))
   val freqSearcher = new IndexSearcher(freqDirectory)
-  val idxFldName = Set("ti", "ab")
-  val docIndex = new DocsIndex(sdIndexPath, docSearcher, freqSearcher, idxFldName)
 
+  val updAllDay = parameters("updAllDay").toInt
+  val updateAll = (Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == updAllDay)
+  val idxFldName = Set("ti", "ab")
+
+  val docIndex = new DocsIndex(docIndexPath, sdSearcher, freqSearcher, idxFldName)
   if (updateAll) docIndex.updateAllRecordDocs()
   else docIndex.updateNewRecordDocs()
 

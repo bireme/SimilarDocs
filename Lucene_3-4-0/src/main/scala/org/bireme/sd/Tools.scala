@@ -35,7 +35,7 @@ object Tools extends App {
     val ireader = IndexReader.open(directory)
     val last = ireader.maxDoc() - 1
 
-    (1 until last).foreach{
+    (0 to last).foreach {
       id => if (! ireader.isDeleted(id)) {
         println(s"======================= $id ========================")
         val doc = ireader.document(id)
@@ -57,9 +57,7 @@ object Tools extends App {
 
   private def showTerms(terms: TermEnum): Unit = {
     val term = terms.term()
-    if (terms.next()) {
-      println(s"[$term]")
-      showTerms(terms)
-    }
+    if (term != null) println(s"[$term]")
+    if (terms.next()) showTerms(terms)
   }
 }

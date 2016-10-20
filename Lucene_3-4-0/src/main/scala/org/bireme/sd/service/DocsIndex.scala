@@ -21,6 +21,7 @@ class DocsIndex(docIndex: String,
   val doc_config = new IndexWriterConfig(Version.LUCENE_34, lc_analyzer)
   val doc_writer =  new IndexWriter(doc_directory, doc_config)
   val simDocs = new SimilarDocs()
+  doc_writer.commit()
 
   def close(): Unit = {
     doc_writer.close()
@@ -29,11 +30,10 @@ class DocsIndex(docIndex: String,
 
   def newRecord(id: String): Unit = {
     val doc_searcher = new IndexSearcher(doc_directory)
-    val doc = new Document()
-
-    doc.add(new Field("id", id, Field.Store.YES, Field.Index.ANALYZED))
     if (doc_searcher.search(new TermQuery(new Term("id", id)), 1).
-                                                              totalHits == 0) {
+                                                               totalHits == 0) {
+      val doc = new Document()
+      doc.add(new Field("id", id, Field.Store.YES, Field.Index.ANALYZED))
       doc.add(new Field("is_new", "true", Field.Store.YES,
                                           Field.Index.NOT_ANALYZED))
       doc_writer.addDocument(doc)
@@ -71,8 +71,8 @@ class DocsIndex(docIndex: String,
 
     doc.add(new Field("id", id, Field.Store.YES, Field.Index.ANALYZED))
     ids.foreach(sd_id =>
-            doc.add(new NumericField("sd_id", sd_id, Field.Store.YES, false)))
-
+      doc.add(new NumericField("sd_id", Field.Store.YES, false).
+                                                            setIntValue(sd_id)))
     doc_writer.updateDocument(new Term("id", id), doc)
     doc_writer.commit()
   }
@@ -99,7 +99,7 @@ class DocsIndex(docIndex: String,
     val doc_searcher = new IndexSearcher(doc_directory)
     val reader = doc_searcher.getIndexReader()
     val max = reader.maxDoc
-    (0 to max).filterNot(reader.isDeleted(_)).foreach(
+    (0 until max).filterNot(reader.isDeleted(_)).foreach (
       id => updateRecordDocs(doc_searcher.doc(id).getFieldable("id").
                                               stringValue(),  minMatch, maxDocs)
     )
