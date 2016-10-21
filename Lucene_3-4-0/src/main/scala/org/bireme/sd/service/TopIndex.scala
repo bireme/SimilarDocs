@@ -30,6 +30,7 @@ class TopIndex(sdIndexPath: String,
   val topDirectory = FSDirectory.open(new File(topIndexPath))
   val topConfig = new IndexWriterConfig(Version.LUCENE_34, lcAnalyzer)
   val topWriter =  new IndexWriter(topDirectory, topConfig)
+  val docDirectory = FSDirectory.open(new File(docIndexPath))
   val docIndex = new DocsIndex(docIndexPath, sdSearcher, freqSearcher, idxFldName)
   val simDocs = new SimilarDocs()
 
@@ -60,27 +61,47 @@ class TopIndex(sdIndexPath: String,
     sdDirectory.close()
     freqDirectory.close()
     topDirectory.close()
+    docDirectory.close()
     docIndex.close()
   }
 
   def addWords(psId: String,
-               sentence: String): Unit = {
-    val words = simDocs.getWordsFromString(sentence)
-    addWords(psId, words)
+               sentences: Set[String]): Unit = {
+    val words = sentences.map(simDocs.getWordsFromString(_))
+    addWords2(psId, words)
   }
 
-  def addWords(psId: String,
-               words: Set[String]): Unit = {
-    val wrds = TreeSet(simDocs.getWords(words, freqSearcher): _*).mkString(" ").
-                                                                   toLowerCase()
+  def addWords2(psId: String,
+               words: Set[Set[String]]): Unit = {
+    val words2:Set[String] = words.map(set => TreeSet(simDocs.getWords(set, freqSearcher): _*).
+                                                    mkString(" ").toLowerCase())
+    val topSearcher = new IndexSearcher(topDirectory)
     val doc = new Document()
-
-    docIndex.newRecord(wrds)
-    topWriter.deleteDocuments(new Term("id", psId))
     doc.add(new Field("id", psId, Field.Store.YES, Field.Index.NOT_ANALYZED))
-    doc.add(new Field("doc_id", wrds, Field.Store.YES, Field.Index.NOT_ANALYZED))
-    topWriter.addDocument(doc)
-    topWriter.commit()    
+
+    val topDocs = topSearcher.search(new TermQuery(new Term("id", psId)), 1)
+    val isNew = (topDocs.totalHits == 0)
+    if  (!isNew) {
+      val docSearcher = new IndexSearcher(docDirectory)
+      val doc = topSearcher.doc(topDocs.scoreDocs(0).doc)
+      val oldDocs:Set[String] = doc.getFieldables("doc_id").map(_.stringValue()).toSet
+      (oldDocs &~ words2).foreach(did => {
+        val topDocs2 = docSearcher.search(
+                                        new TermQuery(new Term("id", did)), 1)
+        if (topDocs2.totalHits == 1) docIndex.deleteRecord(did)
+        else {} // Do nothing
+      })
+    }
+    words2.foreach { wrds =>
+      doc.add(new Field("doc_id", wrds, Field.Store.YES,
+                                                     Field.Index.NOT_ANALYZED))
+      docIndex.newRecord(wrds)
+    }
+    if (isNew) topWriter.addDocument(doc)
+    else topWriter.updateDocument(new Term("id", psId), doc)
+
+    topWriter.commit()
+    topSearcher.close()
   }
 
   def getSimDocs(psId: String,

@@ -9,7 +9,8 @@ object TopIndexTestService extends App {
       "\n\t-otherIndexPath=<path>      : other indexes directory path" +
       "\n\t-psId=<id>                  : personal service identification" +
       "\n\t\n--- and one of the following options: ---\n" +
-      "\n\t-addWords=<wrd1>,<wrd>,...  : add words to be used to look for sim docs" +
+      "\n\t-addWords=<wrdSet1>|<wrdSet2>|...  : add words to be used to look for sim docs." +
+      "\n\t                            : <wrdSet> = <wrd1>,<word2>,..." +
       "\n\t-getSimDocs=<fld>,<fld>,... : get fields from similar documents" +
       "\n\t--delPSRecord               : delete personal service record"
     )
@@ -39,10 +40,13 @@ object TopIndexTestService extends App {
   val topIndex = new TopIndex(sdIndexPath, docIndexPath, freqIndexPath,
                               topIndexPath, Set("ti", "ab"))
   addWords match {
-    case Some(words) => topIndex.addWords(psId, words.trim().split(" *\\, *")
-                                                                         .toSet)
+    case Some(words) => {
+      val set = words.trim().split(" *\\| *").map(_.split(" *\\, *").toSet).toSet
+      topIndex.addWords2(psId, set)
+    }
     case None => getSimDocs match {
-      case Some(fields) => println("Docs=\n" + topIndex.getSimDocsXml(psId, fields.trim()))
+      case Some(fields) => println("Docs=\n" + topIndex.getSimDocsXml(psId,
+                                                                 fields.trim()))
       case None => delPSRecord match {
         case Some(_) => topIndex.delRecord(psId)
         case None => usage()
