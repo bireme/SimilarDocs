@@ -3,7 +3,7 @@ package org.bireme.sd.service
 import collection.JavaConverters._
 import java.io.{File,IOException}
 
-import org.apache.lucene.document.{Document,Field, NumericField}
+import org.apache.lucene.document.{Document, Field, Fieldable, NumericField}
 import org.apache.lucene.index.{IndexWriter,IndexWriterConfig, Term}
 import org.apache.lucene.search.{IndexSearcher, TermQuery}
 import org.apache.lucene.store.FSDirectory
@@ -33,6 +33,8 @@ class TopIndex(sdIndexPath: String,
   val docDirectory = FSDirectory.open(new File(docIndexPath))
   val docIndex = new DocsIndex(docIndexPath, sdSearcher, freqSearcher, idxFldName)
   val simDocs = new SimilarDocs()
+
+  topWriter.commit()
 
   def delRecord(psId:String): Unit = {
     val topSearcher = new IndexSearcher(topDirectory)
@@ -73,7 +75,8 @@ class TopIndex(sdIndexPath: String,
 
   def addWords2(psId: String,
                words: Set[Set[String]]): Unit = {
-    val words2:Set[String] = words.map(set => TreeSet(simDocs.getWords(set, freqSearcher): _*).
+    val words2:Set[String] = words.map(set => TreeSet(
+                                       simDocs.getWords(set, freqSearcher): _*).
                                                     mkString(" ").toLowerCase())
     val topSearcher = new IndexSearcher(topDirectory)
     val doc = new Document()
@@ -84,7 +87,8 @@ class TopIndex(sdIndexPath: String,
     if  (!isNew) {
       val docSearcher = new IndexSearcher(docDirectory)
       val doc = topSearcher.doc(topDocs.scoreDocs(0).doc)
-      val oldDocs:Set[String] = doc.getFieldables("doc_id").map(_.stringValue()).toSet
+      val oldDocs:Set[String] = doc.getFieldables("doc_id").
+                                                       map(_.stringValue()).toSet
       (oldDocs &~ words2).foreach(did => {
         val topDocs2 = docSearcher.search(
                                         new TermQuery(new Term("id", did)), 1)
@@ -134,18 +138,22 @@ class TopIndex(sdIndexPath: String,
   }
 
   def getSimDocsXml(psId: String,
-                    outFlds: String): String = {
-    val outFields = outFlds.trim().split(" *\\, *").toSet
+                    outFields: Set[String]): String = {
+    val head = """<?xml version="1.0" encoding="UTF-8"?>"<documents>""""
 
-    getSimDocs(psId, outFields).foldLeft[String]("<documents>") {
-      case (str,map) => map.foldLeft[String](str) {
-        case (str2, (tag,lst)) => lst.size match {
-          case 0 => str2
-          case 1 => str2 + s"<$tag>${lst(0)}</$tag>"
-          case _ => str2 + s"<${tag}_list>" + lst.foldLeft[String](str2) {
-            case (str3,elem) => str3 + s"<$tag>$elem</$tag>"
-          } + s"</${tag}_list>"
-        }
+    getSimDocs(psId, outFields).foldLeft[String](head) {
+      case (str,map) => {
+        s"${str}<document>" + map.foldLeft[String]("") {
+          case (str2, (tag,lst)) => {
+            lst.size match {
+              case 0 => str2
+              case 1 => str2 + s"<$tag>${lst(0)}</$tag>"
+              case _ => str2 + s"<${tag}_list>" + lst.foldLeft[String]("") {
+                case (str3,elem) => s"$str3<$tag>$elem</$tag>"
+              } + s"</${tag}_list>"
+            }
+          }
+        } + "</document>"
       }
     } + "</documents>"
   }
@@ -173,7 +181,15 @@ class TopIndex(sdIndexPath: String,
                            fields: Set[String]): Map[String,List[String]] = {
     val doc = searcher.doc(id)
 
-    fields.foldLeft[Map[String,List[String]]](Map()) {
+    if (fields.isEmpty) { // put all fields
+      List(doc.getFields()).foldLeft[Map[String,List[String]]](Map()) {
+        case  (map, field:Fieldable) => {
+          val name = field.name()
+          val lst = map.getOrElse(name,List[String]())
+          map + ((name, field.stringValue() :: lst))
+        }
+      }
+    } else fields.foldLeft[Map[String,List[String]]](Map()) {
       case  (map, field) => {
         val flds = doc.getFieldables(field)
         if (flds.isEmpty) map else {
