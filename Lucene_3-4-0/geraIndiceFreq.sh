@@ -1,3 +1,5 @@
+#!/bin/bash
+
 HOME=/home/heitor/sbt-projects/SimilarDocs/Lucene_3-4-0
 PORTAL_ORG=/home/javaapps/iahx-server/indexes/portalorg/main/data/index
 

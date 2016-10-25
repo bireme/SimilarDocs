@@ -1,3 +1,5 @@
+#!/bin/bash
+
 HOME=/home/heitor/sbt-projects/SimilarDocs/Lucene_3-4-0
 DECS_HOME=/bases/org.000/tabs
 
