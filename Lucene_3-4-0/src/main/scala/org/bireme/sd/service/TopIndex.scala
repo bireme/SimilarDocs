@@ -97,7 +97,12 @@ class TopIndex(sdIndexPath: String,
                          words: Set[String]): Unit = {
     val words2 = TreeSet(simDocs.getWords(words, freqSearcher): _*).
                                                                    mkString(" ")
-    doc.removeField(id)
+    val field = doc.getFieldable(id)
+    if (field != null) {
+      val did = field.stringValue()
+      if (did != null) docIndex.delRecIfUnique(did)
+      doc.removeField(id)
+    }
     doc.add(new Field(id, words2, Field.Store.YES, Field.Index.NOT_ANALYZED))
     docIndex.newRecord(words2)
   }

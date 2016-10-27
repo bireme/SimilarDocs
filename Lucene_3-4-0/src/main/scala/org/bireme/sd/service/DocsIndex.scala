@@ -47,6 +47,16 @@ class DocsIndex(docIndex: String,
     doc_writer.commit()
   }
 
+  def delRecIfUnique(id: String): Unit = {
+    val doc_searcher = new IndexSearcher(doc_directory)
+    if (doc_searcher.search(new TermQuery(new Term("id", id)), 2).
+                                                               totalHits == 1) {
+      doc_writer.deleteDocuments(new Term("id", id))
+      doc_writer.commit()
+    }
+    doc_searcher.close()
+  }
+
   def getDocIds(id: String): Set[Int] = {
     val doc_searcher = new IndexSearcher(doc_directory)
     val topDocs = doc_searcher.search(new TermQuery(new Term("id", id)), 1)

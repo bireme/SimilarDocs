@@ -1,4 +1,3 @@
-
 package org.bireme.sd.service
 
 object TopIndexTestService extends App {
@@ -10,9 +9,9 @@ object TopIndexTestService extends App {
       "\n\t-psId=<id>                  : personal service identification" +
       "\n\t\n--- and one of the following options: ---\n" +
       "\n\t-addProfile=<name>=<sentence> : add user profile" +
-      "\n\t-deleteProfile=<name>       : delete user profile" +
+      "\n\t-deleteProfile=<name>         : delete user profile" +
       "\n\t-getSimDocs=<prof>,<prof>,... : get similar documents from profiles" +
-      "\n\t--showProfiles              : show user profiles"
+      "\n\t--showProfiles                : show user profiles"
     )
     System.exit(1)
   }
@@ -51,7 +50,11 @@ object TopIndexTestService extends App {
       case None => getSimDocs match {
         case Some(fields) => println(topIndex.getSimDocsXml(psId, Set(),
                                       fields.trim().split(" *\\, *").toSet, 10))
-        case None => if (showProfiles) topIndex.getProfiles(psId) else usage()
+        case None => if (showProfiles) {
+          topIndex.getProfiles(psId).foreach {
+            case(id,words) => println(s"$id => ${words.mkString(" ")}")
+          }
+        } else usage()
       }
     }
   }
