@@ -1,6 +1,6 @@
 package org.bireme.sd.service
 
-import collection.JavaConverters._
+import scala.collection.JavaConversions._
 import java.io.{File,IOException}
 
 import org.apache.lucene.document.{Document, Field, Fieldable, NumericField}
@@ -20,7 +20,6 @@ class TopIndex(sdIndexPath: String,
                freqIndexPath: String,
                topIndexPath: String,
                idxFldName: Set[String] = Set("ti", "ab")) {
-
   val sdAnalyzer = new SDAnalyzer(SDTokenizer.defValidTokenChars, true)
   val lcAnalyzer = new LowerCaseAnalyzer(true)
   val sdDirectory = FSDirectory.open(new File(sdIndexPath))
@@ -36,26 +35,6 @@ class TopIndex(sdIndexPath: String,
 
   topWriter.commit()
 
-  def delRecord(psId:String): Unit = {
-    val topSearcher = new IndexSearcher(topDirectory)
-    val topDocs = topSearcher.search(new TermQuery(new Term("id", psId)), 1)
-
-    if (topDocs.totalHits != 0) {
-      val doc = topSearcher.doc(topDocs.scoreDocs(0).doc)
-       doc.getFieldables("doc_id").foreach {
-        field => {
-          val docId = field.stringValue()
-          val topDocs = topSearcher.search(new TermQuery(
-                                                  new Term("doc_id", docId)), 1)
-          if (topDocs.totalHits == 1) docIndex.deleteRecord(docId)
-        }
-      }
-      topWriter.deleteDocuments(new Term("id", psId))
-      topWriter.commit()
-    }
-    topSearcher.close()
-  }
-
   def close(): Unit = {
     sdSearcher.close()
     freqSearcher.close()
@@ -67,81 +46,126 @@ class TopIndex(sdIndexPath: String,
     docIndex.close()
   }
 
-  def addWords(psId: String,
-               sentences: Set[String]): Unit = {
-    val words = sentences.map(simDocs.getWordsFromString(_))
-    addWords2(psId, words)
+  def addProfiles(psId: String,
+                  profiles: Map[String,String]): Unit = {
+    val profs = profiles.map {
+      case(id,sentence) => (id, simDocs.getWordsFromString(sentence))
+    }
+    addProfiles2(psId, profs)
   }
 
-  def addWords2(psId: String,
-               words: Set[Set[String]]): Unit = {
-    val words2:Set[String] = words.map(set => TreeSet(
-                                       simDocs.getWords(set, freqSearcher): _*).
-                                                    mkString(" ").toLowerCase())
-    val topSearcher = new IndexSearcher(topDirectory)
+  def addProfiles2(psId: String,
+                   profiles: Map[String,Set[String]]): Unit = {
     val doc = new Document()
     doc.add(new Field("id", psId, Field.Store.YES, Field.Index.NOT_ANALYZED))
+    profiles.foreach {case(id,words) => addProfile(doc, id, words)}
 
-    val topDocs = topSearcher.search(new TermQuery(new Term("id", psId)), 1)
-    val isNew = (topDocs.totalHits == 0)
-    if  (!isNew) {
-      val docSearcher = new IndexSearcher(docDirectory)
-      val doc = topSearcher.doc(topDocs.scoreDocs(0).doc)
-      val oldDocs:Set[String] = doc.getFieldables("doc_id").
-                                                       map(_.stringValue()).toSet
-      (oldDocs &~ words2).foreach(did => {
-        val topDocs2 = docSearcher.search(
-                                        new TermQuery(new Term("id", did)), 1)
-        if (topDocs2.totalHits == 1) docIndex.deleteRecord(did)
-        else {} // Do nothing
-      })
+    getDocument(psId, topDirectory) match {
+      case Some(oldDoc) => topWriter.updateDocument(new Term("id", psId), doc)
+      case None => topWriter.addDocument(doc)
     }
-    words2.foreach { wrds =>
-      doc.add(new Field("doc_id", wrds, Field.Store.YES,
-                                                     Field.Index.NOT_ANALYZED))
-      docIndex.newRecord(wrds)
-    }
-    if (isNew) topWriter.addDocument(doc)
-    else topWriter.updateDocument(new Term("id", psId), doc)
-
     topWriter.commit()
-    topSearcher.close()
   }
 
-  def getSimDocs(psId: String,
-                 outFlds: Set[String],
-                 maxDocs: Int = 10): List[Map[String,List[String]]] = {
-    val topSearcher = new IndexSearcher(topDirectory)
-    val topDocs = topSearcher.search(new TermQuery(new Term("id", psId)), 1)
+  def addProfile(psId: String,
+                 id: String,
+                 sentence: String): Unit = {
+    val words = simDocs.getWordsFromString(sentence)
+    addProfile(psId, id, words)
+  }
 
-    val list = if (topDocs.totalHits == 0) List() else {
-      val doc = topSearcher.doc(topDocs.scoreDocs(0).doc)
-      val docs = doc.getFieldables("doc_id")
-      val docIds = docs.foldLeft[List[Set[Int]]] (List()) {
-        case (lst,id) => {
-          val ids = docIndex.getDocIds(id.stringValue())
-          if (ids.isEmpty) lst else lst :+ ids
-        }
+  def addProfile(psId: String,
+                 id: String,
+                 words: Set[String]): Unit = {
+    getDocument(psId, topDirectory) match {
+      case Some(doc) => {
+        addProfile(doc, id, words)
+        topWriter.updateDocument(new Term("id", psId), doc)
       }
-      if (docIds.isEmpty) List() else {
-        limitDocs(docIds, maxDocs, List()).
-                              foldLeft[List[Map[String,List[String]]]](List()) {
-          case (lst, id) => {
-            val fields = getDocFields(id, sdSearcher, outFlds)
-            if (fields.isEmpty) lst else lst :+ fields
-          }
-        }
+      case None => {
+        val doc = new Document()
+        doc.add(new Field("id", psId, Field.Store.YES, Field.Index.NOT_ANALYZED))
+        addProfile(doc, id, words)
+        topWriter.addDocument(doc)
       }
     }
-    topSearcher.close()
-    list
+    topWriter.commit()
+  }
+
+  private def addProfile(doc: Document,
+                         id: String,
+                         words: Set[String]): Unit = {
+    val words2 = TreeSet(simDocs.getWords(words, freqSearcher): _*).
+                                                                   mkString(" ")
+    doc.removeField(id)
+    doc.add(new Field(id, words2, Field.Store.YES, Field.Index.NOT_ANALYZED))
+    docIndex.newRecord(words2)
+  }
+
+  def deleteProfiles(psId: String): Unit = {
+    getDocument(psId, topDirectory) match {
+      case Some(doc) => {
+        doc.getFields().foreach(field => deleteProfile(doc, field.name()))
+        topWriter.deleteDocuments(new Term("id", psId))
+        topWriter.commit()
+      }
+      case None => ()
+    }
+  }
+
+  def deleteProfile(psId: String,
+                    profId: String): Unit = {
+    getDocument(psId, topDirectory) match {
+      case Some(doc) => {
+        if (deleteProfile(doc, profId))
+          topWriter.deleteDocuments(new Term("id", psId))
+         else topWriter.updateDocument(new Term("id", psId), doc)
+        topWriter.commit()
+      }
+      case None => ()
+    }
+  }
+
+  private def deleteProfile(doc: Document,
+                            id: String): Boolean = {
+    val size = doc.getFields().size()
+    val otherId = doc.get(id)
+    if (id.equals("id") || (otherId == null)) {
+      size == 1
+    } else {
+      doc.removeField(id)
+      deleteRelated(otherId)
+      (size - 1) == 1
+    }
+  }
+
+  private def deleteRelated(id: String): Unit = {
+    val docSearcher = new IndexSearcher(docDirectory)
+    val topDocs = docSearcher.search(new TermQuery(new Term("id", id)), 2)
+
+    if (topDocs.totalHits == 1) docIndex.deleteRecord(id)
+    docSearcher.close()
+  }
+
+  def getProfiles(psId: String): Map[String,Set[String]] = {
+    getDocument(psId, topDirectory) match {
+      case Some(doc) => doc.getFields.foldLeft[Map[String,Set[String]]](Map()) {
+        case (map, field) =>
+          val id = field.name()
+          if (id.equals("id")) map
+          else map + ((id, field.stringValue().split(" ").toSet))
+      }
+      case None => Map()
+    }
   }
 
   def getSimDocsXml(psId: String,
-                    outFields: Set[String]): String = {
-    val head = """<?xml version="1.0" encoding="UTF-8"?>"<documents>""""
+                    profiles: Set[String],
+                    outFields: Set[String],
+                    maxDocs: Int): String = {
+    val head = """<?xml version="1.0" encoding="UTF-8"?><documents>"""
 
-    getSimDocs(psId, outFields).foldLeft[String](head) {
+    getSimDocs(psId, profiles, outFields, maxDocs).foldLeft[String](head) {
       case (str,map) => {
         s"${str}<document>" + map.foldLeft[String]("") {
           case (str2, (tag,lst)) => {
@@ -156,6 +180,35 @@ class TopIndex(sdIndexPath: String,
         } + "</document>"
       }
     } + "</documents>"
+  }
+
+  def getSimDocs(psId: String,
+                 outFlds: Set[String],
+                 profiles: Set[String],
+                 maxDocs: Int): List[Map[String,List[String]]] = {
+    getDocument(psId, topDirectory) match {
+      case Some(doc) => {
+        val docIds = profiles.foldLeft[List[Set[Int]]](List()) {
+          case (lst, id) => {
+            val did = doc.getFieldable(id)
+            if (did == null) lst else {
+              val ids = docIndex.getDocIds(did.stringValue())
+              if (ids.isEmpty) lst else lst :+ ids
+            }
+          }
+        }
+        if (docIds.isEmpty) List() else {
+          limitDocs(docIds, maxDocs, List()).
+                              foldLeft[List[Map[String,List[String]]]](List()) {
+            case (lst, id) => {
+              val fields = getDocFields(id, sdSearcher, outFlds)
+              if (fields.isEmpty) lst else lst :+ fields
+            }
+          }
+        }
+      }
+      case None => List()
+    }
   }
 
   private def limitDocs(docs: List[Set[Int]],
@@ -199,6 +252,25 @@ class TopIndex(sdIndexPath: String,
           map + ((field, lst))
         }
       }
+    }
+  }
+
+  private def getDocument(id: String,
+                          dir: FSDirectory): Option[Document] = {
+    val searcher = new IndexSearcher(dir)
+    val doc = getDocument(id, searcher)
+
+    searcher.close()
+    doc
+  }
+
+  private def getDocument(id: String,
+                          searcher: IndexSearcher): Option[Document] = {
+    val docs = searcher.search(new TermQuery(new Term("id", id)), 1)
+
+    docs.totalHits match {
+      case 0 => None
+      case _ => Some(searcher.doc(docs.scoreDocs(0).doc))
     }
   }
 

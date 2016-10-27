@@ -17,9 +17,7 @@ echo "Cria index com tokens do Decs e suas respectivas frequencias no portal org
 sbt "run-main org.bireme.sd.GenDecsTokenFreq3 decsTokens.txt utf-8 $SD_INDEX_PATH ti,ab $OTHER_INDEX_PATH/decs"
 rm decsTokens.txt
 
-echo "Atualiza todos os rregistros do indice Lucene 'docIndex'"
-sbt "run-main package org.bireme.sd.service.UpdaterBatchService /
--sdIndexPath=$SD_INDEX_PATH -docIndexPath=$OTHER_INDEX_PATH/docIndex /
--freqIndexPath=$OTHER_INDEX_PATH/decs -updAllDay=$UPDATE_ALL_DAY"
+echo "Atualiza todos os registros do indice Lucene 'docIndex'"
+sbt "run-main org.bireme.sd.service.UpdaterBatchService -sdIndexPath=$SD_INDEX_PATH -docIndexPath=$OTHER_INDEX_PATH/docIndex -freqIndexPath=$OTHER_INDEX_PATH/decs -updAllDay=$UPDATE_ALL_DAY"
 
 cd -

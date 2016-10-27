@@ -9,10 +9,10 @@ object TopIndexTestService extends App {
       "\n\t-otherIndexPath=<path>      : other indexes directory path" +
       "\n\t-psId=<id>                  : personal service identification" +
       "\n\t\n--- and one of the following options: ---\n" +
-      "\n\t-addWords=<wrdSet1>|<wrdSet2>|...  : add words to be used to look for sim docs." +
-      "\n\t                                   : <wrdSet> = <wrd1>,<word2>,..." +
-      "\n\t-getSimDocs=<fld>,<fld>,... : get fields from similar documents" +
-      "\n\t--delPSRecord               : delete personal service record"
+      "\n\t-addProfile=<name>=<sentence> : add user profile" +
+      "\n\t-deleteProfile=<name>       : delete user profile" +
+      "\n\t-getSimDocs=<prof>,<prof>,... : get similar documents from profiles" +
+      "\n\t--showProfiles              : show user profiles"
     )
     System.exit(1)
   }
@@ -30,26 +30,28 @@ object TopIndexTestService extends App {
   val freqIndexPath = parameters("freqIndexPath")
   val otherIndexPath = parameters("otherIndexPath")
   val psId = parameters("psId")
-  val addWords = parameters.get("addWords")
+  val addProfile = parameters.get("addProfile")
+  val delProfile = parameters.get("deleteProfile")
   val getSimDocs = parameters.get("getSimDocs")
-  val delPSRecord = parameters.get("delPSRecord")
+  val showProfiles = parameters.contains("showProfiles")
   val docIndexPath = otherIndexPath +
                     (if (otherIndexPath.endsWith("/")) "" else "/") + "docIndex"
   val topIndexPath = otherIndexPath +
                     (if (otherIndexPath.endsWith("/")) "" else "/") + "topIndex"
   val topIndex = new TopIndex(sdIndexPath, docIndexPath, freqIndexPath,
                               topIndexPath, Set("ti", "ab"))
-  addWords match {
-    case Some(words) => {
-      val set = words.trim().split(" *\\| *").map(_.split(" *\\, *").toSet).toSet
-      topIndex.addWords2(psId, set)
+  addProfile match {
+    case Some(profile) => {
+      val split = profile.trim().split(" *\\= *", 2)
+      if (split.length != 2) usage()
+      topIndex.addProfile(psId, split(0), split(1))
     }
-    case None => getSimDocs match {
-      case Some(fields) => println(topIndex.getSimDocsXml(psId,
-                                          fields.trim().split(" *\\, *").toSet))
-      case None => delPSRecord match {
-        case Some(_) => topIndex.delRecord(psId)
-        case None => usage()
+    case None => delProfile match {
+      case Some(profId) => topIndex.deleteProfile(psId,profId)
+      case None => getSimDocs match {
+        case Some(fields) => println(topIndex.getSimDocsXml(psId, Set(),
+                                      fields.trim().split(" *\\, *").toSet, 10))
+        case None => if (showProfiles) topIndex.getProfiles(psId) else usage()
       }
     }
   }

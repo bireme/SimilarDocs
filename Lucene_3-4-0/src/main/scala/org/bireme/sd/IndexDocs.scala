@@ -17,8 +17,8 @@ object IndexDocs extends App {
     Console.err.println("usage: IndexDocs" +
       "\n\t\t-inFile=<name> - input text file " +
       "\n\t\t-index=<path> - path and name of the new Lucene index" +
-      "\n\t\t[-idxFldName=<name>] - new tag of the document field associated " +
-      "with file content (ex. title a/or abstract)" +
+      "\n\t\t-idxFldNames=<name>|<name>|<name>|... - tags of indexed fields " +
+      "(ex. title|abstract)" +
       "\n\t\t[-validTokenChars=<ch><ch>...<ch>] - chars that will not be " +
       "considered token separators" +
       "\n\t\t[-encoding=<str>] - input file encoding" +
@@ -27,7 +27,7 @@ object IndexDocs extends App {
     System.exit(1)
   }
 
-  if (args.length < 2) usage()
+  if (args.length < 3) usage()
 
   val parameters = args.foldLeft[Map[String,String]](Map()) {
     case (map,par) => {
@@ -39,13 +39,14 @@ object IndexDocs extends App {
 
   val inFile = parameters("inFile")
   val index = parameters("index")
-  val idxFldName = parameters.getOrElse("idxFldName", "idxField")
+  val idxFldNames = parameters("idxFldNames")
   val valTokChars = parameters.getOrElse("validTokenChars", "")
   val validTokenChars = if (valTokChars.isEmpty()) SDTokenizer.defValidTokenChars
                         else valTokChars.toSet
   val encoding = parameters.getOrElse("encoding", "utf-8")
   val tokenize = !parameters.contains("doNotTokenize")
   val uniform = parameters.contains("uniformToken")
+  val indexedFields = idxFldNames.trim().split(" *\\| *").toList
 
   create()
 
@@ -55,16 +56,25 @@ object IndexDocs extends App {
     val config = new IndexWriterConfig(Version.LUCENE_34, analyzer)
     val iwriter = new IndexWriter(directory, config)
     val src = Source.fromFile(inFile, encoding)
+    val idxFlds = indexedFields.zipWithIndex
+    val idxFldLen = idxFlds.size
 
     src.getLines().zipWithIndex.foreach {
       case (line,pos) => {
         if (pos % 10000 == 0) println(s"+++$pos")
-        val split = line.trim.split(""" *\| *""", 3)
-        if (split.length == 3) {
+        val split = line.trim.split(""" *\| *""")
+        if (split.length >= 3) {
           val doc = new Document()
-          doc.add(new Field("dbname", split(0), Field.Store.YES, Field.Index.NOT_ANALYZED))
-          doc.add(new Field("id", split(1), Field.Store.YES, Field.Index.NOT_ANALYZED))
-          doc.add(new Field(idxFldName, split(2), Field.Store.YES, Field.Index.ANALYZED))
+          doc.add(new Field("dbname", split(0), Field.Store.YES,
+                                                Field.Index.NOT_ANALYZED))
+          doc.add(new Field("id", split(1), Field.Store.YES,
+                                            Field.Index.NOT_ANALYZED))
+          idxFlds.foreach {
+            case (fname, index) => if (index + 2 < split.length) {
+              doc.add(new Field(fname, split(index + 2), Field.Store.YES,
+                                                         Field.Index.ANALYZED))
+            }
+          }
           iwriter.addDocument(doc)
         }
       }
