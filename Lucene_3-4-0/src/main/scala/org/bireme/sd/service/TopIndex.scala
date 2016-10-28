@@ -124,7 +124,7 @@ class TopIndex(sdIndexPath: String,
       case Some(doc) => {
         if (deleteProfile(doc, profId))
           topWriter.deleteDocuments(new Term("id", psId))
-         else topWriter.updateDocument(new Term("id", psId), doc)
+        else topWriter.updateDocument(new Term("id", psId), doc)
         topWriter.commit()
       }
       case None => ()
@@ -139,17 +139,9 @@ class TopIndex(sdIndexPath: String,
       size == 1
     } else {
       doc.removeField(id)
-      deleteRelated(otherId)
+      docIndex.delRecIfUnique(otherId)
       (size - 1) == 1
     }
-  }
-
-  private def deleteRelated(id: String): Unit = {
-    val docSearcher = new IndexSearcher(docDirectory)
-    val topDocs = docSearcher.search(new TermQuery(new Term("id", id)), 2)
-
-    if (topDocs.totalHits == 1) docIndex.deleteRecord(id)
-    docSearcher.close()
   }
 
   def getProfiles(psId: String): Map[String,Set[String]] = {
