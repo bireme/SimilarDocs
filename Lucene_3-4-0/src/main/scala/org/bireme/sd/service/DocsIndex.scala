@@ -60,18 +60,14 @@ class DocsIndex(docIndex: String,
     val doc_searcher = new IndexSearcher(doc_directory)
     val tot_docs = doc_searcher.search(new TermQuery(new Term("id", id)), 2)
 
-    tot_docs.totalHits match {
-      case 0 => ()
-      case 1 =>
-      case _ => {
-        val doc = doc_searcher.doc(tot_docs.scoreDocs(0).doc)
-        val total = doc.getFieldable("__total").stringValue().toInt
-        if (total == 1) doc_writer.deleteDocuments(new Term("id", id)) else {
-          doc.removeField("__total")
-          doc.add(new NumericField("__total", Field.Store.YES, false).
+    if (tot_docs.totalHits > 0) {
+      val doc = doc_searcher.doc(tot_docs.scoreDocs(0).doc)
+      val total = doc.getFieldable("__total").stringValue().toInt
+      if (total == 1) doc_writer.deleteDocuments(new Term("id", id)) else {
+        doc.removeField("__total")
+        doc.add(new NumericField("__total", Field.Store.YES, false).
                                                          setIntValue(total - 1))
-          doc_writer.addDocument(doc)
-        }
+        doc_writer.addDocument(doc)
       }
     }
     doc_writer.commit()
