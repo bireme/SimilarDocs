@@ -42,8 +42,9 @@ class DocsIndex(docIndex: String,
     } else {
       val doc = doc_searcher.doc(tot_docs.scoreDocs(0).doc)
       val total = doc.getFieldable("__total").stringValue().toInt
+      doc.removeField("__total")
       doc.add(new NumericField("__total", Field.Store.YES, false).setIntValue(total + 1))
-      doc_writer.addDocument(doc)
+      doc_writer.updateDocument(new Term("id", id), doc)
     }
 
     doc_writer.commit()
@@ -65,7 +66,7 @@ class DocsIndex(docIndex: String,
       case _ => {
         val doc = doc_searcher.doc(tot_docs.scoreDocs(0).doc)
         val total = doc.getFieldable("__total").stringValue().toInt
-        
+
         doc.removeField("__total")
         doc.add(new NumericField("__total", Field.Store.YES, false).
                                                          setIntValue(total - 1))
