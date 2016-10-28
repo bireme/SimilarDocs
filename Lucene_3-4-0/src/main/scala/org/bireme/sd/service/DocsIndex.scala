@@ -30,15 +30,23 @@ class DocsIndex(docIndex: String,
 
   def newRecord(id: String): Unit = {
     val doc_searcher = new IndexSearcher(doc_directory)
-    if (doc_searcher.search(new TermQuery(new Term("id", id)), 1).
-                                                               totalHits == 0) {
+    val tot_docs = doc_searcher.search(new TermQuery(new Term("id", id)), 1)
+
+    if (tot_docs.totalHits == 0) {
       val doc = new Document()
       doc.add(new Field("id", id, Field.Store.YES, Field.Index.ANALYZED))
       doc.add(new Field("is_new", "true", Field.Store.YES,
                                           Field.Index.NOT_ANALYZED))
+      doc.add(new NumericField("__total", Field.Store.YES, false).setIntValue(1))
       doc_writer.addDocument(doc)
-      doc_writer.commit()
+    } else {
+      val doc = doc_searcher.doc(tot_docs.scoreDocs(0).doc)
+      val total = doc.getFieldable("__total").stringValue().toInt
+      doc.add(new NumericField("__total", Field.Store.YES, false).setIntValue(total + 1))
+      doc_writer.addDocument(doc)
     }
+
+    doc_writer.commit()
     doc_searcher.close()
   }
 
@@ -49,11 +57,22 @@ class DocsIndex(docIndex: String,
 
   def delRecIfUnique(id: String): Unit = {
     val doc_searcher = new IndexSearcher(doc_directory)
-    if (doc_searcher.search(new TermQuery(new Term("id", id)), 2).
-                                                               totalHits == 1) {
-      doc_writer.deleteDocuments(new Term("id", id))
-      doc_writer.commit()
+    val tot_docs = doc_searcher.search(new TermQuery(new Term("id", id)), 1)
+
+    tot_docs.totalHits match {
+      case 0 => ()
+      case 1 => doc_writer.deleteDocuments(new Term("id", id))
+      case _ => {
+        val doc = doc_searcher.doc(tot_docs.scoreDocs(0).doc)
+        val total = doc.getFieldable("__total").stringValue().toInt
+        
+        doc.removeField("__total")
+        doc.add(new NumericField("__total", Field.Store.YES, false).
+                                                         setIntValue(total - 1))
+        doc_writer.addDocument(doc)
+      }
     }
+    doc_writer.commit()
     doc_searcher.close()
   }
 
