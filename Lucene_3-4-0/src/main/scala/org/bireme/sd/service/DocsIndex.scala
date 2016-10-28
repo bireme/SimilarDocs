@@ -61,13 +61,14 @@ class DocsIndex(docIndex: String,
     val tot_docs = doc_searcher.search(new TermQuery(new Term("id", id)), 2)
 
     if (tot_docs.totalHits > 0) {
+      val term = new Term("id", id)
       val doc = doc_searcher.doc(tot_docs.scoreDocs(0).doc)
       val total = doc.getFieldable("__total").stringValue().toInt
-      if (total == 1) doc_writer.deleteDocuments(new Term("id", id)) else {
+      if (total == 1) doc_writer.deleteDocuments(term) else {
         doc.removeField("__total")
         doc.add(new NumericField("__total", Field.Store.YES, false).
                                                          setIntValue(total - 1))
-        doc_writer.addDocument(doc)
+        doc_writer.updateDocument(term, doc)
       }
     }
     doc_writer.commit()
