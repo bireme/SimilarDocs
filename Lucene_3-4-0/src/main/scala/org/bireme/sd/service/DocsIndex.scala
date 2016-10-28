@@ -58,19 +58,20 @@ class DocsIndex(docIndex: String,
 
   def delRecIfUnique(id: String): Unit = {
     val doc_searcher = new IndexSearcher(doc_directory)
-    val tot_docs = doc_searcher.search(new TermQuery(new Term("id", id)), 1)
+    val tot_docs = doc_searcher.search(new TermQuery(new Term("id", id)), 2)
 
     tot_docs.totalHits match {
       case 0 => ()
-      case 1 => doc_writer.deleteDocuments(new Term("id", id))
+      case 1 =>
       case _ => {
         val doc = doc_searcher.doc(tot_docs.scoreDocs(0).doc)
         val total = doc.getFieldable("__total").stringValue().toInt
-
-        doc.removeField("__total")
-        doc.add(new NumericField("__total", Field.Store.YES, false).
+        if (total == 1) doc_writer.deleteDocuments(new Term("id", id)) else {
+          doc.removeField("__total")
+          doc.add(new NumericField("__total", Field.Store.YES, false).
                                                          setIntValue(total - 1))
-        doc_writer.addDocument(doc)
+          doc_writer.addDocument(doc)
+        }
       }
     }
     doc_writer.commit()
