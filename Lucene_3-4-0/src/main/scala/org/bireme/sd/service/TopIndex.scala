@@ -144,6 +144,13 @@ class TopIndex(sdIndexPath: String,
     }
   }
 
+  def getProfilesXml(psId: String): String = {
+    getProfiles(psId).foldLeft[String]("<profiles>") {
+      case(str,(k,set)) =>
+        s"""$str<profile><name>$k</name><words>${set.mkString(",")}</words>"""
+    } + "</profiles>"
+  }
+
   def getProfiles(psId: String): Map[String,Set[String]] = {
     getDocument(psId, topDirectory) match {
       case Some(doc) => doc.getFields.foldLeft[Map[String,Set[String]]](Map()) {
