@@ -147,7 +147,7 @@ class TopIndex(sdIndexPath: String,
   def getProfilesXml(psId: String): String = {
     getProfiles(psId).foldLeft[String]("<profiles>") {
       case(str,(k,set)) =>
-        s"""$str<profile><name>$k</name><words>${set.mkString(",")}</words>"""
+        s"""$str<profile><name>$k</name><words>${set.mkString(",")}</words></profile>"""
     } + "</profiles>"
   }
 

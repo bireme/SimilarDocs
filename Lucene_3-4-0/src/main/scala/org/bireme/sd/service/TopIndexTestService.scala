@@ -50,11 +50,8 @@ object TopIndexTestService extends App {
       case None => getSimDocs match {
         case Some(fields) => println(topIndex.getSimDocsXml(psId, Set(),
                                       fields.trim().split(" *\\, *").toSet, 10))
-        case None => if (showProfiles) {
-          topIndex.getProfiles(psId).foreach {
-            case(id,words) => println(s"$id => ${words.mkString(" ")}")
-          }
-        } else usage()
+        case None => if (showProfiles) println(topIndex.getProfilesXml(psId))
+                     else usage()
       }
     }
   }
