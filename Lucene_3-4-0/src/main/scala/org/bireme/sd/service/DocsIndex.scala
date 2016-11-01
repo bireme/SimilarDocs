@@ -28,27 +28,30 @@ class DocsIndex(docIndex: String,
     doc_directory.close()
   }
 
-  def newRecord(id: String): Unit = {
+  def newRecord(id: String): Int = {
     val doc_searcher = new IndexSearcher(doc_directory)
     val tot_docs = doc_searcher.search(new TermQuery(new Term("id", id)), 1)
-
-    if (tot_docs.totalHits == 0) {
+    val total = if (tot_docs.totalHits == 0) {
       val doc = new Document()
       doc.add(new Field("id", id, Field.Store.YES, Field.Index.ANALYZED))
       doc.add(new Field("is_new", "true", Field.Store.YES,
                                           Field.Index.NOT_ANALYZED))
       doc.add(new NumericField("__total", Field.Store.YES, false).setIntValue(1))
       doc_writer.addDocument(doc)
+      1
     } else {
       val doc = doc_searcher.doc(tot_docs.scoreDocs(0).doc)
-      val total = doc.getFieldable("__total").stringValue().toInt
+      val tot = doc.getFieldable("__total").stringValue().toInt
       doc.removeField("__total")
-      doc.add(new NumericField("__total", Field.Store.YES, false).setIntValue(total + 1))
+      doc.add(new NumericField("__total", Field.Store.YES, false).
+                                                           setIntValue(tot + 1))
       doc_writer.updateDocument(new Term("id", id), doc)
+      tot + 1
     }
-
+//println(s"newRecord total=$total")
     doc_writer.commit()
     doc_searcher.close()
+    total
   }
 
   def deleteRecord(id: String): Unit = {
@@ -59,7 +62,7 @@ class DocsIndex(docIndex: String,
   def delRecIfUnique(id: String): Unit = {
     val doc_searcher = new IndexSearcher(doc_directory)
     val tot_docs = doc_searcher.search(new TermQuery(new Term("id", id)), 2)
-
+//println(s"delRecIfUnique id=$id")
     if (tot_docs.totalHits > 0) {
       val term = new Term("id", id)
       val doc = doc_searcher.doc(tot_docs.scoreDocs(0).doc)
@@ -91,13 +94,15 @@ class DocsIndex(docIndex: String,
   }
 
   def updateRecordDocs(id: String,
+                       total: Int,
                        minMatch: Int = 3,
                        maxDocs: Int = 10): Unit = {
+println(s"total=$total")
     val doc = new Document()
     val (_,ids) = simDocs.search(id, sd_analyzer, sdSearcher, idxFldName,
                                                freqSearcher, minMatch, maxDocs)
-
     doc.add(new Field("id", id, Field.Store.YES, Field.Index.ANALYZED))
+    doc.add(new NumericField("__total", Field.Store.YES, false).setIntValue(total))
     ids.foreach(sd_id =>
       doc.add(new NumericField("sd_id", Field.Store.YES, false).
                                                             setIntValue(sd_id)))
@@ -112,10 +117,12 @@ class DocsIndex(docIndex: String,
                              new TermQuery(new Term("is_new", "true")), 1000000)
 
     if (topDocs.totalHits > 0) {
-      topDocs.scoreDocs.foreach(
-        id => {
-          val doc = doc_searcher.doc(id.doc)
-          updateRecordDocs(doc.getFieldable("id").stringValue(), minMatch, maxDocs)
+      topDocs.scoreDocs.foreach (
+        sdoc => {
+          val doc = doc_searcher.doc(sdoc.doc)
+          val id = doc.getFieldable("id").stringValue()
+          val total = doc.getFieldable("__total").stringValue().toInt
+          updateRecordDocs(id, total, minMatch, maxDocs)
         }
       )
     }
@@ -128,8 +135,12 @@ class DocsIndex(docIndex: String,
     val reader = doc_searcher.getIndexReader()
     val max = reader.maxDoc
     (0 until max).filterNot(reader.isDeleted(_)).foreach (
-      id => updateRecordDocs(doc_searcher.doc(id).getFieldable("id").
-                                              stringValue(),  minMatch, maxDocs)
+      id => {
+        val doc = doc_searcher.doc(id)
+        val id2 = doc.getFieldable("id").stringValue()
+        val total = doc.getFieldable("__total").stringValue().toInt
+        updateRecordDocs(id2, total, minMatch, maxDocs)
+      }
     )
     doc_searcher.close()
   }

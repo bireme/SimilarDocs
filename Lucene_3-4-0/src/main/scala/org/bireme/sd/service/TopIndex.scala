@@ -58,7 +58,12 @@ class TopIndex(sdIndexPath: String,
                    profiles: Map[String,Set[String]]): Unit = {
     val doc = new Document()
     doc.add(new Field("id", psId, Field.Store.YES, Field.Index.NOT_ANALYZED))
-    profiles.foreach {case(id,words) => addProfile(doc, id, words)}
+    profiles.foreach {
+      case(id,words) =>
+        val words2 = TreeSet(simDocs.getWords(words, freqSearcher): _*).
+                                                                   mkString(" ")
+        addProfile(doc, id, words2)
+    }
 
     getDocument(psId, topDirectory) match {
       case Some(oldDoc) => topWriter.updateDocument(new Term("id", psId), doc)
@@ -69,42 +74,50 @@ class TopIndex(sdIndexPath: String,
 
   def addProfile(psId: String,
                  id: String,
-                 sentence: String): Unit = {
+                 sentence: String,
+                 genRelated: Boolean = true): Unit = {
     val words = simDocs.getWordsFromString(sentence)
-    addProfile(psId, id, words)
+    addProfile(psId, id, words, genRelated)
   }
 
   def addProfile(psId: String,
                  id: String,
-                 words: Set[String]): Unit = {
-    getDocument(psId, topDirectory) match {
+                 words: Set[String],
+                 genRelated: Boolean): Unit = {
+    val words2 = TreeSet(simDocs.getWords(words, freqSearcher): _*).mkString(" ")
+
+    val total = getDocument(psId, topDirectory) match {
       case Some(doc) => {
-        addProfile(doc, id, words)
+        val tot = addProfile(doc, id, words2)
         topWriter.updateDocument(new Term("id", psId), doc)
+        tot
       }
       case None => {
         val doc = new Document()
         doc.add(new Field("id", psId, Field.Store.YES, Field.Index.NOT_ANALYZED))
-        addProfile(doc, id, words)
+        val tot = addProfile(doc, id, words2)
         topWriter.addDocument(doc)
+        tot
       }
     }
     topWriter.commit()
+
+    if (genRelated) {
+      docIndex.updateRecordDocs(words2, total)
+    }
   }
 
   private def addProfile(doc: Document,
                          id: String,
-                         words: Set[String]): Unit = {
-    val words2 = TreeSet(simDocs.getWords(words, freqSearcher): _*).
-                                                                   mkString(" ")
+                         words: String): Int = {
     val field = doc.getFieldable(id)
     if (field != null) {
       val did = field.stringValue()
       if (did != null) docIndex.delRecIfUnique(did)
       doc.removeField(id)
     }
-    doc.add(new Field(id, words2, Field.Store.YES, Field.Index.NOT_ANALYZED))
-    docIndex.newRecord(words2)
+    doc.add(new Field(id, words, Field.Store.YES, Field.Index.NOT_ANALYZED))
+    docIndex.newRecord(words)
   }
 
   def deleteProfiles(psId: String): Unit = {
@@ -169,15 +182,15 @@ class TopIndex(sdIndexPath: String,
                     maxDocs: Int): String = {
     val head = """<?xml version="1.0" encoding="UTF-8"?><documents>"""
 
-    getSimDocs(psId, profiles, outFields, maxDocs).foldLeft[String](head) {
+    getSimDocs(psId, profiles, outFields, maxDocs).foldLeft[String] (head) {
       case (str,map) => {
         s"${str}<document>" + map.foldLeft[String]("") {
           case (str2, (tag,lst)) => {
             lst.size match {
               case 0 => str2
-              case 1 => str2 + s"<$tag>${lst(0)}</$tag>"
+              case 1 => str2 + s"<$tag>${cleanString(lst(0))}</$tag>"
               case _ => str2 + s"<${tag}_list>" + lst.foldLeft[String]("") {
-                case (str3,elem) => s"$str3<$tag>$elem</$tag>"
+                case (str3,elem) => s"$str3<$tag>${cleanString(elem)}</$tag>"
               } + s"</${tag}_list>"
             }
           }
@@ -187,25 +200,20 @@ class TopIndex(sdIndexPath: String,
   }
 
   def getSimDocs(psId: String,
-                 outFlds: Set[String],
                  profiles: Set[String],
+                 outFlds: Set[String],
                  maxDocs: Int): List[Map[String,List[String]]] = {
     getDocument(psId, topDirectory) match {
       case Some(doc) => {
-        val docIds = profiles.foldLeft[List[Set[Int]]](List()) {
-          case (lst, id) => {
-            val did = doc.getFieldable(id)
-            if (did == null) lst else {
-              val ids = docIndex.getDocIds(did.stringValue())
-              if (ids.isEmpty) lst else lst :+ ids
-            }
-          }
-        }
-        if (docIds.isEmpty) List() else {
+        val docIds = getDocIds(doc, profiles)
+//println(s"docIds=$docIds")
+        if (docIds.isEmpty) List()
+        else {
           limitDocs(docIds, maxDocs, List()).
                               foldLeft[List[Map[String,List[String]]]](List()) {
             case (lst, id) => {
               val fields = getDocFields(id, sdSearcher, outFlds)
+//println(s"fields=$fields")
               if (fields.isEmpty) lst else lst :+ fields
             }
           }
@@ -215,22 +223,37 @@ class TopIndex(sdIndexPath: String,
     }
   }
 
+  private def getDocIds(doc: Document,
+                        profiles: Set[String]): List[Set[Int]] = {
+    profiles.foldLeft[List[Set[Int]]](List()) {
+      case (lst, id) => {
+        val did = doc.getFieldable(id)
+        if (did == null) lst else {
+          val ids = docIndex.getDocIds(did.stringValue())
+          if (ids.isEmpty) lst else lst :+ ids
+        }
+      }
+    }
+  }
+
   private def limitDocs(docs: List[Set[Int]],
                         maxDocs: Int,
                         ids: List[Int]): List[Int] = {
-    val num = maxDocs - ids.size
-    if (num > 0) {
-      val newIds = docs.foldLeft[Set[Int]](Set()) {
-        case (outSet,lstSet) => if (lstSet.isEmpty) outSet
-                                else  outSet + lstSet.head
-      }
-      val newDocs = docs.foldLeft[List[Set[Int]]](List()) {
-        case (lst,set) => if ((set.isEmpty)||(set.tail.isEmpty)) lst
-                          else lst :+ set.tail
-      }
-      limitDocs(newDocs, maxDocs, (ids ++ newIds.take(num)))
-    } else if (num == 0) ids
-    else ids.take(maxDocs)
+    if (docs.isEmpty) ids.take(maxDocs)
+    else {
+      val num = maxDocs - ids.size
+      if (num > 0) {
+        val newIds = docs.foldLeft[Set[Int]](Set()) {
+          case (outSet,lstSet) => if (lstSet.isEmpty) outSet
+                                  else  outSet + lstSet.head
+        }
+        val newDocs = docs.foldLeft[List[Set[Int]]](List()) {
+          case (lst,set) => if ((set.isEmpty)||(set.tail.isEmpty)) lst
+                            else lst :+ set.tail
+        }
+        limitDocs(newDocs, maxDocs, (ids ++ newIds.take(num)))
+      } else ids.take(maxDocs)
+    }
   }
 
   private def getDocFields(id: Int,
@@ -239,14 +262,14 @@ class TopIndex(sdIndexPath: String,
     val doc = searcher.doc(id)
 
     if (fields.isEmpty) { // put all fields
-      List(doc.getFields()).foldLeft[Map[String,List[String]]](Map()) {
+      doc.getFields().foldLeft[Map[String,List[String]]] (Map()) {
         case  (map, field:Fieldable) => {
           val name = field.name()
           val lst = map.getOrElse(name,List[String]())
           map + ((name, field.stringValue() :: lst))
         }
       }
-    } else fields.foldLeft[Map[String,List[String]]](Map()) {
+    } else fields.foldLeft[Map[String,List[String]]] (Map()) {
       case  (map, field) => {
         val flds = doc.getFieldables(field)
         if (flds.isEmpty) map else {
@@ -276,6 +299,11 @@ class TopIndex(sdIndexPath: String,
       case 0 => None
       case _ => Some(searcher.doc(docs.scoreDocs(0).doc))
     }
+  }
+
+  private def cleanString(in: String): String = {
+    in.replace("\"", "&quot;").replace("&", "&amp;").replace("''", "&pos;").
+       replace("<", "&lt;").replace(">", "&gt;")
   }
 
   private def readUrlContent(url: String,

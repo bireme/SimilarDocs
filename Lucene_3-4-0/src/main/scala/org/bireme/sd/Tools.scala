@@ -13,8 +13,8 @@ object Tools extends App {
 
   if (args.length != 1) usage();
 
-  showIndexInfo(args(0))
-  showTerms(args(0))
+  //showIndexInfo(args(0))
+  //showTerms(args(0))
   showDocuments(args(0))
 
   def showTerms(indexName: String): Unit = {
@@ -59,5 +59,10 @@ object Tools extends App {
     val term = terms.term()
     if (term != null) println(s"[$term]")
     if (terms.next()) showTerms(terms)
+  }
+
+  def deleteLockFile(path: String): Unit = {
+    val file = new File(path, "write.lock")
+    if (file.exists()) file.delete()
   }
 }

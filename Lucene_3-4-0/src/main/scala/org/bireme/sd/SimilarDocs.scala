@@ -20,7 +20,7 @@ class SimilarDocs {
 
   val stopwords = Set("com", "das", "dos", "meu", "por", "que", "nas", "nos",
                       "seu", "sobre", "sua", "teu", "tua", "con", "del",
-                      "entre", "las", "los", "para", "por", "about", "and",
+                      "entre", "las", "los", "para", "pela", "por", "about", "and",
                       "for", "her", "his", "its", "like", "more", "the", "with",
                       "objectives", "out", "methods", "results", "conclusion")
   val MAX_PROCESS_WORDS = 14
@@ -60,11 +60,11 @@ class SimilarDocs {
              minMatchWords: Int,
              maxHits: Int): (List[String],List[Int]) = {
   ////println("antes da chamada do getWords")
-val ts = new TimeString()
-ts.start()
+//val ts = new TimeString()
+//ts.start()
     val words = getWords(query, fsearcher)
-println(ts.getTime)
-ts.start()
+//println(ts.getTime)
+//ts.start()
     val minMatchWds = Math.min(query.size, minMatchWords)
   //println(s"words=$words idxFldName=$idxFldName")
     val parser = new MultiFieldQueryParser(Version.LUCENE_34,
@@ -73,14 +73,14 @@ ts.start()
       case (l,key) => l :+ TreeSet(key)
     }
   //println(s"list=$list")
-ts.start()
+//ts.start()
     val in = getExpressions(searcher, parser, list, words, minMatchWds)
-println(ts.getTime)
+//println(ts.getTime)
     //println(s"in=$in")
-ts.start()
+//ts.start()
     val ids = getIds(searcher, parser, in, maxHits, List[Int]())
 
-println(ts.getTime)
+//println(ts.getTime)
     (words,ids)
   }
 
