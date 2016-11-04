@@ -150,6 +150,12 @@ class SimilarDocs {
     }
   }
 
+  /**
+   * @return Returns an ordered list of the most frequent words from an input set
+   * @param wds an input set of words used to build the output list
+   * @param fsearcher the IndexSearcher of the frequency words index
+   * @param max the desired size of the output list
+   */
   def getWords(wds: Set[String],
                fsearcher: IndexSearcher,
                max: Int = MAX_PROCESS_WORDS): List[String] = {
@@ -169,6 +175,25 @@ class SimilarDocs {
     val keys = getWords(words.values.toList, Set[String](), max, 0)
   //println(s"keys=$keys")
     keys
+  }
+
+ /**
+  * @return Returns a list of the most frequent words
+  * @param words a list of sets of words with same frequency
+  * @param keys a working buffer
+  * @param max the desired size of the output list
+  * @param size the current size of the working buffer
+  */
+  private def getWords(words: List[Set[String]],
+                       keys: Set[String],
+                       max: Int,
+                       size: Int): List[String] = {
+    if (keys.isEmpty)
+      if (words.isEmpty) Nil
+      else getWords(words.tail, words.head, max, size)
+    else
+      if (size < max) keys.head :: getWords(words, keys.tail, max, size + 1)
+      else Nil
   }
 
   def getWordsFromString(in: String): Set[String] =
@@ -212,18 +237,6 @@ class SimilarDocs {
   //println(s"word=$word hits=${top.totalHits}")
     if (top.totalHits == 0) None
     else Some(is.doc(top.scoreDocs(0).doc).get("freq").toInt)
-  }
-
-  private def getWords(words: List[Set[String]],
-                       keys: Set[String],
-                       max: Int,
-                       size: Int): List[String] = {
-    if (keys.isEmpty)
-      if (words.isEmpty) Nil
-      else getWords(words.tail, words.head, max, size)
-    else
-      if (size < max) keys.head :: getWords(words, keys.tail, max, size + 1)
-      else Nil
   }
 
   private def uniformString(in: String): String = {

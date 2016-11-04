@@ -1,6 +1,6 @@
 package org.bireme.sd
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import java.io.File
 import org.apache.lucene.index.{CheckIndex,IndexReader,TermEnum}
 import org.apache.lucene.store.FSDirectory
@@ -39,7 +39,7 @@ object Tools extends App {
       id => if (! ireader.isDeleted(id)) {
         println(s"======================= $id ========================")
         val doc = ireader.document(id)
-        doc.getFields().foreach {
+        doc.getFields().asScala.foreach {
           fld => println(s"${fld.name()}: ${fld.stringValue()}")
         }
       }

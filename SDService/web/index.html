@@ -20,43 +20,43 @@ of a Personal Service (PS) record and looks for documents having those words
         <h3>Add profile</h3>
         <div>Add PS service profile words</div>
         <br/>
-        <div>Syntax: <b>SDService/?psId=&lt;id&gt;&amp;addProfile=&lt;id&gt;&amp;sentence=&lt;sentence&gt;</b></div>
+        <div>Syntax: <b>SDService?psId=&lt;id&gt;&amp;addProfile=&lt;id&gt;&amp;sentence=&lt;sentence&gt;</b></div>
         <br/>
         <div><b>psId:</b> personal service record identifier</div>
         <div><b>id:</b> profile identifier</div>
         <div><b>sentence:</b> a sentence with the words stored in the profile</div>
         <br/>
-        <div>Example: SDService/?psId=Joao Doria&amp;addProfile=books&amp;my preferences are: sentence=romance, adventure, scifi</div>
+        <div>Example: SDService?psId=Joao Doria&amp;addProfile=books&amp;sentence=my preferences are: romance, adventure, scifi</div>
         <br/>
         <h3>Delete profile</h3>
         <div>Delete in this service a PS record profile</div>
         <br/>
-        <div>Syntax: <b>SDService/?psId=&lt;id&gt;&amp;deleteProfile=&lt;id&gt;</b></div>
+        <div>Syntax: <b>SDService?psId=&lt;id&gt;&amp;deleteProfile=&lt;id&gt;</b></div>
         <br/>
         <div><b>psId:</b> personal service record identifier</div>
         <div><b>id:</b> profile identifier</div>
         <br/>
-        <div>Example: SDService/?psId=Joao Doria&amp;deleteProfile=books</div>
+        <div>Example: SDService?psId=Joao Doria&amp;deleteProfile=books</div>
         <br/>
         <h3>Get similar documents</h3>
         <div>Retrieve documents having most of words stored in a set of profiles</div>
         <br/>
-        <div>Syntax: <b>SDService/?psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;&amp;outFields=&lt;field&gt;,...,&lt;field&gt;</b></div>
+        <div>Syntax: <b>SDService?psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;&amp;outFields=&lt;field&gt;,...,&lt;field&gt;</b></div>
         <br/>
         <div><b>psId:</b> personal service record identifier</div>
         <div><b>profile:</b> profile identifier</div>
         <div><b>field:</b> tag of similar doc field to be outputed. If no fields were specified all fields will be outputed</div>
         <br/>
-        <div>Example: SDService/?psId=Joao Doria&amp;getSimDocs=books,cars,hobbies&amp;outFields=id,date,name</div>
+        <div>Example: SDService?psId=Joao Doria&amp;getSimDocs=books,cars,hobbies&amp;outFields=id,date,name</div>
         <br/>
         <h3>Show profiles</h3>
         <div>Show all profiles and respective words of a PS record</div>
         <br/>  
-        <div>Syntax: <b>SDService/?psId=&lt;psId&gt;&amp;showProfiles=&lt;id&gt;</b></div>
+        <div>Syntax: <b>SDService?psId=&lt;psId&gt;&amp;showProfiles=&lt;id&gt;</b></div>
         <br/>
         <div><b>psId:</b> personal service record identifier</div>
         <div><b>id:</b> profile identifier</div>
         <br/>
-        <div>Example: SDService/?psId=Joao Doria&amp;showProfiles=</div>                
+        <div>Example: SDService?psId=Joao Doria&amp;showProfiles=</div>                
     </body>
 </html>

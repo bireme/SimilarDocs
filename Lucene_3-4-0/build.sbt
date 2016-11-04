@@ -1,7 +1,7 @@
 lazy val commonSettings = Seq(
   organization := "br.bireme",
   version := "0.1.0",
-  scalaVersion := "2.11.8"
+  scalaVersion := "2.12.0" //"2.11.8"
 )
 
 lazy val root = (project in file(".")).
@@ -16,8 +16,8 @@ libraryDependencies ++= Seq(
   "org.apache.lucene" % "lucene-core" % luceneVersion,
   //"org.apache.lucene" % "lucene-analyzers" % luceneVersion,
   "org.apache.lucene" % "lucene-queryparser" % luceneVersion,
-  "org.apache.lucene" % "lucene-queries" % luceneVersion,
-  "org.mongodb" %% "casbah" % "3.1.1"
+  "org.apache.lucene" % "lucene-queries" % luceneVersion
+  //"org.mongodb" %% "casbah" % "3.1.1"
 )
 
-scalacOptions ++= Seq("-unchecked", "-deprecation")
+scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")

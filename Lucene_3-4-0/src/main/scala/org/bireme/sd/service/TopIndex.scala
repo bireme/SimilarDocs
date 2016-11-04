@@ -1,6 +1,6 @@
 package org.bireme.sd.service
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import java.io.{File,IOException}
 
 import org.apache.lucene.document.{Document, Field, Fieldable, NumericField}
@@ -47,28 +47,32 @@ class TopIndex(sdIndexPath: String,
   }
 
   def addProfiles(psId: String,
-                  profiles: Map[String,String]): Unit = {
+                  profiles: Map[String,String],
+                  genRelated: Boolean): Unit = {
     val profs = profiles.map {
-      case(id,sentence) => (id, simDocs.getWordsFromString(sentence))
+      case (id, sentence) => (id, simDocs.getWordsFromString(sentence))
     }
-    addProfiles2(psId, profs)
+    addProfiles2(psId, profs, genRelated)
   }
 
   def addProfiles2(psId: String,
-                   profiles: Map[String,Set[String]]): Unit = {
-    val doc = new Document()
-    doc.add(new Field("id", psId, Field.Store.YES, Field.Index.NOT_ANALYZED))
+                   profiles: Map[String,Set[String]],
+                   genRelated: Boolean): Unit = {
+    val doc = getDocument(psId, topDirectory) match {
+      case Some(doc) => doc
+      case None => {
+        val doc2 = new Document()
+        doc2.add(new Field("id", psId, Field.Store.YES,
+                                                      Field.Index.NOT_ANALYZED))
+        doc2
+      }
+    }
     profiles.foreach {
-      case(id,words) =>
-        val words2 = TreeSet(simDocs.getWords(words, freqSearcher): _*).
-                                                                   mkString(" ")
-        addProfile(doc, id, words2)
+      case (id, words) =>
+        val words2 = TreeSet(simDocs.getWords(words, freqSearcher): _*)
+        addProfile(doc, id, words2, genRelated)
     }
-
-    getDocument(psId, topDirectory) match {
-      case Some(oldDoc) => topWriter.updateDocument(new Term("id", psId), doc)
-      case None => topWriter.addDocument(doc)
-    }
+    topWriter.updateDocument(new Term("id", psId), doc)
     topWriter.commit()
   }
 
@@ -84,46 +88,46 @@ class TopIndex(sdIndexPath: String,
                  id: String,
                  words: Set[String],
                  genRelated: Boolean): Unit = {
-    val words2 = TreeSet(simDocs.getWords(words, freqSearcher): _*).mkString(" ")
-
-    val total = getDocument(psId, topDirectory) match {
+    getDocument(psId, topDirectory) match {
       case Some(doc) => {
-        val tot = addProfile(doc, id, words2)
+        addProfile(doc, id, words, genRelated)
         topWriter.updateDocument(new Term("id", psId), doc)
-        tot
       }
       case None => {
         val doc = new Document()
         doc.add(new Field("id", psId, Field.Store.YES, Field.Index.NOT_ANALYZED))
-        val tot = addProfile(doc, id, words2)
+        addProfile(doc, id, words, genRelated)
         topWriter.addDocument(doc)
-        tot
       }
     }
     topWriter.commit()
-
-    if (genRelated) {
-      docIndex.updateRecordDocs(words2, total)
-    }
   }
 
   private def addProfile(doc: Document,
                          id: String,
-                         words: String): Int = {
+                         words: Set[String],
+                         genRelated: Boolean): Unit = {
+    val filteredWords = TreeSet(simDocs.getWords(words, freqSearcher): _*)
+    val filteredWordsStr = filteredWords.mkString(" ")
     val field = doc.getFieldable(id)
     if (field != null) {
       val did = field.stringValue()
       if (did != null) docIndex.delRecIfUnique(did)
       doc.removeField(id)
+      doc.removeField(id + "__original")
     }
-    doc.add(new Field(id, words, Field.Store.YES, Field.Index.NOT_ANALYZED))
-    docIndex.newRecord(words)
+    doc.add(new Field(id, filteredWordsStr, Field.Store.YES,
+                                                      Field.Index.NOT_ANALYZED))
+    doc.add(new Field(id + "__original", words.mkString(" "), Field.Store.YES,
+                                                      Field.Index.NOT_ANALYZED))
+    if (genRelated) docIndex.updateRecordDocs(filteredWordsStr)
+    else docIndex.newRecord(filteredWordsStr)
   }
 
   def deleteProfiles(psId: String): Unit = {
     getDocument(psId, topDirectory) match {
       case Some(doc) => {
-        doc.getFields().foreach(field => deleteProfile(doc, field.name()))
+        doc.getFields().asScala.foreach(field => deleteProfile(doc, field.name()))
         topWriter.deleteDocuments(new Term("id", psId))
         topWriter.commit()
       }
@@ -166,7 +170,8 @@ class TopIndex(sdIndexPath: String,
 
   def getProfiles(psId: String): Map[String,Set[String]] = {
     getDocument(psId, topDirectory) match {
-      case Some(doc) => doc.getFields.foldLeft[Map[String,Set[String]]](Map()) {
+      case Some(doc) => doc.getFields.asScala.
+                                     foldLeft[Map[String,Set[String]]] (Map()) {
         case (map, field) =>
           val id = field.name()
           if (id.equals("id")) map
@@ -262,7 +267,7 @@ class TopIndex(sdIndexPath: String,
     val doc = searcher.doc(id)
 
     if (fields.isEmpty) { // put all fields
-      doc.getFields().foldLeft[Map[String,List[String]]] (Map()) {
+      doc.getFields().asScala.foldLeft[Map[String,List[String]]] (Map()) {
         case  (map, field:Fieldable) => {
           val name = field.name()
           val lst = map.getOrElse(name,List[String]())
@@ -320,7 +325,7 @@ class TopIndex(sdIndexPath: String,
         val s3 = (s1 + " " + s2).trim
 
         bsource.close()
-        if (s3 isEmpty) Failure(new IOException("empty title, h1 and h2"))
+        if (s3.isEmpty) Failure(new IOException("empty title, h1 and h2"))
         else Success(s3)
       case Failure(x) => Failure(x)
     }

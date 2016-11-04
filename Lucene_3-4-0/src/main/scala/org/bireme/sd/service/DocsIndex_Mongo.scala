@@ -1,5 +1,7 @@
+
 package org.bireme.sd.service
 
+/*
 import com.mongodb.casbah.Imports._
 
 import java.io.{File,IOException}
@@ -12,7 +14,7 @@ import org.bireme.sd.SimilarDocs
 
 import scala.collection.immutable.TreeSet
 import scala.util.{Try, Success, Failure}
-/*
+
 class DocsIndex_Mongo(mongoDB: MongoDB,
                       index: String,
                       freqIndex: String,
