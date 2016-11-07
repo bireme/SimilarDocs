@@ -7,7 +7,7 @@ import java.text.Normalizer
 import java.text.Normalizer.Form
 
 import org.apache.lucene.analysis.Analyzer
-import org.apache.lucene.index.Term
+import org.apache.lucene.index.{IndexReader,Term}
 import org.apache.lucene.queryParser.{MultiFieldQueryParser,QueryParser}
 import org.apache.lucene.search.{IndexSearcher,TermQuery}
 import org.apache.lucene.store.FSDirectory
@@ -18,8 +18,8 @@ import scala.collection.immutable.{TreeMap,TreeSet}
 class SimilarDocs {
   val separators = """[\d\s\,\.\-;\"\=\<\>\$\&\:\+\%\*\@\?\!\~\^\(\)\[\]`'/¿#_\\]+"""
 
-  val stopwords = Set("com", "das", "dos", "meu", "por", "que", "nas", "nos",
-                      "seu", "sobre", "sua", "teu", "tua", "con", "del",
+  val stopwords = Set("com", "das", "dos", "meu", "por", "que", "nao", "nas", "nos",
+                      "para", "por", "seu", "sobre", "sua", "teu", "tua", "con", "del",
                       "entre", "las", "los", "para", "pela", "por", "about", "and",
                       "for", "her", "his", "its", "like", "more", "the", "with",
                       "objectives", "out", "methods", "results", "conclusion")
@@ -62,10 +62,12 @@ class SimilarDocs {
   ////println("antes da chamada do getWords")
 //val ts = new TimeString()
 //ts.start()
-    val words = getWords(query, fsearcher)
+    //val words = getWords(query, fsearcher)
+    val words = getWords(query, idxFldName, fsearcher.getIndexReader(),
+                                                              MAX_PROCESS_WORDS)
 //println(ts.getTime)
 //ts.start()
-    val minMatchWds = Math.min(query.size, minMatchWords)
+    val minMatchWds = Math.min(words.size, minMatchWords)
   //println(s"words=$words idxFldName=$idxFldName")
     val parser = new MultiFieldQueryParser(Version.LUCENE_34,
                                            idxFldName.toArray, analyzer)
@@ -148,6 +150,14 @@ class SimilarDocs {
 
       (tit + " " + abs.mkString(" ")).trim
     }
+  }
+
+  def getWords(wds: Set[String],
+               fields: Set[String],
+               reader: IndexReader,
+               max: Int): List[String] = {
+    val freqs = new GenerTokenFreq(reader).process(wds, fields)
+    freqs.take(max).values.toList
   }
 
   /**

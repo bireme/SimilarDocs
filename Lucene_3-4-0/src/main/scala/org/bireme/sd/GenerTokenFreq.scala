@@ -8,43 +8,28 @@ import java.text.Normalizer.Form
 import org.apache.lucene.index.{IndexReader, Term, TermDocs}
 import org.apache.lucene.store.FSDirectory
 
-object GenerTokenFreq extends App {
+import scala.collection.immutable.TreeMap
+
+class GenerTokenFreq(reader: IndexReader) {
   private val separators =
               """[\d\s\,\.\-;\"\=\<\>\$\&\:\+\%\*\@\?\!\~\^\(\)\[\]`'/¿#_\\]+"""
 
-  private def usage(): Unit = {
-    Console.err.println(
-      "usage: GenerTokenFreq <inIndex> <field>,<field>,...,<field> <inString>")
-    System.exit(1)
-  }
-
-  if (args.length != 3) usage()
-
-  val fields = args(1).split("\\,").map(_.trim).toSet
-  val inDir = FSDirectory.open(new File(args(0)))
-  val reader = IndexReader.open(inDir)
-
-  process(args(2), fields, reader).foreach {
-    case (tok,tot) => println(s"[$tok] => $tot")
-  }
-  close()
-
-  def close(): Unit = {
-    reader.close()
-    inDir.close()
-  }
 
   def process(str: String,
-              fields: Set[String],
-              reader: IndexReader): Map[String,Int] = {
-    uniformString(str).split(separators).toSet.foldLeft [Map[String,Int]] (Map()) {
+              fields: Set[String]): Map[Int,String] = {
+    process(uniformString(str).split(separators).toSet, fields)
+  }
+
+  def process(words: Set[String],
+              fields: Set[String]): Map[Int,String] = {
+    val map = words.filter(_.length() > 2).foldLeft [Map[String,Int]] (Map()) {
       case (map, tok) =>
         val total = fields.foldLeft[Set[Int]] (Set()) {
-          case (set, fld) =>
-            totalTermDocs(tok, fld, set, reader)
+          case (set, fld) => totalTermDocs(tok, fld, set, reader)
         }
         map + ((tok, total.size))
     }
+    order(map)
   }
 
   private def totalTermDocs(key: String,
@@ -68,4 +53,31 @@ object GenerTokenFreq extends App {
     val s = Normalizer.normalize(in.trim().toLowerCase(), Form.NFD)
     s.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
   }
+
+  private def order(map: Map[String,Int]): Map[Int,String] = {
+    map.foldLeft[Map[Int,String]] (TreeMap()) {
+      case (tm, (k,v)) => tm + ((v,k))
+    }
+  }
+}
+
+object GenerTokenFreq extends App {
+  private def usage(): Unit = {
+    Console.err.println(
+      "usage: GenerTokenFreq <inIndex> <field>,<field>,...,<field> <inString>")
+    System.exit(1)
+  }
+
+  if (args.length != 3) usage()
+
+  val fields = args(1).split("\\,").map(_.trim).toSet
+  val inDir = FSDirectory.open(new File(args(0)))
+  val reader = IndexReader.open(inDir)
+  val map = new GenerTokenFreq(reader).process(args(2), fields)
+
+  map.toSeq.zipWithIndex.foreach {
+    case ((tot, tok),idx) => println(s"$idx.[$tok] => $tot")
+  }
+  reader.close()
+  inDir.close()
 }
