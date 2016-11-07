@@ -107,7 +107,9 @@ class TopIndex(sdIndexPath: String,
                          id: String,
                          words: Set[String],
                          genRelated: Boolean): Unit = {
-    val filteredWords = TreeSet(simDocs.getWords(words, freqSearcher): _*)
+    //val filteredWords = TreeSet(simDocs.getWords(words, freqSearcher): _*)
+    val filteredWords = TreeSet(simDocs.getWords(words, idxFldName,
+                    sdSearcher.getIndexReader(), simDocs.MAX_PROCESS_WORDS): _*)
     val filteredWordsStr = filteredWords.mkString(" ")
     val field = doc.getFieldable(id)
     if (field != null) {
