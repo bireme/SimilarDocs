@@ -79,6 +79,8 @@ class SimilarDocs {
       case (l,key) => l :+ TreeSet(key)
     }
     val in = getExpressions(searcher, parser, list, words, minMatchWds)
+println("\nAll expressions found:")
+in.foreach(exp => s"\t[$exp]")    
     val ids = getIds(searcher, parser, in, maxHits, List[Int]())
 
     (words,ids)
