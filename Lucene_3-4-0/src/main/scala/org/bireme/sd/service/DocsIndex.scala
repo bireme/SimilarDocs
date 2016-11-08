@@ -102,9 +102,9 @@ class DocsIndex(docIndex: String,
     val total = if (topDocs.totalHits == 0) 1 else
       doc_searcher.doc(topDocs.scoreDocs(0).doc).getFieldable("__total").
                                                             stringValue().toInt
-
-    val (_,ids) = simDocs.search(id, sd_analyzer, sdSearcher, idxFldName,
-                                               freqSearcher, minMatch, maxDocs)
+    val idSet = id.trim().split(" ").toList
+    val (_,ids) = simDocs.searchPreProcessed(idSet, sd_analyzer, sdSearcher,
+                                    idxFldName, freqSearcher, minMatch, maxDocs)
     val doc = new Document()
     doc.add(new Field("id", id, Field.Store.YES, Field.Index.ANALYZED))
     doc.add(new NumericField("__total", Field.Store.YES, false).setIntValue(total))

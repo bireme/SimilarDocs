@@ -59,30 +59,32 @@ class SimilarDocs {
              fsearcher: IndexSearcher,
              minMatchWords: Int,
              maxHits: Int): (List[String],List[Int]) = {
-  ////println("antes da chamada do getWords")
-//val ts = new TimeString()
-//ts.start()
-    //val words = getWords(query, fsearcher)
     val words = getWords(query, idxFldName, fsearcher.getIndexReader(),
-                                                              MAX_PROCESS_WORDS)
-//println(ts.getTime)
-//ts.start()
+                                                      MAX_PROCESS_WORDS)
+    searchPreProcessed(words, analyzer, searcher, idxFldName, fsearcher,
+                                                         minMatchWords, maxHits)
+  }
+
+  def searchPreProcessed(words: List[String],
+                         analyzer: Analyzer,
+                         searcher: IndexSearcher,
+                         idxFldName: Set[String],
+                         fsearcher: IndexSearcher,
+                         minMatchWords: Int,
+                         maxHits: Int): (List[String],List[Int]) = {
     val minMatchWds = Math.min(words.size, minMatchWords)
-  //println(s"words=$words idxFldName=$idxFldName")
     val parser = new MultiFieldQueryParser(Version.LUCENE_34,
-                                           idxFldName.toArray, analyzer)
+                                                   idxFldName.toArray, analyzer)
     val list = words.foldLeft[List[TreeSet[String]]](List()) {
       case (l,key) => l :+ TreeSet(key)
     }
-  //println(s"list=$list")
-//ts.start()
     val in = getExpressions(searcher, parser, list, words, minMatchWds)
-//println(ts.getTime)
-    //println(s"in=$in")
-//ts.start()
+println("pre-processed words:")
+words.foreach(w => println(s"\t$w"))
+println("expressions found:")
+in.foreach(ts => println("\t" + ts.mkString(", ")))
     val ids = getIds(searcher, parser, in, maxHits, List[Int]())
 
-//println(ts.getTime)
     (words,ids)
   }
 
@@ -157,6 +159,8 @@ class SimilarDocs {
                reader: IndexReader,
                max: Int): List[String] = {
     val freqs = new GenerTokenFreq(reader).process(wds, fields)
+println("token frequency:")
+freqs.foreach { case (k,v) => println(s"\t[$v] => $k") }
     freqs.take(max).values.toList
   }
 
