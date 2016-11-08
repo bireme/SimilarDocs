@@ -80,7 +80,8 @@ class SimilarDocs {
     }
     val in = getExpressions(searcher, parser, list, words, minMatchWds)
 println("\nAll expressions found:")
-in.foreach(exp => println(s"\t[$exp]"))    
+in.foreach(exp => println(s"\t${exp.mkString(", ")}"))
+println("\nexpressions found:")
     val ids = getIds(searcher, parser, in, maxHits, List[Int]())
 
     (words,ids)
@@ -221,8 +222,7 @@ freqs.foreach { case (k,v) => println(s"\t[$v] => $k") }
       case Nil => found
       case h::t => {
         val ids = getIds(searcher, parser, h.mkString(" AND "), maxHits)
-println("\nexpressions found:")
-println(s"\t${h.mkString(", ")}\n\t\t[${ids.mkString(", ")}]")
+println(s"\n\t${h.mkString(", ")}\n\t\t[${ids.mkString(", ")}]")
         val found2 = found ++ (ids -- found)
 
         if (found2.size < maxHits) getIds(searcher, parser, t, maxHits, found2)
@@ -268,10 +268,10 @@ println(s"\t${h.mkString(", ")}\n\t\t[${ids.mkString(", ")}]")
   }
 
   private def getExpressions(searcher: IndexSearcher,
-                              parser: QueryParser,
-                              in: List[TreeSet[String]],
-                              init: List[String],
-                              minMatchWords: Int): List[TreeSet[String]] = {
+                             parser: QueryParser,
+                             in: List[TreeSet[String]],
+                             init: List[String],
+                             minMatchWords: Int): List[TreeSet[String]] = {
   //println(s"\nentrando no getExpressions in=$in")
     val in2 = in.filter(set => hasHits(searcher, parser, set.mkString(" AND ")))
   //println(s"in2=$in2")
