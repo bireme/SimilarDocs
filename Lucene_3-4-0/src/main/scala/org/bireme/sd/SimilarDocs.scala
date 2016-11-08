@@ -79,10 +79,6 @@ class SimilarDocs {
       case (l,key) => l :+ TreeSet(key)
     }
     val in = getExpressions(searcher, parser, list, words, minMatchWds)
-println("pre-processed words:")
-words.foreach(w => println(s"\t$w"))
-println("expressions found:")
-in.foreach(ts => println("\t" + ts.mkString(", ")))
     val ids = getIds(searcher, parser, in, maxHits, List[Int]())
 
     (words,ids)
@@ -159,7 +155,7 @@ in.foreach(ts => println("\t" + ts.mkString(", ")))
                reader: IndexReader,
                max: Int): List[String] = {
     val freqs = new GenerTokenFreq(reader).process(wds, fields)
-println("token frequency:")
+println("\ntoken frequency:")
 freqs.foreach { case (k,v) => println(s"\t[$v] => $k") }
     freqs.take(max).values.toList
   }
@@ -223,8 +219,8 @@ freqs.foreach { case (k,v) => println(s"\t[$v] => $k") }
       case Nil => found
       case h::t => {
         val ids = getIds(searcher, parser, h.mkString(" AND "), maxHits)
-        //val dif = ids -- found
-        //println(s"in=$in h=$h expr=${h.mkString(" AND ")} ids=$dif\n")
+println("\nexpressions found:")
+println(s"\t${h.mkString(", ")}\n\t\t[${ids.mkString(", ")}]")
         val found2 = found ++ (ids -- found)
 
         if (found2.size < maxHits) getIds(searcher, parser, t, maxHits, found2)

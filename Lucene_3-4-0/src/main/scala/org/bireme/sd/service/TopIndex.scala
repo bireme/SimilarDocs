@@ -107,8 +107,8 @@ class TopIndex(sdIndexPath: String,
                          id: String,
                          words: Set[String],
                          genRelated: Boolean): Unit = {
-println("inputed words:")
-words.foreach(w => s"\t$w")                           
+println("\ninputed words:" + words)
+words.foreach(w => s"\t$w")
     //val filteredWords = TreeSet(simDocs.getWords(words, freqSearcher): _*)
     val filteredWords = TreeSet(simDocs.getWords(words, idxFldName,
                     sdSearcher.getIndexReader(), simDocs.MAX_PROCESS_WORDS): _*)
