@@ -1,2 +1,2 @@
 # SimilarDocs
-Engine to look for similar documents stored at a Lucene index
+Engine to look for similar documents stored in a Lucene index
