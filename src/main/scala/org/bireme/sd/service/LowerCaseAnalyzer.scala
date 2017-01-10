@@ -19,13 +19,22 @@
 
 =========================================================================*/
 
-package org.bireme.sd
+package org.bireme.sd.service
 
-/** The default ngram size
-  *
-  * @author: Heitor Barbieri
-  * date: 20170102
-*/
-object NGSize {
-  val ngram_size = 3
+import java.io.Reader
+
+import org.apache.lucene.analysis.{Analyzer,LowerCaseFilter,TokenStream}
+import org.apache.lucene.analysis.core.KeywordTokenizer
+import org.apache.lucene.analysis.Analyzer.TokenStreamComponents
+
+import org.bireme.sd.UniformFilter
+
+class LowerCaseAnalyzer(uniformTokens: Boolean = true) extends Analyzer {
+
+  override def createComponents(fieldName: String): TokenStreamComponents = {
+    val source = new KeywordTokenizer()
+    val filter = if (uniformTokens) new UniformFilter(source)
+                 else new LowerCaseFilter(source)
+    return new TokenStreamComponents(source, filter)
+  }
 }

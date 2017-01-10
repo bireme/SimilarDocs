@@ -1,3 +1,24 @@
+/*=========================================================================
+
+    Copyright © 2017 BIREME/PAHO/WHO
+
+    This file is part of SimilarDocs.
+
+    SimilarDocs is free software: you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public License as
+    published by the Free Software Foundation, either version 2.1 of
+    the License, or (at your option) any later version.
+
+    SimilarDocs is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with SimilarDocs. If not, see <http://www.gnu.org/licenses/>.
+
+=========================================================================*/
+
 package org.bireme.sd
 
 import java.io.File
@@ -12,16 +33,30 @@ import org.apache.lucene.queryparser.classic.{MultiFieldQueryParser,QueryParser}
 import org.apache.lucene.search.{IndexSearcher, TermQuery}
 import org.apache.lucene.store.FSDirectory
 
-class LuceneSearch(indexPath: String) {
+class SimDocsSearch(indexPath: String) {
   val directory = FSDirectory.open(new File(indexPath).toPath())
   val reader = DirectoryReader.open(directory)
   val searcher = new IndexSearcher(reader)
 
+  /**
+    * Closes all used resources
+    */
   def close(): Unit = {
     reader.close()
     directory.close()
   }
 
+  /**
+    * Searches for documents having a string in some fields
+    *
+    * @param text the text to be searched
+    * @param fields document fields into where the text will be searched
+    * @param maxDocs maximum number of returned documents
+    * @param minSim minimum similarity between the input text and the retrieved
+    *               field text
+    * @return a list of pairs with document score and a map of field name and a
+    *         list of its contents
+    */
   def search(text: String,
              fields: Set[String],
              maxDocs: Int,
@@ -31,10 +66,20 @@ class LuceneSearch(indexPath: String) {
     }
   }
 
-  private def searchIds(text: String,
-                        fields: Set[String],
-                        maxDocs: Int,
-                        minSim: Float): List[(Int,Float)] = {
+  /**
+    * Searches for documents having a string in some fields
+    *
+    * @param text the text to be searched
+    * @param fields document fields into where the text will be searched
+    * @param maxDocs maximum number of returned documents
+    * @param minSim minimum similarity between the input text and the retrieved
+    *               field text
+    * @return a list of pairs with document id and document score
+    */
+  def searchIds(text: String,
+                fields: Set[String],
+                maxDocs: Int,
+                minSim: Float): List[(Int,Float)] = {
     val mqParser = new MultiFieldQueryParser(fields.toArray,
                                            new NGramAnalyzer(NGSize.ngram_size))
     val query =  mqParser.parse(text)
@@ -43,6 +88,13 @@ class LuceneSearch(indexPath: String) {
                                              map(sd => (sd.doc,sd.score)).toList
   }
 
+  /**
+    * Loads the document content given its id and desired fields
+    *
+    * @param id Lucene document id
+    * @param fields desired document fields
+    * @return the document as a map of field name and a list of its contents
+    */
   private def loadDoc(id: Int,
                       fields: Set[String]): Map[String,List[String]] = {
     asScalaBuffer[IndexableField](reader.document(id).getFields()).
@@ -55,9 +107,9 @@ class LuceneSearch(indexPath: String) {
   }
 }
 
-object LuceneSearch extends App {
+object SimDocsSearch extends App {
   private def usage(): Unit = {
-    Console.err.println("usage: LuceneSearch <indexPath> <text>" +
+    Console.err.println("usage: SimDocsSearch <indexPath> <text>" +
     "\n\t-fields=<field>,<field>,...,<field>" +
     "\n\t[-maxDocs=<num>]" +
     "\n\t[-minSim=<num>]")
@@ -77,7 +129,7 @@ object LuceneSearch extends App {
                  else sFields.split(" *, *").toSet
   val maxDocs = parameters.getOrElse("maxDocs", "10").toInt
   val minSim = parameters.getOrElse("minSim", "0.5").toFloat
-  val search = new LuceneSearch(args(0))
+  val search = new SimDocsSearch(args(0))
   val docs = search.search(args(1), fldNames, maxDocs, minSim)
 
   val directory = FSDirectory.open(new File(args(0)).toPath())
