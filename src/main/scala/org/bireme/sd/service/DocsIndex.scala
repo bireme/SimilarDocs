@@ -31,8 +31,11 @@ import org.apache.lucene.index.{DirectoryReader, IndexWriter, IndexWriterConfig,
 import org.apache.lucene.search.{IndexSearcher, TermQuery}
 import org.apache.lucene.store.FSDirectory
 
-/** Collection of documents having 3 fields:
-  * id: unique identifier. It is the expression used to look for similar documents
+/** Collection of documents where each document has 3 fields:
+  * id: Unique identifier. It is the expression used to look for similar
+  *     documents in SDIndex (Similar Documents Lucene Index). This expression
+  *     is also stored as a profile field in one or more documents of
+  *     personal services document
   * sd_id: Repetitive field that contains the lucene id of a similar document
   * totals: Number of personal services documents which have their profiles equal
   *         to this document id
@@ -90,10 +93,11 @@ class DocsIndex(docIndex: String,
   }
 
   /**
-    * Deletes a document with 'id' unique identifier.
+    * Deletes a document with 'id' unique identifier by seeting the field
+    * 'total' to zero if onlyIfUnique is not set or decrement it if it is set.
     *
     * @param id document unique identifier
-    * @param onlyIfUnique
+    * @param onlyIfUnique if true decrements total, if false set it to zero.
     */
   def deleteRecord(id: String,
                    onlyIfUnique: Boolean = false): Unit = {
@@ -110,6 +114,7 @@ class DocsIndex(docIndex: String,
     val doc_reader = DirectoryReader.open(doc_writer)
     val doc_searcher = new IndexSearcher(doc_reader)
     val tot_docs = doc_searcher.search(new TermQuery(new Term("id", id)), 2)
+
     if (tot_docs.totalHits > 0) {
       if (onlyIfUnique) {
         val doc = doc_searcher.doc(tot_docs.scoreDocs(0).doc)
@@ -121,6 +126,13 @@ class DocsIndex(docIndex: String,
     doc_reader.close()
   }
 
+  /**
+    * Retrieves a list of Lucene ids of similar documents associated with
+    * this document id (sentence)
+    *
+    * @param id document unique identifier
+    * @return a list of Lucene ids of similar documents
+    */
   def getDocIds(id: String): Set[Int] = {
     val doc_reader = DirectoryReader.open(doc_writer)
     val doc_searcher = new IndexSearcher(doc_reader)
@@ -137,6 +149,15 @@ class DocsIndex(docIndex: String,
     retSet
   }
 
+  /**
+    * Updates the sd_id (similar document ids) associated with this record id
+    * (sentence)
+    *
+    * @param id document unique identifier
+    * @param idxFldNames names of document fields used to find similar docs
+    * @param minSim minimum acceptable similarity between documents
+    * @param maxDocs maximum number of similar documents updateDocument
+    */
   def updateRecordDocs(id: String,
                        idxFldNames: Set[String],
                        minSim: Float,
@@ -164,6 +185,14 @@ class DocsIndex(docIndex: String,
     doc_reader.close()
   }
 
+  /**
+    * Updates the sd_id (similar document ids) associated with all docIndex
+    * new records (having is_new field)
+    *
+    * @param idxFldNames names of document fields used to find similar docs
+    * @param minSim minimum acceptable similarity between documents
+    * @param maxDocs maximum number of similar documents updateDocument
+    */
   def updateNewRecordDocs(idxFldNames: Set[String],
                           minSim: Float,
                           maxDocs: Int = 10): Unit = {
@@ -184,6 +213,15 @@ class DocsIndex(docIndex: String,
     doc_reader.close()
   }
 
+  /**
+    * Updates the sd_id (similar document ids) associated with all docIndex
+    *  records (new ones - having is_new field and old ones - with out field
+    * is_new)
+    *
+    * @param idxFldNames names of document fields used to find similar docs
+    * @param minSim minimum acceptable similarity between documents
+    * @param maxDocs maximum number of similar documents updateDocument
+    */
   def updateAllRecordDocs(idxFldNames: Set[String],
                           minSim: Float,
                           maxDocs: Int = 10): Unit = {

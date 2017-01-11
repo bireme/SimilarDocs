@@ -29,8 +29,14 @@ import org.apache.lucene.analysis.Analyzer.TokenStreamComponents
 
 import org.bireme.sd.UniformFilter
 
+/** Lucene analyzer thar converts all tokens (words separated by white spaces)
+  * to lower case ones
+  */
 class LowerCaseAnalyzer(uniformTokens: Boolean = true) extends Analyzer {
 
+  /**
+    * See Lucene Analyzer class documentation
+    */
   override def createComponents(fieldName: String): TokenStreamComponents = {
     val source = new KeywordTokenizer()
     val filter = if (uniformTokens) new UniformFilter(source)

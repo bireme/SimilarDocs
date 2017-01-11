@@ -26,7 +26,6 @@ import java.nio.file.Paths
 import java.text.Normalizer
 import java.text.Normalizer.Form
 
-
 import org.apache.lucene.document.{Document, Field, StringField, StoredField}
 import org.apache.lucene.index.{DirectoryReader, IndexWriter, IndexWriterConfig, Term}
 import org.apache.lucene.search.{IndexSearcher, TermQuery}
@@ -39,6 +38,16 @@ import scala.collection.immutable.TreeSet
 import scala.io.Source
 import scala.util.{Try, Success, Failure}
 
+/** This class represents a personal service document that indexed by Lucene
+  * engine. Each document has two kinds of fields:
+  * id:  Unique identifier.
+  * the other fields are profiles where the name of the field is the profile name
+  * and its content is a sentence used to look for similar documents stored
+  * at documents in SDIndex (Similar Documents Lucene Index).
+  *
+  * @author: Heitor Barbieri
+  * date: 20170110
+*/
 class TopIndex(sdIndexPath: String,
                docIndexPath: String,
                topIndexPath: String,
@@ -53,6 +62,9 @@ class TopIndex(sdIndexPath: String,
 
   topWriter.commit()
 
+  /**
+    * Closes all open resources
+    */
   def close(): Unit = {
     topWriter.close()
     topDirectory.close()
@@ -61,9 +73,14 @@ class TopIndex(sdIndexPath: String,
     docIndex.close()
   }
 
+  /**
+    * Adds profile instances to a personal services document
+    *
+    * @param psId personal services document identifier
+    * @param name profile collection of profile name and content
+    */
   def addProfiles(psId: String,
-                  profiles: Map[String,String],
-                  genRelated: Boolean): Unit = {
+                  profiles: Map[String,String]): Unit = {
     // Retrieves or creates the pesonal service document
     val doc = getDocument(psId) match {
       case Some(doc) => doc
@@ -82,6 +99,13 @@ class TopIndex(sdIndexPath: String,
     topWriter.commit()
   }
 
+  /**
+    * Adds a profile instance to a personal services document
+    *
+    * @param psId personal services document identifier
+    * @param name profile name
+    * @param sentence profile content
+    */
   def addProfile(psId: String,
                  name: String,
                  sentence: String): Unit = {
@@ -102,6 +126,13 @@ class TopIndex(sdIndexPath: String,
     topWriter.commit()
   }
 
+  /**
+    * Adds a profile instance to a personal services document
+    *
+    * @param doc personal services document
+    * @param name profile name
+    * @param sentence profile content
+    */
   private def addProfile(doc: Document,
                          name: String,
                          sentence: String): Unit = {
@@ -113,6 +144,11 @@ class TopIndex(sdIndexPath: String,
     }
   }
 
+  /**
+    * Deletes all profiles from a personal services document
+    *
+    * @param psId personal services document identifier
+    */
   def deleteProfiles(psId: String): Unit = {
     getDocument(psId) match {
       case Some(doc) => {
@@ -124,19 +160,34 @@ class TopIndex(sdIndexPath: String,
     }
   }
 
+  /**
+    * Deletes a profile from a personal services document
+    *
+    * @param psId personal services document identifier
+    * @param name profile name
+    * @return true if the profile was deleted or false if not
+    */
   def deleteProfile(psId: String,
-                    name: String): Unit = {
+                    name: String): Boolean = {
     getDocument(psId) match {
       case Some(doc) => {
         if (deleteProfile(doc, name)) {
           topWriter.updateDocument(new Term("id", psId), doc)
           topWriter.commit()
-        }
+          true
+        } else false
       }
-      case None => ()
+      case None => false
     }
   }
 
+  /**
+    * Deletes a profile from a personal services document
+    *
+    * @param doc personal services document
+    * @param name profile name
+    * @return true if the profile was deleted or false if not
+    */
   private def deleteProfile(doc: Document,
                             name: String): Boolean = {
     val size = doc.getFields().size()
@@ -149,6 +200,14 @@ class TopIndex(sdIndexPath: String,
     }
   }
 
+  /**
+    * Given a personal services document, it returns all profiles contents
+    * (some fields of that document) represented as a XML document
+    *
+    * @param psId personal services document unique id
+    * @return a XML document having profiles names and its contents. Profiles
+    *         can have more than one occurrence
+    */
   def getProfilesXml(psId: String): String = {
     getProfiles(psId).foldLeft[String]("<profiles>") {
       case(str,(k,set)) =>
@@ -156,6 +215,14 @@ class TopIndex(sdIndexPath: String,
     } + "</profiles>"
   }
 
+  /**
+    * Given a personal services document, it returns all profiles contents
+    * (some fields of that document)
+    *
+    * @param psId personal services document unique id
+    * @return a collection of profiles names and its contents. Profiles as
+    *         document fields can have more than one occurrence
+    */
   def getProfiles(psId: String): Map[String,Set[String]] = {
     getDocument(psId) match {
       case Some(doc) => doc.getFields.asScala.
@@ -169,6 +236,18 @@ class TopIndex(sdIndexPath: String,
     }
   }
 
+  /**
+    * Given a id of a personal service document, profiles names and
+    * similar documents fields where the profiles will be compared, returns
+    * a list of similar documents represented as a XML document
+    *
+    * @param psId personal services document id
+    * @param profiles name of profiles used to find similar documents
+    * @param outFlds fields of similar documents to be retrieved
+    * @param maxDocs the maximun number of similar documents to be retrieved
+    * @return an XML document with each desired field and its respective
+    *         occurrences, given that fields can have more than one occurrences
+    */
   def getSimDocsXml(psId: String,
                     profiles: Set[String],
                     outFields: Set[String],
@@ -192,6 +271,19 @@ class TopIndex(sdIndexPath: String,
     } + "</documents>"
   }
 
+  /**
+    * Given a id of a personal service document, profiles names and
+    * similar documents fields where the profiles will be compared, returns
+    * a list of similar documents
+    *
+    * @param psId personal services document id
+    * @param profiles name of profiles used to find similar documents
+    * @param outFlds fields of similar documents to be retrieved
+    * @param maxDocs the maximun number of similar documents to be retrieved
+    * @return a list of similar documents, where each similar document is a
+    *         a collection of field names and its contents. Each fields can
+    *         have more than one occurrence
+    */
   def getSimDocs(psId: String,
                  profiles: Set[String],
                  outFlds: Set[String],
@@ -221,6 +313,15 @@ class TopIndex(sdIndexPath: String,
     }
   }
 
+  /**
+    * Given a document and set of profile names, returns all of its contents
+    * (personel services sentences)
+    *
+    * @param doc Lucene Document object
+    * @param profiles a set of profiles names (fields of the given document)
+    * @return a list with sets of contents of each profile. Profiles can have
+    *         more than one occurrence
+    */
   private def getDocIds(doc: Document,
                         profiles: Set[String]): List[Set[Int]] = {
     profiles.foldLeft[List[Set[Int]]](List()) {
@@ -234,6 +335,16 @@ class TopIndex(sdIndexPath: String,
     }
   }
 
+  /**
+    * Given a set of similar document identifiers for each profile, it
+    * takes on id for each profile each time until the desired number of
+    * ids has been reached.
+    *
+    * @param docs list of ids for each profile
+    * @param maxDocs the maximum number of ids to be returned
+    * @param ids auxiliary id list
+    * @return a list of similiar document ids
+    */
   private def limitDocs(docs: List[Set[Int]],
                         maxDocs: Int,
                         ids: List[Int]): List[Int] = {
@@ -254,6 +365,15 @@ class TopIndex(sdIndexPath: String,
     }
   }
 
+  /**
+    * Retrieves the contents of some fields of the 'id' document
+    *
+    * @param id document identifier (personal service document identifier)
+    * @param searcher Lucene IndexSearcher object. See Lucene documentation
+    * @param fields set of field names whose content will be retrieved
+    * @return a map of field name and it contents. A field can have more than
+    *         one occurrence.
+    */
   private def getDocFields(id: Int,
                            searcher: IndexSearcher,
                            fields: Set[String]): Map[String,List[String]] = {
@@ -280,6 +400,13 @@ class TopIndex(sdIndexPath: String,
     }
   }
 
+  /**
+    * Retrieves a Lucene Document object from personal services index,
+    * given its identifier
+    *
+    * @param id document identifier (personal service document identifier)
+    * @return Lucene Document
+    */
   private def getDocument(id: String): Option[Document] = {
     val topReader = DirectoryReader.open(topWriter)
     val topSearcher = new IndexSearcher(topReader)
@@ -294,11 +421,24 @@ class TopIndex(sdIndexPath: String,
     result
   }
 
+  /**
+    * Replaces some string characters ("&'<>) for their entity representation
+    *
+    * @param in the input string
+    * @return the string with some characters replaced by entities
+    */
   private def cleanString(in: String): String = {
-    in.replace("\"", "&quot;").replace("&", "&amp;").replace("''", "&pos;").
+    in.replace("\"", "&quot;").replace("&", "&amp;").replace("'", "&pos;").
        replace("<", "&lt;").replace(">", "&gt;")
   }
 
+  /**
+    * Reads the content of a internet package
+    *
+    * @param url the address of the internet package
+    * @param encoding the character enconding of the internet package
+    * @return the page content or the error message
+    */
   private def readUrlContent(url: String,
                              encoding: String): Try[String] = {
     val src = Try(Source.fromURL(url, encoding))

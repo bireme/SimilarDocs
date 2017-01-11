@@ -33,6 +33,8 @@ import org.apache.lucene.queryparser.classic.{MultiFieldQueryParser,QueryParser}
 import org.apache.lucene.search.{IndexSearcher, TermQuery}
 import org.apache.lucene.store.FSDirectory
 
+/** Class that looks for similar documents to a given ones
+  */
 class SimDocsSearch(indexPath: String) {
   val directory = FSDirectory.open(new File(indexPath).toPath())
   val reader = DirectoryReader.open(directory)
@@ -109,10 +111,12 @@ class SimDocsSearch(indexPath: String) {
 
 object SimDocsSearch extends App {
   private def usage(): Unit = {
-    Console.err.println("usage: SimDocsSearch <indexPath> <text>" +
-    "\n\t-fields=<field>,<field>,...,<field>" +
-    "\n\t[-maxDocs=<num>]" +
-    "\n\t[-minSim=<num>]")
+    Console.err.println("usage: SimDocsSearch" +
+    "\n\t<indexPath> - lucene Index where the similar document will be searched" +
+    "\n\t<text> - text used to look for similar documents" +
+    "\n\t-fields=<field>,<field>,...,<field> - document fields used to look for similarities" +
+    "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
+    "\n\t[-minSim=<num>] - minimum similarity level (0 to 1.0) accepted ")
     System.exit(1)
   }
 
@@ -170,6 +174,13 @@ object SimDocsSearch extends App {
     }
   }
 
+  /**
+    * Given an input text, returns all of its ngrams
+    *
+    * @param text input text
+    * @param analyzer Lucene analyzer class
+    * @return a set of ngrams
+    */
   private def getNGrams(text: String,
                         analyzer: Analyzer): Set[String] = {
     val tokenStream = analyzer.tokenStream(null, text)
@@ -184,6 +195,14 @@ object SimDocsSearch extends App {
     set
   }
 
+  /**
+    * Returns all tokens from a token stream
+    *
+    * @param tokenStream Lucene token stream object
+    * @param cattr auxiliary object. See Lucene documentation
+    * @param auxSet temporary working set
+    * @return a set of tokens
+    */
   private def getTokens(tokenStream: TokenStream,
                         cattr: CharTermAttribute,
                         auxSet: Set[String]): Set[String] = {

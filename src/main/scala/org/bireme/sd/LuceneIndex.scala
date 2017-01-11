@@ -27,10 +27,18 @@ import org.apache.lucene.document.{Document,Field,StoredField,TextField}
 import org.apache.lucene.index.{IndexWriter,IndexWriterConfig}
 import org.apache.lucene.store.FSDirectory
 
+/** Creates a Lucene index from a set of xml document files
+*
+* @author: Heitor Barbieri
+* date: 20170102
+*/
 object LuceneIndex extends App {
   private def usage(): Unit = {
-    Console.err.println("usage: LuceneIndex <indexPath> <xmlDir>" +
-    "[-fields=<field1>,...,<fieldN>] [-encoding=<str>]")
+    Console.err.println("usage: LuceneIndex" +
+      "\n\t<indexPath> - path to Lucene index to be created" +
+      "\n\t<xmlDir> - directory of xml used to populate the index" +
+      "\n\t[-fields=<field1>,...,<fieldN>] - field names that will be indexed" +
+      "\n\t[-encoding=<str>] - character encoding from xml files")
     System.exit(1)
   }
 

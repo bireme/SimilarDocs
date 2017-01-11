@@ -23,6 +23,12 @@ package org.bireme.sd.service
 
 import org.bireme.sd.SimDocsSearch
 
+/**
+  * Application to test the same services offered by the associated web services
+  *
+  * @author: Heitor Barbieri
+  * date: 20170110
+  */
 object TopIndexTestService extends App {
   private def usage(): Unit = {
     Console.err.println("usage: TopIndexTestService\n" +

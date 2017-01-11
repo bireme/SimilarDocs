@@ -26,6 +26,11 @@ import scala.collection.mutable.Map
 import scala.io.{BufferedSource, Source}
 import scala.util.{Try, Success, Failure}
 
+/** Parses an Iahx XML file to convert it into a Lucene document
+  *
+  * @author: Heitor Barbieri
+  * date: 20170110
+  */
 object IahxXmlParser {
   val field_regexp = """ *<field name="(.+?)">(.+?)</field> *""".r
 
@@ -137,6 +142,12 @@ object IahxXmlParser {
     }
   }
 
+  /**
+    * Returns the xml lines until there is a 'field' open tag
+    *
+    * @param lines current xml line and the next ones
+    * @return the xml lines until there is a 'field' open tag or None if not
+    */
   private def getOpenFieldElem(lines: Iterator[String]): Option[String] = {
     if (!lines.hasNext)
       throw new IOException("<field> or </doc> element expected")
@@ -147,6 +158,15 @@ object IahxXmlParser {
     else getOpenFieldElem(lines)
   }
 
+  /**
+    * Returns the content of the current xml line until a line having the close
+    * tag of 'field' xml element
+    *
+    * @param aux current xml line
+    * @param lines the next xml lines
+    * @return the content of the current xml line until a line having the close
+    *         tag of 'field' xml element
+    */
   private def getUntilCloseFldElem(aux: String,
                                    lines: Iterator[String]): String = {
     if (lines.hasNext) {  // new lines are eliminated
@@ -156,15 +176,28 @@ object IahxXmlParser {
     } else throw new IOException("</field> element expected")
   }
 
+  /**
+    * Parses the xml using a regular expression and returns the name and
+    * content of a xml element 'field'
+    *
+    * @param str xml content
+    * @return name and content of a xml element 'field'
+    */
   private def parseField(str: String): (String, String) = {
     Try {
       str match { case field_regexp(name, content) => (name, content) }
     } match {
       case Success((tag,content)) => (tag,content)
-      case Failure(_) => parseField1(str)
+      case Failure(_) => parseField1(str)  // To catch rare cases use the other method
     }
   }
 
+  /**
+    * Returns the name and content of a xml element 'field'
+    *
+    * @param str xml content
+    * @return name and content of a xml element 'field'
+    */
   private def parseField1(str: String): (String, String) = {
     val pos1 = str.indexOf("<field name=")
     if (pos1 == -1) throw new IOException(s"parseField [$str]")

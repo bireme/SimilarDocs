@@ -29,6 +29,11 @@ import org.bireme.sd.SimDocsSearch
 import org.apache.lucene.search.IndexSearcher
 import org.apache.lucene.store.FSDirectory
 
+/** Application to regularly update all similar documents into lucene indexes
+*
+* @author: Heitor Barbieri
+* date: 20170110
+*/
 object UpdaterBatchService extends App {
   private def usage(): Unit = {
     Console.err.println("usage: UpdateBatchService:\n" +
