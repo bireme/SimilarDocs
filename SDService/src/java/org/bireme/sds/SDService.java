@@ -1,8 +1,4 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package org.bireme.sds;
 
 import java.io.IOException;
@@ -13,7 +9,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import org.bireme.sd.Tools;
 
 import org.bireme.sd.service.TopIndex;
 
@@ -37,9 +32,6 @@ public class SDService extends HttpServlet {
         final String sdIndexPath = context.getInitParameter("SD_INDEX_PATH");
         if (sdIndexPath == null) throw new ServletException(
                                               "empty 'SD_INDEX_PATH' config");           
-        final String freqIndexPath = context.getInitParameter("FREQ_INDEX_PATH");
-        if (freqIndexPath == null) throw new ServletException(
-                                              "empty 'FREQ_INDEX_PATH' config");   
         final String otherIndexPath = context.getInitParameter("OTHER_INDEX_PATH");
         if (otherIndexPath == null) throw new ServletException(
                                               "empty 'OTHER_INDEX_PATH' config");   
@@ -49,13 +41,25 @@ public class SDService extends HttpServlet {
                          (otherIndexPath.endsWith("/") ? "" : "/") + "topIndex";
         Set<String> fields = new HashSet<>();
         fields.add("ti");
+        fields.add("ti_de");
+        fields.add("ti_en");
+        fields.add("ti_es");
+        fields.add("ti_fr");
+        fields.add("ti_it");
+        fields.add("ti_pt");
         fields.add("ab");
+        fields.add("ab_de");
+        fields.add("ab_en");
+        fields.add("ab_es");
+        fields.add("ab_fr");
+        fields.add("ab_it");
+        fields.add("ab_pt");
         
         Tools.deleteLockFile(docIndexPath);
         Tools.deleteLockFile(topIndexPath);
 
-        topIndex = new TopIndex(sdIndexPath, docIndexPath, freqIndexPath,
-                              topIndexPath, fields.toSet());
+        topIndex = new TopIndex(sdIndexPath, docIndexPath, topIndexPath, 
+                                                                fields.toSet());
     }
 
     /**
@@ -116,7 +120,7 @@ public class SDService extends HttpServlet {
                     final String sentence = request.getParameter("sentence");
                     if (sentence == null) usage(out);
                     else {
-                        topIndex.addProfile(psId, addProfile, sentence, true);
+                        topIndex.addProfile(psId, addProfile, sentence);
                         out.println("<RESULT>OK</RESULT>");
                     }
                 }

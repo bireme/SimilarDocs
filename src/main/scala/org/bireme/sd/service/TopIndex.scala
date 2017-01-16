@@ -77,7 +77,7 @@ class TopIndex(sdIndexPath: String,
     * Adds profile instances to a personal services document
     *
     * @param psId personal services document identifier
-    * @param name profile collection of profile name and content
+    * @param profiles collection of profile name and content
     */
   def addProfiles(psId: String,
                   profiles: Map[String,String]): Unit = {
