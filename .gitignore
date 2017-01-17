@@ -1,4 +1,3 @@
-*.class
 *.log
 
 # sbt specific
@@ -11,22 +10,6 @@ lib_managed/
 src_managed/
 project/boot/
 project/plugins/project/
-Lucene_3-4-0/TitAbs
-Lucene_3-4-0/decs
-Lucene_3-4-0/.ensime_cache
-Lucene_3-4-0/.cache-main
-Lucene_3-4-0/.classpath
-Lucene_3-4-0/.ensime
-Lucene_3-4-0/.project
-Lucene_3-4-0/.settings/org.eclipse.core.resources.prefs
-Lucene_6-1-0/TitAbs
-Lucene_6-1-0/decs
-Lucene_6-1-0/.ensime_cache
-Lucene_6-1-0/.cache-main
-Lucene_6-1-0/.classpath
-Lucene_6-1-0/.ensime
-Lucene_6-1-0/.project
-Lucene_6-1-0/.settings/org.eclipse.core.resources.prefs
 
 # Scala-IDE specific
 .scala_dependencies
