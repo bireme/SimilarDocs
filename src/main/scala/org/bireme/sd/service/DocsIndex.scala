@@ -60,8 +60,8 @@ class DocsIndex(docIndex: String,
   }
 
   /**
-    * Creates a new document if there is not one with this is. It there is
-    * some, increment the total field
+    * Creates a new document if there is not one with this id. If there is
+    * some, increment the '__total' field
     *
     * @param id: document unique identifier
     * @return the total number of personal services documents associated with

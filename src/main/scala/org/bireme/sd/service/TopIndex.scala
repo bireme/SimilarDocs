@@ -127,7 +127,8 @@ class TopIndex(sdIndexPath: String,
   }
 
   /**
-    * Adds a profile instance to a personal services document
+    * Adds a profile instance to a personal services document. If there is
+    * a profile with the same name, then replace it;
     *
     * @param doc personal services document
     * @param name profile name
@@ -136,11 +137,19 @@ class TopIndex(sdIndexPath: String,
   private def addProfile(doc: Document,
                          name: String,
                          sentence: String): Unit = {
-    val uSentence = uniformString(sentence)
+    val newSentence = uniformString(sentence)
+    val oldSentence = doc.get(name)
 
-    if (doc.getField(name) != null) {
-      doc.add(new StoredField("name", uSentence))
-      docIndex.newRecord(uSentence) // create a new document at docIndex
+    if (oldSentence == null) { // new profile
+      doc.add(new StoredField(name, newSentence))
+      docIndex.newRecord(newSentence) // create a new document at docIndex
+    } else { // there was already a profile with the same name
+      if (! oldSentence.equals(newSentence)) { // same profile but with different sentence
+        doc.removeField(name)
+        doc.add(new StoredField(name, newSentence))
+        docIndex.deleteRecord(oldSentence, onlyIfUnique=true)
+        docIndex.newRecord(newSentence) // create a new document at docIndex
+      }
     }
   }
 
