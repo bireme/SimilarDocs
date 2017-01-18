@@ -81,12 +81,14 @@ class TopIndex(sdIndexPath: String,
     */
   def addProfiles(psId: String,
                   profiles: Map[String,String]): Unit = {
+    val lpsId = psId.toLowerCase()
+
     // Retrieves or creates the pesonal service document
-    val doc = getDocument(psId) match {
+    val doc = getDocument(lpsId) match {
       case Some(doc) => doc
       case None => {
         val doc2 = new Document()
-        doc2.add(new StringField("id", psId, Field.Store.YES))
+        doc2.add(new StringField("id", lpsId, Field.Store.YES))
         doc2
       }
     }
@@ -95,7 +97,7 @@ class TopIndex(sdIndexPath: String,
       case (name,sentence) => addProfile(doc, name, sentence)
     }
     // Saves document
-    topWriter.updateDocument(new Term("id", psId), doc)
+    topWriter.updateDocument(new Term("id", lpsId), doc)
     topWriter.commit()
   }
 
@@ -109,20 +111,25 @@ class TopIndex(sdIndexPath: String,
   def addProfile(psId: String,
                  name: String,
                  sentence: String): Unit = {
+    val lpsId = psId.toLowerCase()
+
     // Retrieves or creates the pesonal service document
-    val doc = getDocument(psId) match {
-      case Some(doc) => doc
+    val (doc,isNew) = getDocument(lpsId) match {
+      case Some(doc) => (doc,false)
       case None => {
         val doc2 = new Document()
-        doc2.add(new StringField("id", psId, Field.Store.YES))
-        doc2
+        doc2.add(new StringField("id", lpsId, Field.Store.YES))
+        (doc2,true)
       }
     }
     // Adds profile to the document
     addProfile(doc, name, sentence)
 
+//doc.getFields().asScala.foreach(field => println(s"name:${field.name()} content:${field.stringValue()}"))
+
     // Saves document
-    topWriter.updateDocument(new Term("id", psId), doc)
+    if (isNew) topWriter.addDocument(doc)
+    else topWriter.updateDocument(new Term("id", lpsId), doc)
     topWriter.commit()
   }
 
@@ -145,7 +152,7 @@ class TopIndex(sdIndexPath: String,
       docIndex.newRecord(newSentence) // create a new document at docIndex
     } else { // there was already a profile with the same name
       if (! oldSentence.equals(newSentence)) { // same profile but with different sentence
-        doc.removeField(name)
+        doc.removeField(name)  // only one occurrence for profile
         doc.add(new StoredField(name, newSentence))
         docIndex.deleteRecord(oldSentence, onlyIfUnique=true)
         docIndex.newRecord(newSentence) // create a new document at docIndex
@@ -178,10 +185,12 @@ class TopIndex(sdIndexPath: String,
     */
   def deleteProfile(psId: String,
                     name: String): Boolean = {
-    getDocument(psId) match {
+    val lpsId = psId.toLowerCase()
+
+    getDocument(lpsId) match {
       case Some(doc) => {
         if (deleteProfile(doc, name)) {
-          topWriter.updateDocument(new Term("id", psId), doc)
+          topWriter.updateDocument(new Term("id", lpsId), doc)
           topWriter.commit()
           true
         } else false
@@ -199,8 +208,8 @@ class TopIndex(sdIndexPath: String,
     */
   private def deleteProfile(doc: Document,
                             name: String): Boolean = {
-    val size = doc.getFields().size()
     val docId = doc.get(name)
+
     if (name.equals("id") || (docId == null)) false
     else {
       doc.removeField(name)
@@ -218,9 +227,9 @@ class TopIndex(sdIndexPath: String,
     *         can have more than one occurrence
     */
   def getProfilesXml(psId: String): String = {
-    getProfiles(psId).foldLeft[String]("<profiles>") {
-      case(str,(k,set)) =>
-        s"""$str<profile><name>$k</name><words>${set.mkString(",")}</words></profile>"""
+      getProfiles(psId).foldLeft[String]("<profiles>") {
+      case(str,(name,content)) =>
+        s"""$str<profile><name>$name</name><content>$content</content></profile>"""
     } + "</profiles>"
   }
 
@@ -229,19 +238,21 @@ class TopIndex(sdIndexPath: String,
     * (some fields of that document)
     *
     * @param psId personal services document unique id
-    * @return a collection of profiles names and its contents. Profiles as
-    *         document fields can have more than one occurrence
+    * @return a collection of profiles names and its contents. Profiles can not
+    *         have more than one occurrence
     */
-  def getProfiles(psId: String): Map[String,Set[String]] = {
-    getDocument(psId) match {
+  def getProfiles(psId: String): Map[String,String] = {
+    val lpsId = psId.toLowerCase()
+
+    getDocument(lpsId) match {
       case Some(doc) => doc.getFields.asScala.
-                                     foldLeft[Map[String,Set[String]]] (Map()) {
-        case (map, field) =>
-          val id = field.name()
-          if (id.equals("id")) map
-          else map + ((id, field.stringValue().split(" ").toSet))
-      }
-      case None => Map()
+        foldLeft[Map[String,String]] (Map()) {
+          case (map, field) =>
+            val id = field.name()
+            if (id.equals("id")) map
+            else map + ((id, field.stringValue()))
+        }
+      case None => println("nao achei");Map()
     }
   }
 
@@ -297,7 +308,9 @@ class TopIndex(sdIndexPath: String,
                  profiles: Set[String],
                  outFlds: Set[String],
                  maxDocs: Int): List[Map[String,List[String]]] = {
-    getDocument(psId) match {
+    val lpsId = psId.toLowerCase()
+
+    getDocument(lpsId) match {
       case Some(doc) => {
         val docIds = getDocIds(doc, profiles)
 //println(s"docIds=$docIds")
@@ -420,7 +433,7 @@ class TopIndex(sdIndexPath: String,
     val topReader = DirectoryReader.open(topWriter)
     val topSearcher = new IndexSearcher(topReader)
     val docs = topSearcher.search(new TermQuery(new Term("id", id)), 1)
-
+println(s"totalHits=${docs.totalHits} id=$id")
     val result = docs.totalHits match {
       case 0 => None
       case _ => Some(topSearcher.doc(docs.scoreDocs(0).doc))
@@ -469,7 +482,8 @@ class TopIndex(sdIndexPath: String,
   }
 
   /**
-    * Converts all input charactes into a-z, 0-9 and spaces
+    * Converts all input charactes into a-z, 0-9 and spaces. Removes adjacent
+    * whites and sort the words.
     *
     * @param in input string to be converted
     * @return the converted string
@@ -478,6 +492,7 @@ class TopIndex(sdIndexPath: String,
     val s1 = Normalizer.normalize(in.toLowerCase(), Form.NFD)
     val s2 = s1.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
 
-    s2.replaceAll("\\W", " ")
+    TreeSet(s2.replaceAll("\\W", " ").trim().split(" +"): _*).
+                                             filter(_.length >= 3).mkString(" ")
   }
 }

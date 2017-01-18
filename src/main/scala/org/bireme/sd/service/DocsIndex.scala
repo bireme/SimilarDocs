@@ -101,11 +101,12 @@ class DocsIndex(docIndex: String,
     */
   def deleteRecord(id: String,
                    onlyIfUnique: Boolean = false): Unit = {
-    def delDoc(): Unit = {
+    def delDoc(total: Int,
+               isNew: Boolean): Unit = {
       val doc = new Document()
       doc.add(new StringField("id", id, Field.Store.YES))
-      doc.add(new StoredField("is_new", "false"))
-      doc.add(new StoredField("__total", 0))
+      doc.add(new StoredField("is_new", if (isNew) "true" else "false"))
+      doc.add(new StoredField("__total", total))
       doc_writer.addDocument(doc)
       doc_writer.updateDocument(new Term("id", id), doc)
       doc_writer.commit()
@@ -116,12 +117,13 @@ class DocsIndex(docIndex: String,
     val tot_docs = doc_searcher.search(new TermQuery(new Term("id", id)), 2)
 
     if (tot_docs.totalHits > 0) {
-      if (onlyIfUnique) {
-        val doc = doc_searcher.doc(tot_docs.scoreDocs(0).doc)
-        val total = doc.getField("__total").numericValue().intValue
-        if (total == 1) delDoc()
+      val doc = doc_searcher.doc(tot_docs.scoreDocs(0).doc)
+      val isNew = "true".equals(doc.get("is_new"))
 
-      } else delDoc()
+      if (onlyIfUnique) {
+        val total = doc.getField("__total").numericValue().intValue
+        if (total > 0) delDoc(total - 1, isNew)
+      } else delDoc(0, isNew)
     }
     doc_reader.close()
   }
@@ -187,7 +189,7 @@ class DocsIndex(docIndex: String,
 
   /**
     * Updates the sd_id (similar document ids) associated with all docIndex
-    * new records (having is_new field)
+    * new records (having is_new field equals to true)
     *
     * @param idxFldNames names of document fields used to find similar docs
     * @param minSim minimum acceptable similarity between documents
@@ -215,8 +217,8 @@ class DocsIndex(docIndex: String,
 
   /**
     * Updates the sd_id (similar document ids) associated with all docIndex
-    *  records (new ones - having is_new field and old ones - with out field
-    * is_new)
+    *  records: new ones - with is_new field equal to true and old ones -
+    *  with out field is_new field equal to false
     *
     * @param idxFldNames names of document fields used to find similar docs
     * @param minSim minimum acceptable similarity between documents
