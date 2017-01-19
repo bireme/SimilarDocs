@@ -227,7 +227,9 @@ class TopIndex(sdIndexPath: String,
     *         can have more than one occurrence
     */
   def getProfilesXml(psId: String): String = {
-      getProfiles(psId).foldLeft[String]("<profiles>") {
+    val head = """<?xml version="1.0" encoding="UTF-8"?><profiles>"""
+
+    getProfiles(psId).foldLeft[String](head) {
       case(str,(name,content)) =>
         s"""$str<profile><name>$name</name><content>$content</content></profile>"""
     } + "</profiles>"
@@ -252,7 +254,7 @@ class TopIndex(sdIndexPath: String,
             if (id.equals("id")) map
             else map + ((id, field.stringValue()))
         }
-      case None => println("nao achei");Map()
+      case None => Map()
     }
   }
 
@@ -278,12 +280,14 @@ class TopIndex(sdIndexPath: String,
       case (str,map) => {
         s"${str}<document>" + map.foldLeft[String]("") {
           case (str2, (tag,lst)) => {
+            val tag2 = tag.trim().replaceAll(" +", "_")
+
             lst.size match {
               case 0 => str2
-              case 1 => str2 + s"<$tag>${cleanString(lst(0))}</$tag>"
-              case _ => str2 + s"<${tag}_list>" + lst.foldLeft[String]("") {
-                case (str3,elem) => s"$str3<$tag>${cleanString(elem)}</$tag>"
-              } + s"</${tag}_list>"
+              case 1 => str2 + s"<$tag2>${cleanString(lst(0))}</$tag2>"
+              case _ => str2 + lst.foldLeft[String]("") {
+                case (str3,elem) => s"$str3<$tag2>${cleanString(elem)}</$tag2>"
+              }
             }
           }
         } + "</document>"
@@ -433,7 +437,7 @@ class TopIndex(sdIndexPath: String,
     val topReader = DirectoryReader.open(topWriter)
     val topSearcher = new IndexSearcher(topReader)
     val docs = topSearcher.search(new TermQuery(new Term("id", id)), 1)
-println(s"totalHits=${docs.totalHits} id=$id")
+//println(s"totalHits=${docs.totalHits} id=$id")
     val result = docs.totalHits match {
       case 0 => None
       case _ => Some(topSearcher.doc(docs.scoreDocs(0).doc))
