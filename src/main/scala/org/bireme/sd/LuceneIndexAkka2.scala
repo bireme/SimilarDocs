@@ -35,6 +35,11 @@ import scala.util.control.NonFatal
 
 case object FinishMessage
 
+/***
+* AVISO - Erro de algoritmo - corrigir
+          java.lang.OutOfMemoryError: GC overhead limit exceeded
+***/
+
 class LuceneIndexMain2(indexPath: String,
                        xmlDir: String,
                        fldNames: Set[String],
