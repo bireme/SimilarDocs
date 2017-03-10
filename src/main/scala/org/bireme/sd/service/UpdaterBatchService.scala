@@ -40,7 +40,7 @@ object UpdaterBatchService extends App {
       "\n\t-sdIndexPath=<path>     : documents Lucene index path" +
       "\n\t-docIndexPath=<path>    : doc indexes directory path" +
       "\n\t-updAllDay=<day-number> : day to update all similar documents " +
-                                       "index 1-sunday 7-saturday"
+                                       "index 0-today 1-sunday 7-saturday"
     )
     System.exit(1)
   }
@@ -61,7 +61,8 @@ object UpdaterBatchService extends App {
   val sdSearcher = new SimDocsSearch(sdIndexPath)
 
   val updAllDay = parameters("updAllDay").toInt
-  val updateAll = (Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == updAllDay)
+  val updateAll = ((updAllDay == 0) ||
+                  (Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == updAllDay))
   val idxFldName = Set("ti", "ab")
 
   val docIndex = new DocsIndex(docIndexPath, sdSearcher)
