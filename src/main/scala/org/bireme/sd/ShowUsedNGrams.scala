@@ -170,7 +170,8 @@ object ShowUsedNGrams extends App {
                        analyzer: Analyzer): Boolean = {
     val mqParser = new MultiFieldQueryParser(fields.toArray, analyzer)
 //println(s"tok=$tok")
-    if (tok.contains("(") || tok.contains(")") || tok.contains(":")) false else {
+    if (tok.contains("(") || tok.contains(")") || tok.contains(":")) false
+    else {
       val query =  mqParser.parse(tok)
 
       searcher.search(query, 1).totalHits > 0
