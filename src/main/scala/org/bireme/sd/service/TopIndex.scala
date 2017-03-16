@@ -51,7 +51,11 @@ import scala.util.{Try, Success, Failure}
 class TopIndex(sdIndexPath: String,
                docIndexPath: String,
                topIndexPath: String,
-               idxFldName: Set[String] = Set("ti", "ab")) {
+               idxFldNames: Set[String] = Set(
+  "ti","ti_pt","ti_ru","ti_fr","ti_de","ti_it","ti_en","ti_es","ti_eng","ti_Pt",
+  "ti_Ru","ti_Fr","ti_De","ti_It","ti_En","ti_Es","ab_en","ab_es","ab_Es",
+  "ab_de","ab_De","ab_pt","ab_fr","ab_french")) {
+
   val lcAnalyzer = new LowerCaseAnalyzer(true)
   val topDirectory = FSDirectory.open(Paths.get(topIndexPath))
   val topConfig = new IndexWriterConfig(lcAnalyzer)
@@ -149,13 +153,13 @@ class TopIndex(sdIndexPath: String,
 
     if (oldSentence == null) { // new profile
       doc.add(new StoredField(name, newSentence))
-      docIndex.newRecord(newSentence) // create a new document at docIndex
+      docIndex.newRecord(newSentence, idxFldNames) // create a new document at docIndex
     } else { // there was already a profile with the same name
       if (! oldSentence.equals(newSentence)) { // same profile but with different sentence
         doc.removeField(name)  // only one occurrence for profile
         doc.add(new StoredField(name, newSentence))
         docIndex.deleteRecord(oldSentence, onlyIfUnique=true)
-        docIndex.newRecord(newSentence) // create a new document at docIndex
+        docIndex.newRecord(newSentence, idxFldNames) // create a new document at docIndex
       }
     }
   }

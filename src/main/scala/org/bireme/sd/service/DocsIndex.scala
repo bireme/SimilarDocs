@@ -64,21 +64,23 @@ class DocsIndex(docIndex: String,
     * some, increment the '__total' field
     *
     * @param id: document unique identifier
+    * @param idxFldNames: names of fields used to look for similar documents
     * @return the total number of personal services documents associated with
     *         this one
     */
-  def newRecord(id: String): Int = {
+  def newRecord(id: String,
+                idxFldNames: Set[String]): Int = {
     val doc_reader = DirectoryReader.open(doc_writer)
     val doc_searcher = new IndexSearcher(doc_reader)
     val tot_docs = doc_searcher.search(new TermQuery(new Term("id", id)), 1)
-    val total = if (tot_docs.totalHits == 0) { // there is a document with this id
+    val total = if (tot_docs.totalHits == 0) { // there is no document with this id
       val doc = new Document()
       doc.add(new StringField("id", id, Field.Store.YES))
       doc.add(new StoredField("is_new", "true"))
       doc.add(new StoredField("__total", 1))
       doc_writer.addDocument(doc)
       1
-    } else {                                // there is no document with this id
+    } else {                                // there is a document with this id
       val doc = doc_searcher.doc(tot_docs.scoreDocs(0).doc)
       val tot = doc.getField("__total").numericValue().intValue
       doc.removeField("__total")
@@ -86,8 +88,9 @@ class DocsIndex(docIndex: String,
       doc_writer.updateDocument(new Term("id", id), doc)
       tot + 1
     }
-//println(s"newRecord total=$total")
     doc_writer.commit()
+    updateRecordDocs(id, idxFldNames)  // updates sd_id fields
+//println(s"newRecord total=$total")
     doc_reader.close()
     total
   }
@@ -102,28 +105,31 @@ class DocsIndex(docIndex: String,
   def deleteRecord(id: String,
                    onlyIfUnique: Boolean = false): Unit = {
     def delDoc(total: Int,
+               sdIds: Array[String],
                isNew: Boolean): Unit = {
       val doc = new Document()
       doc.add(new StringField("id", id, Field.Store.YES))
       doc.add(new StoredField("is_new", if (isNew) "true" else "false"))
+      sdIds.foreach(sdId => doc.add(new StoredField("sd_id", sdId)))
       doc.add(new StoredField("__total", total))
-      doc_writer.addDocument(doc)
-      doc_writer.updateDocument(new Term("id", id), doc)
+      if (isNew) doc_writer.addDocument(doc)
+      else doc_writer.updateDocument(new Term("id", id), doc)
       doc_writer.commit()
     }
 
     val doc_reader = DirectoryReader.open(doc_writer)
     val doc_searcher = new IndexSearcher(doc_reader)
-    val tot_docs = doc_searcher.search(new TermQuery(new Term("id", id)), 2)
+    val tot_docs = doc_searcher.search(new TermQuery(new Term("id", id)), 1)
 
     if (tot_docs.totalHits > 0) {
       val doc = doc_searcher.doc(tot_docs.scoreDocs(0).doc)
       val isNew = "true".equals(doc.get("is_new"))
+      val sdIds = doc.getValues("sd_id")
 
       if (onlyIfUnique) {
         val total = doc.getField("__total").numericValue().intValue
-        if (total > 0) delDoc(total - 1, isNew)
-      } else delDoc(0, isNew)
+        if (total > 0) delDoc(total - 1, sdIds, isNew)
+      } else delDoc(0, sdIds, isNew)
     }
     doc_reader.close()
   }
@@ -162,7 +168,7 @@ class DocsIndex(docIndex: String,
     */
   def updateRecordDocs(id: String,
                        idxFldNames: Set[String],
-                       minSim: Float,
+                       minSim: Float = 0.8f,
                        maxDocs: Int = 10): Unit = {
     val doc_reader = DirectoryReader.open(doc_writer)
     val doc_searcher = new IndexSearcher(doc_reader)
@@ -171,12 +177,14 @@ class DocsIndex(docIndex: String,
     val total = if (topDocs.totalHits == 0) 0 else
       doc_searcher.doc(topDocs.scoreDocs(0).doc).getField("__total").
                                                          numericValue().intValue
-    if  (total > 0) {
-      val doc_searcher = new IndexSearcher(doc_reader)
+//println(s"TOTAL = $total")
+    if  (total > 0) { // there are personal services documents with this profile
       val results = simSearch.searchIds(id, idxFldNames, maxDocs, minSim)
+//println(s"results=$results")
       val doc = new Document()
 
       doc.add(new StringField("id", id, Field.Store.YES))
+      doc.add(new StoredField("is_new", "false"))
       doc.add(new StoredField("__total", total))
       results.foreach {
         case (sd_id,_) => doc.add(new StoredField("sd_id", sd_id))
