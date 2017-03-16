@@ -142,13 +142,17 @@ class LuceneIndexActor(indexWriter: IndexWriter,
 
   def receive = {
     case (fname:String, encoding:String) => {
-      IahxXmlParser.getElements(fname, encoding, Set()).zipWithIndex.foreach {
-        case (map,idx) => {
-          if (idx % 50000 == 0) {
-            log.info(s"[$fname] - $idx")
+      try {
+        IahxXmlParser.getElements(fname, encoding, Set()).zipWithIndex.foreach {
+          case (map,idx) => {
+            if (idx % 50000 == 0) {
+              log.info(s"[$fname] - $idx")
+            }
+            indexWriter.addDocument(map2doc(map.toMap, doc))
           }
-          indexWriter.addDocument(map2doc(map.toMap, doc))
         }
+      } catch  {
+        case ex: Throwable => log.error(s"[$fname] -${ex.toString()}")
       }
     }
     case msg:String =>
