@@ -38,7 +38,8 @@ import scala.util.control.NonFatal
 
 class LuceneIndexMain(indexPath: String,
                       xmlDir: String,
-                      fldNames: Set[String],
+                      fldIdxNames: Set[String],
+                      fldStrdNames: Set[String],
                       decsDir: String,
                       encoding: String) extends Actor with ActorLogging {
   val idxWorkers = 5 // Number of actors to run concurrently
@@ -57,7 +58,7 @@ class LuceneIndexMain(indexPath: String,
   val routerIdx = {
     val routees = Vector.fill(idxWorkers) {
       val r = context.actorOf(Props(classOf[LuceneIndexActor], indexWriter,
-                                                  fldNames, decsMap, decsBoost))
+                                 fldIdxNames, fldStrdNames, decsMap, decsBoost))
       context watch r
       ActorRefRoutee(r)
     }
@@ -127,13 +128,14 @@ class LuceneIndexMain(indexPath: String,
 }
 
 class LuceneIndexActor(indexWriter: IndexWriter,
-                       fldNames: Set[String],
+                       fldIdxNames: Set[String],
+                       fldStrdNames: Set[String],
                        decsMap: Map[Int,Set[String]],
                        decsBoost: Float) extends Actor with ActorLogging {
   val regexp = """\^d\d+""".r
   val doc = new Document()
   val indexDecs = !decsMap.isEmpty
-  val fldMap = fldNames.foldLeft[Map[String,Float]](Map[String,Float]()) {
+  val fldMap = fldIdxNames.foldLeft[Map[String,Float]](Map[String,Float]()) {
     case (map,fname) =>
       val split = fname.split(" *: *", 2)
       if (split.length == 1) map + ((split(0), 1f))
@@ -199,10 +201,10 @@ class LuceneIndexActor(indexWriter: IndexWriter,
               fld.setBoost(boost)
               doc.add(fld)
           }
-        } else {
-          /*lst.foreach {
+        } else if (fldStrdNames.contains(tag)) {
+          lst.foreach {
             elem => doc.add(new StoredField(tag, elem))
-          }*/
+          }
         }
     }
     doc
@@ -222,7 +224,8 @@ object LuceneIndexAkka extends App {
 
   private def usage(): Unit = {
     Console.err.println("usage: LuceneIndexAkka <indexPath> <xmlDir>" +
-    "\n\t[-fields=<field1>[:<boost>],...,<fieldN>[:<boost>]]" +
+    "\n\t[-indexedFields=<field1>[:<boost>],...,<fieldN>[:<boost>]]" +
+    "\n\t[-storedFields=<field1>,...,<fieldN>]" +
     "\n\t[-decs=<dir>[:<boost>]]" +
     "\n\t[-encoding=<str>]")
     System.exit(1)
@@ -236,17 +239,20 @@ object LuceneIndexAkka extends App {
       map + ((split(0).substring(1), split(1)))
     }
   }
-  val sFields = parameters.getOrElse("fields", "")
-  val fldNames = (if (sFields.isEmpty) Set[String]()
-                 else sFields.split(" *, *").toSet) + "id"
+  val sIdxFields = parameters.getOrElse("indexedFields", "")
+  val fldIdxNames = (if (sIdxFields.isEmpty) Set[String]()
+                     else sIdxFields.split(" *, *").toSet)
+  val sStrdFields = parameters.getOrElse("storedFields", "")
+  val fldStrdNames = (if (sStrdFields.isEmpty) Set[String]()
+                      else sStrdFields.split(" *, *").toSet) + "id"
 
   val decsDir = parameters.getOrElse("decs", "")
   val encoding = parameters.getOrElse("encoding", "ISO-8859-1")
 
   val system = ActorSystem("Main")
   try {
-    val props = Props(classOf[LuceneIndexMain], args(0), args(1), fldNames,
-                                                              decsDir, encoding)
+    val props = Props(classOf[LuceneIndexMain], args(0), args(1), fldIdxNames,
+                                                 sStrdFields, decsDir, encoding)
     val app = system.actorOf(props, "app")
     val terminator = system.actorOf(Props(classOf[Terminator], app),
                                                                "app-terminator")
