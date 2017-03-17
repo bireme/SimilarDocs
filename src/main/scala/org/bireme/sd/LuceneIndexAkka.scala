@@ -252,7 +252,7 @@ object LuceneIndexAkka extends App {
   val system = ActorSystem("Main")
   try {
     val props = Props(classOf[LuceneIndexMain], args(0), args(1), fldIdxNames,
-                                                 sStrdFields, decsDir, encoding)
+                                                fldStrdNames, decsDir, encoding)
     val app = system.actorOf(props, "app")
     val terminator = system.actorOf(Props(classOf[Terminator], app),
                                                                "app-terminator")
