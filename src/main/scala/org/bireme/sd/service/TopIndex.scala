@@ -458,7 +458,7 @@ class TopIndex(sdIndexPath: String,
     * @return the string with some characters replaced by entities
     */
   private def cleanString(in: String): String = {
-    in.replace("\"", "&quot;").replace("&", "&amp;").replace("'", "&pos;").
+    in.replace("\"", "&quot;").replace("&", "&amp;").replace("'", "&apos;").
        replace("<", "&lt;").replace(">", "&gt;")
   }
 
