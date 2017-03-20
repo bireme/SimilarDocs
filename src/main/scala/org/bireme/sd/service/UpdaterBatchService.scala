@@ -38,6 +38,7 @@ object UpdaterBatchService extends App {
   private def usage(): Unit = {
     Console.err.println("usage: UpdateBatchService:\n" +
       "\n\t-sdIndexPath=<path>     : documents Lucene index path" +
+      "\n\t-topIndexPath=<path>    : top indexes directory path" +
       "\n\t-docIndexPath=<path>    : doc indexes directory path" +
       "\n\t-updAllDay=<day-number> : day to update all similar documents " +
                                        "index 0-today 1-sunday 7-saturday"
@@ -45,7 +46,7 @@ object UpdaterBatchService extends App {
     System.exit(1)
   }
 
-  if (args.length != 3) usage()
+  if (args.length != 4) usage()
 
   val minSim = 0.5f
   val parameters = args.foldLeft[Map[String,String]](Map()) {
@@ -55,6 +56,7 @@ object UpdaterBatchService extends App {
       else map + ((split(0).substring(2), ""))
     }
   }
+  val topIndexPath = parameters("topIndexPath")
   val docIndexPath = parameters("docIndexPath")
 
   val sdIndexPath = parameters("sdIndexPath")
@@ -74,4 +76,7 @@ object UpdaterBatchService extends App {
 
   docIndex.close()
   sdSearcher.close()
+
+// Only to create the top index if it does not exist.
+  new TopIndex(sdIndexPath, docIndexPath, topIndexPath, idxFldName).close()
 }
