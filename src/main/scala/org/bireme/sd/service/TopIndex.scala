@@ -26,12 +26,14 @@ import java.nio.file.Paths
 import java.text.Normalizer
 import java.text.Normalizer.Form
 
+import org.apache.lucene.analysis.core.KeywordAnalyzer
 import org.apache.lucene.document.{Document, Field, StringField, StoredField}
 import org.apache.lucene.index.{DirectoryReader, IndexWriter, IndexWriterConfig, Term}
-import org.apache.lucene.search.{IndexSearcher, TermQuery}
+import org.apache.lucene.queryparser.classic.QueryParser
+import org.apache.lucene.search.IndexSearcher
 import org.apache.lucene.store.FSDirectory
 
-import org.bireme.sd.{SimDocsSearch}
+import org.bireme.sd.SimDocsSearch
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.TreeSet
@@ -59,12 +61,21 @@ class TopIndex(sdIndexPath: String,
   val lcAnalyzer = new LowerCaseAnalyzer(true)
   val topDirectory = FSDirectory.open(Paths.get(topIndexPath))
   val topConfig = new IndexWriterConfig(lcAnalyzer)
-  val topWriter =  new IndexWriter(topDirectory, topConfig)
-  val docDirectory = FSDirectory.open(Paths.get(docIndexPath))
   val simSearch = new SimDocsSearch(sdIndexPath)
   val docIndex = new DocsIndex(docIndexPath, simSearch)
 
+  var topWriter =  new IndexWriter(topDirectory, topConfig)
   topWriter.commit()
+
+  /**
+    * Forces the reopen of the IndexWriter
+    */
+  def refresh(): Unit = {
+    topWriter.close()
+    topWriter =  new IndexWriter(topDirectory, topConfig)
+    simSearch.refresh()
+    docIndex.refresh()
+  }
 
   /**
     * Closes all open resources
@@ -72,7 +83,6 @@ class TopIndex(sdIndexPath: String,
   def close(): Unit = {
     topWriter.close()
     topDirectory.close()
-    docDirectory.close()
     simSearch.close()
     docIndex.close()
   }
@@ -120,16 +130,20 @@ class TopIndex(sdIndexPath: String,
     // Retrieves or creates the pesonal service document
     val (doc,isNew) = getDocument(lpsId) match {
       case Some(doc) => (doc,false)
-      case None => {
+      case None =>
         val doc2 = new Document()
         doc2.add(new StringField("id", lpsId, Field.Store.YES))
         (doc2,true)
-      }
     }
     // Adds profile to the document
     addProfile(doc, name, sentence)
 
 //doc.getFields().asScala.foreach(field => println(s"name:${field.name()} content:${field.stringValue()}"))
+//println(s"addProfile psId=$psId doc=[$doc]")
+
+    // Avoid Lucene makes id tokenized (workarround)
+    doc.removeField("id")
+    doc.add(new StringField("id", lpsId, Field.Store.YES))
 
     // Saves document
     if (isNew) topWriter.addDocument(doc)
@@ -440,8 +454,10 @@ class TopIndex(sdIndexPath: String,
   private def getDocument(id: String): Option[Document] = {
     val topReader = DirectoryReader.open(topWriter)
     val topSearcher = new IndexSearcher(topReader)
-    val docs = topSearcher.search(new TermQuery(new Term("id", id)), 1)
-//println(s"totalHits=${docs.totalHits} id=$id")
+    val parser = new QueryParser("id", new KeywordAnalyzer())
+    val query = parser.parse(id);
+    val docs = topSearcher.search(query, 1)
+//println(s"totalHits=${docs.totalHits} id=[$id] query=[$query]")
     val result = docs.totalHits match {
       case 0 => None
       case _ => Some(topSearcher.doc(docs.scoreDocs(0).doc))

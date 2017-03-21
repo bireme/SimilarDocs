@@ -60,6 +60,7 @@ public class SDService extends HttpServlet {
 
         topIndex = new TopIndex(sdIndexPath, docIndexPath, topIndexPath,
                                                                 fields.toSet());
+        context.setAttribute("MAINTENANCE_MODE", Boolean.FALSE);
     }
 
     /**
@@ -76,8 +77,14 @@ public class SDService extends HttpServlet {
                                                         throws ServletException,
                                                                    IOException {
         response.setContentType("text/xml;charset=UTF-8");
+        
+        final ServletContext context = request.getServletContext();
+        
 
-        try (PrintWriter out = response.getWriter()) {
+        try (PrintWriter out = response.getWriter()) {             
+            /*if ((Boolean)context.getAttribute("MAINTENANCE_MODE")) {
+                out.println("<WARNING>System in maintenance mode</WARNING>");
+            }*/
             final String psId = request.getParameter("psId");
             if (psId == null) {
                 out.println("<ERROR>missing 'psId' parameter</ERROR>");

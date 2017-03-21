@@ -37,15 +37,20 @@ import org.apache.lucene.store.FSDirectory
   */
 class SimDocsSearch(indexPath: String) {
   val directory = FSDirectory.open(new File(indexPath).toPath())
-  val reader = DirectoryReader.open(directory)
-  val searcher = new IndexSearcher(reader)
+  var oldReader: DirectoryReader = null
 
   /**
     * Closes all used resources
     */
   def close(): Unit = {
-    reader.close()
     directory.close()
+  }
+
+  /**
+    * Forces the reopen of the DirectoryReader
+    */
+  def refresh(): Unit = {
+    oldReader = null
   }
 
   /**
@@ -85,9 +90,29 @@ class SimDocsSearch(indexPath: String) {
     val mqParser = new MultiFieldQueryParser(fields.toArray,
                                            new NGramAnalyzer(NGSize.ngram_size))
     val query =  mqParser.parse(text)
+    val searcher = new IndexSearcher(getReader())
 
     searcher.search(query, maxDocs).scoreDocs.filter(_.score >= minSim).
                                              map(sd => (sd.doc,sd.score)).toList
+  }
+
+ /**
+   * Open a new DirectoryReader if necessary, otherwise use the old one
+   *
+   * @return an DirectoryReader reflecting all changes made in the Lucene index
+   */
+  private def getReader(): DirectoryReader = {
+    if (oldReader == null) {
+      oldReader = DirectoryReader.open(directory)
+    } else {
+      val reader = DirectoryReader.openIfChanged(oldReader)
+      if (reader == null) oldReader
+      else {
+        oldReader.close()
+        oldReader = reader
+      }
+    }
+    oldReader
   }
 
   /**
@@ -99,7 +124,7 @@ class SimDocsSearch(indexPath: String) {
     */
   private def loadDoc(id: Int,
                       fields: Set[String]): Map[String,List[String]] = {
-    asScalaBuffer[IndexableField](reader.document(id).getFields()).
+    asScalaBuffer[IndexableField](getReader().document(id).getFields()).
                                     foldLeft[Map[String,List[String]]] (Map()) {
       case (map,fld) =>
         val name = fld.name()
@@ -136,9 +161,6 @@ object SimDocsSearch extends App {
   val search = new SimDocsSearch(args(0))
   val docs = search.search(args(1), fldNames, maxDocs, minSim)
 
-  val directory = FSDirectory.open(new File(args(0)).toPath())
-  val reader = DirectoryReader.open(directory)
-  val searcher = new IndexSearcher(reader)
   val analyzer = new NGramAnalyzer(NGSize.ngram_size)
   val set_text = getNGrams(args(1), analyzer)
 
@@ -160,9 +182,6 @@ object SimDocsSearch extends App {
           }
       }
   }
-  search.close()
-  reader.close()
-  directory.close()
 
   private def getSimilarText(doc: Map[String,List[String]],
                              fNames: Set[String]): String = {

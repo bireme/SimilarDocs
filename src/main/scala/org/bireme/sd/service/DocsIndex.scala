@@ -48,7 +48,7 @@ class DocsIndex(docIndex: String,
   val lc_analyzer = new LowerCaseAnalyzer(true)
   val doc_directory = FSDirectory.open(Paths.get(docIndex))
   val doc_config = new IndexWriterConfig(lc_analyzer)
-  val doc_writer =  new IndexWriter(doc_directory, doc_config)
+  var doc_writer =  new IndexWriter(doc_directory, doc_config)
   doc_writer.commit()
 
   /**
@@ -57,6 +57,14 @@ class DocsIndex(docIndex: String,
   def close(): Unit = {
     doc_writer.close()
     doc_directory.close()
+  }
+
+  /**
+    * Forces the reopen of the IndexWriter
+    */
+  def refresh(): Unit = {
+    doc_writer.close()
+    doc_writer =  new IndexWriter(doc_directory, doc_config)
   }
 
   /**
