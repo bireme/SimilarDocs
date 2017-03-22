@@ -13,6 +13,7 @@ lazy val root = (project in file(".")).
 val luceneVersion = "6.3.0"
 //val luceneVersion = "6.2.1"
 val akkaVersion = "2.4.14"
+val httpClientVersion = "4.5.2"
 
 libraryDependencies ++= Seq(
   "org.apache.lucene" % "lucene-core" % luceneVersion,
@@ -20,8 +21,9 @@ libraryDependencies ++= Seq(
   "org.apache.lucene" % "lucene-queryparser" % luceneVersion,
   "org.apache.lucene" % "lucene-queries" % luceneVersion,
   "org.apache.lucene" % "lucene-backward-codecs" % luceneVersion,
-  "com.typesafe.akka" %% "akka-actor" % akkaVersion
-  //"com.typesafe.akka" %% "akka-slf4j" % akkaVersion
+  "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+  //"com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
+  "org.apache.httpcomponents" % "httpclient" % httpClientVersion
 )
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")
