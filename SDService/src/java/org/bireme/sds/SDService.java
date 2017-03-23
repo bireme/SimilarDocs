@@ -136,8 +136,14 @@ public class SDService extends HttpServlet {
                     }
                 }
             } else {
-                context.setAttribute("MAINTENANCE_MODE", 
-                                     Boolean.valueOf(maintenance));
+                final Boolean maint = Boolean.valueOf(maintenance);
+                
+                context.setAttribute("MAINTENANCE_MODE", maint);
+                if (maint) { // maintenance mode is on
+                    topIndex.close();
+                } else { // maintenance mode is off
+                    topIndex.refresh();
+                }
                 out.println("<result>MAINTENANCE_MODE=" + maintenance + 
                                                                    "</result>");
             }
