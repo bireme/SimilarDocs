@@ -59,20 +59,22 @@ class TopIndex(sdIndexPath: String,
   "ab_de","ab_De","ab_pt","ab_fr","ab_french")) {
 
   val lcAnalyzer = new LowerCaseAnalyzer(true)
-  val topDirectory = FSDirectory.open(Paths.get(topIndexPath))
-  val topConfig = new IndexWriterConfig(lcAnalyzer)
   val simSearch = new SimDocsSearch(sdIndexPath)
   val docIndex = new DocsIndex(docIndexPath, simSearch)
 
-  var topWriter =  new IndexWriter(topDirectory, topConfig)
+  var topDirectory = FSDirectory.open(Paths.get(topIndexPath))
+  var topWriter =  new IndexWriter(topDirectory,
+                                   new IndexWriterConfig(lcAnalyzer))
   topWriter.commit()
 
   /**
     * Forces the reopen of the IndexWriter
     */
   def refresh(): Unit = {
-    topWriter.close()
-    topWriter =  new IndexWriter(topDirectory, topConfig)
+    close()
+    topDirectory = FSDirectory.open(Paths.get(topIndexPath))
+    topWriter =  new IndexWriter(topDirectory,
+                                 new IndexWriterConfig(lcAnalyzer))
     simSearch.refresh()
     docIndex.refresh()
   }

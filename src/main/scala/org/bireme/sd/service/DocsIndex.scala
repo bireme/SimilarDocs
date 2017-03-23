@@ -46,9 +46,9 @@ import org.apache.lucene.store.FSDirectory
 class DocsIndex(docIndex: String,
                 simSearch: SimDocsSearch) {
   val lc_analyzer = new LowerCaseAnalyzer(true)
-  val doc_directory = FSDirectory.open(Paths.get(docIndex))
-  val doc_config = new IndexWriterConfig(lc_analyzer)
-  var doc_writer =  new IndexWriter(doc_directory, doc_config)
+  var doc_directory = FSDirectory.open(Paths.get(docIndex))
+  var doc_writer =  new IndexWriter(doc_directory,
+                                    new IndexWriterConfig(lc_analyzer))
   doc_writer.commit()
 
   /**
@@ -63,8 +63,10 @@ class DocsIndex(docIndex: String,
     * Forces the reopen of the IndexWriter
     */
   def refresh(): Unit = {
-    doc_writer.close()
-    doc_writer =  new IndexWriter(doc_directory, doc_config)
+    close()
+    doc_directory = FSDirectory.open(Paths.get(docIndex))
+    doc_writer =  new IndexWriter(doc_directory,
+                                  new IndexWriterConfig(lc_analyzer))
   }
 
   /**
