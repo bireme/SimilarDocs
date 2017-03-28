@@ -28,6 +28,7 @@ import akka.routing.{ ActorRefRoutee, Broadcast, RoundRobinRoutingLogic, Router,
 import bruma.master._
 
 import java.io.File
+import java.util.regex.Pattern
 
 import org.apache.lucene.document.{Document,Field,StoredField,TextField}
 import org.apache.lucene.index.{IndexWriter,IndexWriterConfig}
@@ -38,6 +39,7 @@ import scala.util.control.NonFatal
 
 class LuceneIndexMain(indexPath: String,
                       xmlDir: String,
+                      xmlFileFilter: String,
                       fldIdxNames: Set[String],
                       fldStrdNames: Set[String],
                       decsDir: String,
@@ -65,13 +67,16 @@ class LuceneIndexMain(indexPath: String,
     Router(RoundRobinRoutingLogic(), routees)
     //Router(SmallestMailboxRoutingLogic(), routees)
   }
+  val matcher = Pattern.compile(xmlFileFilter).matcher("")
   var activeIdx  = idxWorkers
+
 
   (new File(xmlDir)).listFiles().foreach {
     file =>
       val xmlFile = file.getPath()
-      if (xmlFile.toLowerCase().endsWith(".xml")) {
-        indexFile(xmlFile, encoding)
+      if (xmlFile.isFile()) {
+        matcher.reset(xmlFile.getName())
+        if (matcher.matches) indexFile(xmlFile, encoding)
       }
   }
 
@@ -224,6 +229,7 @@ object LuceneIndexAkka extends App {
 
   private def usage(): Unit = {
     Console.err.println("usage: LuceneIndexAkka <indexPath> <xmlDir>" +
+    "\n\t[-xmlFileFilter=<regExp>]" +
     "\n\t[-indexedFields=<field1>[:<boost>],...,<fieldN>[:<boost>]]" +
     "\n\t[-storedFields=<field1>,...,<fieldN>]" +
     "\n\t[-decs=<dir>[:<boost>]]" +
@@ -239,6 +245,7 @@ object LuceneIndexAkka extends App {
       map + ((split(0).substring(1), split(1)))
     }
   }
+  val xmlFileFilter = parameters.getOrElse("xmlFileFilter", ".+\\.xml")
   val sIdxFields = parameters.getOrElse("indexedFields", "")
   val fldIdxNames = (if (sIdxFields.isEmpty) Set[String]()
                      else sIdxFields.split(" *, *").toSet)
@@ -251,8 +258,8 @@ object LuceneIndexAkka extends App {
 
   val system = ActorSystem("Main")
   try {
-    val props = Props(classOf[LuceneIndexMain], args(0), args(1), fldIdxNames,
-                                                fldStrdNames, decsDir, encoding)
+    val props = Props(classOf[LuceneIndexMain], args(0), args(1), xmlFileFilter,
+                                   fldIdxNames, fldStrdNames, decsDir, encoding)
     val app = system.actorOf(props, "app")
     val terminator = system.actorOf(Props(classOf[Terminator], app),
                                                                "app-terminator")
