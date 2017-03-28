@@ -73,10 +73,9 @@ class LuceneIndexMain(indexPath: String,
 
   (new File(xmlDir)).listFiles().foreach {
     file =>
-      val xmlFile = file.getPath()
-      if (xmlFile.isFile()) {
-        matcher.reset(xmlFile.getName())
-        if (matcher.matches) indexFile(xmlFile, encoding)
+      if (file.isFile()) {
+        matcher.reset(file.getName())
+        if (matcher.matches) indexFile(file.getPath(), encoding)
       }
   }
 
