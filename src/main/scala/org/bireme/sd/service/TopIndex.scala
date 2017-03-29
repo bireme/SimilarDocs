@@ -521,4 +521,15 @@ class TopIndex(sdIndexPath: String,
     TreeSet(s2.replaceAll("\\W", " ").trim().split(" +"): _*).
                                              filter(_.length >= 3).mkString(" ")
   }
+
+/**
+  * Prints all document fields.
+  *
+  * @param doc document whose fields will be printed
+  */
+  private def showDocFields(doc: Document): Unit = {
+    doc.getFields.asScala.foreach {
+      field => println(s"${field.name}: ${field.stringValue}")
+    }
+  }
 }
