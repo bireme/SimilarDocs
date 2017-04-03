@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Vai para diretório da apicaçã0 SimilarDcs
+cd /home/javaapps/sbt-projects/SimilarDocs 
+
 # Apaga todos os arquivos do diretório de trabalho temporario
 rm -r indexes/tmp/sdIndex/*
 
@@ -30,3 +33,5 @@ rm indexes/sdIndex/write.lock
 
 # Destrava o servidor para atualizações
 sbt "run-main org.bireme.sd.service.MaintenanceMode http://serverofi5.bireme.br:8080/SDService/SDService reset"
+
+cd -
