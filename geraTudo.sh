@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# Vai para diretório da apicaçã0 SimilarDcs
-cd /home/javaapps/sbt-projects/SimilarDocs 
+# Vai para diretório da aplicação SimilarDcs
+cd /home/javaapps/sbt-projects/SimilarDocs
 
 # Apaga todos os arquivos do diretório de trabalho temporario
 rm -r indexes/tmp/sdIndex/*
