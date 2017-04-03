@@ -30,7 +30,7 @@ import org.apache.lucene.analysis.core.KeywordAnalyzer
 import org.apache.lucene.document.{Document, Field, StringField, StoredField}
 import org.apache.lucene.index.{DirectoryReader, IndexWriter, IndexWriterConfig, Term}
 import org.apache.lucene.queryparser.classic.QueryParser
-import org.apache.lucene.search.IndexSearcher
+import org.apache.lucene.search.{IndexSearcher,TermQuery,TopDocs}
 import org.apache.lucene.store.FSDirectory
 
 import org.bireme.sd.SimDocsSearch
@@ -206,10 +206,13 @@ class TopIndex(sdIndexPath: String,
   def deleteProfile(psId: String,
                     name: String): Boolean = {
     val lpsId = psId.toLowerCase()
-
     getDocument(lpsId) match {
       case Some(doc) => {
         if (deleteProfile(doc, name)) {
+          // Avoid Lucene makes id tokenized (workarround)
+          doc.removeField("id")
+          doc.add(new StringField("id", lpsId, Field.Store.YES))
+
           topWriter.updateDocument(new Term("id", lpsId), doc)
           topWriter.commit()
           true
@@ -337,7 +340,6 @@ class TopIndex(sdIndexPath: String,
     getDocument(lpsId) match {
       case Some(doc) => {
         val docIds = getDocIds(doc, profiles)
-//println(s"docIds=$docIds")
         if (docIds.isEmpty) List()
         else {
           val sdReader = DirectoryReader.open(
@@ -347,7 +349,6 @@ class TopIndex(sdIndexPath: String,
                               foldLeft[List[Map[String,List[String]]]](List()) {
             case (lst, id) => {
               val fields = getDocFields(id, sdSearcher, outFlds)
-//println(s"fields=$fields")
               if (fields.isEmpty) lst else lst :+ fields
             }
           }
@@ -457,7 +458,9 @@ class TopIndex(sdIndexPath: String,
     val topReader = DirectoryReader.open(topWriter)
     val topSearcher = new IndexSearcher(topReader)
     val parser = new QueryParser("id", new KeywordAnalyzer())
-    val query = parser.parse(id);
+    val query0 = parser.parse(id);
+    val query = new TermQuery(new Term("id", id))
+//println(s"query=$query")
     val docs = topSearcher.search(query, 1)
 //println(s"totalHits=${docs.totalHits} id=[$id] query=[$query]")
     val result = docs.totalHits match {
@@ -529,7 +532,7 @@ class TopIndex(sdIndexPath: String,
   */
   private def showDocFields(doc: Document): Unit = {
     doc.getFields.asScala.foreach {
-      field => println(s"${field.name}: ${field.stringValue}")
+      field => println(s"${field.name}:: ${field.stringValue}")
     }
   }
 }
