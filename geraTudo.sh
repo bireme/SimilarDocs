@@ -9,7 +9,7 @@ rm -r indexes/tmp/sdIndex/*
 # A partir do diretório do Iahx, pega todos os xmls e cria indice Lucene para a
 # busca de documentos similares no diretório temporário.
 #sbt "run-main org.bireme.sd.LuceneIndexAkka indexes/tmp/sdIndex /bases/iahx/xml-inbox/regional -indexedFields=ti,ti_pt,ti_ru,ti_fr,ti_de,ti_it,ti_en,ti_es,ti_eng,ti_Pt,ti_Ru,ti_Fr,ti_De,ti_It,ti_En,ti_Es,ab,ab_en,ab_es,ab_Es,ab_de,ab_De,ab_pt,ab_fr,ab_french -storedFields=au,la -decs=/bases/dec.000/dec.dec/decs -encoding=ISO-8859-1"
-sbt 'run-main org.bireme.sd.LuceneIndexAkka indexes/tmp/sdIndex /bases/iahx/xml-inbox/regional "-xmlFileFilter=(lil_regional.xml|mdl\d\d_regional.xml)" -indexedFields=ti,ti_pt,ti_ru,ti_fr,ti_de,ti_it,ti_en,ti_es,ti_eng,ti_Pt,ti_Ru,ti_Fr,ti_De,ti_It,ti_En,ti_Es,ab,ab_en,ab_es,ab_Es,ab_de,ab_De,ab_pt,ab_fr,ab_french -storedFields=au,la -decs=/bases/dec.000/dec.dec/decs -encoding=ISO-8859-1'
+sbt 'run-main org.bireme.sd.LuceneIndexAkka indexes/tmp/sdIndex /bases/iahx/xml-inbox/regional "-xmlFileFilter=(lil_regional.xml|mdl\\d\\d_regional.xml)" -indexedFields=ti,ti_pt,ti_ru,ti_fr,ti_de,ti_it,ti_en,ti_es,ti_eng,ti_Pt,ti_Ru,ti_Fr,ti_De,ti_It,ti_En,ti_Es,ab,ab_en,ab_es,ab_Es,ab_de,ab_De,ab_pt,ab_fr,ab_french -storedFields=au,la -decs=/bases/dec.000/dec.dec/decs -encoding=ISO-8859-1'
 
 # Trava o servidor para atualizações
 sbt "run-main org.bireme.sd.service.MaintenanceMode http://serverofi5.bireme.br:8080/SDService/SDService set"
