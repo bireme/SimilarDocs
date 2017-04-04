@@ -21,7 +21,7 @@
 
 package org.bireme.sd.service
 
-import java.io.IOException
+import java.io.{File,IOException}
 import java.nio.file.Paths
 import java.text.Normalizer
 import java.text.Normalizer.Form
@@ -72,7 +72,13 @@ class TopIndex(sdIndexPath: String,
     */
   def refresh(): Unit = {
     close()
-    topDirectory = FSDirectory.open(Paths.get(topIndexPath))
+    val path = Paths.get(topIndexPath)
+
+    // Force lock file deletion
+    val file = new File(path.toFile(), "write.lock")
+    if (file.isFile()) file.delete()
+
+    topDirectory = FSDirectory.open(path)
     topWriter =  new IndexWriter(topDirectory,
                                  new IndexWriterConfig(lcAnalyzer))
     simSearch.refresh()

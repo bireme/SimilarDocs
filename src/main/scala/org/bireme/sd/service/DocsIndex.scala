@@ -22,6 +22,7 @@
 package org.bireme.sd.service
 
 import collection.JavaConverters._
+import java.io.File
 import java.nio.file.Paths
 
 import org.bireme.sd.SimDocsSearch
@@ -64,6 +65,13 @@ class DocsIndex(docIndex: String,
     */
   def refresh(): Unit = {
     close()
+
+    val path = Paths.get(docIndex)
+
+    // Force lock file deletion
+    val file = new File(path.toFile(), "write.lock")
+    if (file.isFile()) file.delete()
+
     doc_directory = FSDirectory.open(Paths.get(docIndex))
     doc_writer =  new IndexWriter(doc_directory,
                                   new IndexWriterConfig(lc_analyzer))
