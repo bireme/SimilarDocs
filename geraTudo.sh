@@ -1,5 +1,10 @@
 #!/bin/sh
 
+export JAVA_HOME=/usr/local/oracle-8-jdk
+export J2SDKDIR=$JAVA_HOME
+export J2REDIR=$JAVA_HOME/jre
+export PATH=$JAVA_HOME/bin:$PATH
+
 # Vai para diretório da aplicação SimilarDcs
 cd /home/javaapps/sbt-projects/SimilarDocs
 
