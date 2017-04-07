@@ -33,9 +33,9 @@ mv indexes/tmp/sdIndex indexes
 sbt "run-main org.bireme.sd.service.UpdaterBatchService -sdIndexPath=/home/javaapps/sbt-projects/SimilarDocs/indexes/sdIndex -topIndexPath=/home/javaapps/sbt-projects/SimilarDocs/indexes/topIndex -docIndexPath=/home/javaapps/sbt-projects/SimilarDocs/indexes/docIndex -updAllDay=0"
 
 # Apaga arquivos 'write.lock' dos índices
-rm indexes/docIndex/write.lock
-rm indexes/topIndex/write.lock
-rm indexes/sdIndex/write.lock
+rm -f indexes/docIndex/write.lock
+rm -f indexes/topIndex/write.lock
+rm -f indexes/sdIndex/write.lock
 
 # Destrava o servidor para atualizações
 sbt "run-main org.bireme.sd.service.MaintenanceMode http://serverofi5.bireme.br:8080/SDService/SDService reset"

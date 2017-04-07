@@ -22,7 +22,7 @@
 package org.bireme.sd
 
 import java.io.File
-import org.apache.lucene.index.DirectoryReader
+import org.apache.lucene.index.{DirectoryReader,IndexReader}
 import org.apache.lucene.store.FSDirectory
 import scala.collection.JavaConverters._
 
@@ -34,13 +34,14 @@ import scala.collection.JavaConverters._
 */
 object ShowDocs extends App {
   private def usage(): Unit = {
-    Console.err.println("usage: ShowDocs <indexName> <doc number>")
+    Console.err.println("usage: ShowDocs <indexName> [<doc number>]")
     System.exit(1)
   }
 
-  if (args.length != 2) usage();
+  if (args.length < 1) usage();
 
-  showDocument(args(0), args(1))
+  val docNum = if (args.length == 1) "" else args(1)
+  showDocument(args(0), docNum)
 
   /**
     * Shows a Lucene index document
@@ -52,15 +53,28 @@ object ShowDocs extends App {
                    docNum: String): Unit = {
     val directory = FSDirectory.open(new File(indexName).toPath())
     val ireader = DirectoryReader.open(directory);
-    val doc = ireader.document(docNum.toInt)
+
+    if (docNum.isEmpty) (0 until ireader.numDocs()).foreach(showDoc(ireader, _))
+    else showDoc(ireader, docNum.toInt)
+
+    ireader.close()
+    directory.close()
+  }
+
+  /**
+    * Shows a Lucene index document
+    *
+    * @param indexName Lucene index path
+    * @param docNum Lucene document number
+    */
+  private def showDoc(ireader: IndexReader,
+                      docNum: Int): Unit = {
+    val doc = ireader.document(docNum)
 
     println("----------------------------------------------------------")
     doc.getFields().asScala.foreach(field =>
       println(s"[${field.name}]=${field.stringValue()}"))
     //println(doc)
     println("----------------------------------------------------------")
-
-    ireader.close()
-    directory.close()
   }
 }

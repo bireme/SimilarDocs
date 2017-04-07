@@ -22,6 +22,7 @@
 package org.bireme.sd
 
 import java.io.File
+import java.nio.file.Paths
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.TreeSet
@@ -51,6 +52,12 @@ class SimDocsSearch(indexPath: String) {
     */
   def refresh(): Unit = {
     oldReader = null
+
+    val path = Paths.get(indexPath)
+
+    // Force lock file deletion
+    val file = new File(path.toFile(), "write.lock")
+    if (file.isFile()) file.delete()
   }
 
   /**
