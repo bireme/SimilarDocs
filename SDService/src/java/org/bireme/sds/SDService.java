@@ -71,85 +71,7 @@ public class SDService extends HttpServlet {
      * @param response servlet response
      * @throws ServletException if a servlet-specific error occurs
      * @throws IOException if an I/O error occurs
-     */
-    protected void processRequest0(final HttpServletRequest request,
-                                   final HttpServletResponse response)
-                                                        throws ServletException,
-                                                                   IOException {
-        response.setContentType("text/xml;charset=UTF-8");
-        
-        final ServletContext context = request.getServletContext();
-        final boolean maintenanceMode = 
-                              (Boolean)context.getAttribute("MAINTENANCE_MODE");
-        try (PrintWriter out = response.getWriter()) {           
-            final String maintenance = request.getParameter("maintenance");
-            if (maintenance == null) {
-                if (maintenanceMode) {
-                    out.println("<WARNING>System in maintenance mode</WARNING>");
-                    return;
-                }
-                final String psId = request.getParameter("psId");
-                if (psId == null) {
-                    out.println("<ERROR>missing 'psId' parameter</ERROR>");
-                } else {
-                    final String addProfile = request.getParameter("addProfile");
-                    if (addProfile == null) {
-                        final String deleteProfile = request.getParameter(
-                                                               "deleteProfile");
-                        if (deleteProfile == null) {
-                            final String getSimDocs = request.getParameter(
-                                                                  "getSimDocs");
-                            if (getSimDocs == null) {
-                                final String showProfiles = request.getParameter(
-                                                                "showProfiles");
-                                if (showProfiles == null) usage(out);
-                                else out.println(topIndex.getProfilesXml(psId));
-                            } else {
-                                final String[] profs = getSimDocs.split(" *\\, *");
-                                Set<String> profiles = new HashSet<>();
-                                for (String prof: profs) {
-                                    profiles.add(prof);
-                                }
-                                final String outFields = request.getParameter(
-                                                                   "outFields");
-                                final String[] oFields = (outFields == null)
-                                                   ?  new String[0]
-                                                   : outFields.split(" *\\, *");
-                                Set<String> fields = new HashSet<>();
-                                for (String fld: oFields) {
-                                    fields.add(fld);
-                                }
-                                out.println(topIndex.getSimDocsXml(psId,
-                                         profiles.toSet(), fields.toSet(), 10));
-                            }
-                        } else {
-                            topIndex.deleteProfile(psId, deleteProfile);
-                            out.println("<result>OK</result>");
-                        }
-                    } else {
-                        final String sentence = request.getParameter("sentence");
-                        if (sentence == null) usage(out);
-                        else {
-                            topIndex.addProfile(psId, addProfile, sentence);
-                            out.println("<result>OK</result>");
-                        }
-                    }
-                }
-            } else {
-                final Boolean maint = Boolean.valueOf(maintenance);
-                
-                context.setAttribute("MAINTENANCE_MODE", maint);
-                if (maint) { // maintenance mode is on
-                    topIndex.close();
-                } else { // maintenance mode is off
-                    topIndex.refresh();
-                }
-                out.println("<result>MAINTENANCE_MODE=" + maintenance + 
-                                                                   "</result>");
-            }
-        }
-    }
-
+     */    
     protected void processRequest(final HttpServletRequest request,
                                   final HttpServletResponse response)
                                                         throws ServletException,
@@ -222,8 +144,7 @@ public class SDService extends HttpServlet {
                 } else { // maintenance mode is off
                     topIndex.refresh();
                 }
-                out.println("<result>MAINTENANCE_MODE=" + maintenance + 
-                                                                   "</result>");
+                out.println("<result>MAINTENANCE_MODE=" + maint + "</result>");
             }
         }
     }
