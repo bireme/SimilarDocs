@@ -37,21 +37,23 @@ import org.apache.lucene.store.FSDirectory
 /** Class that looks for similar documents to a given ones
   */
 class SimDocsSearch(indexPath: String) {
-  val directory = FSDirectory.open(new File(indexPath).toPath())
-  var oldReader: DirectoryReader = null
+  var dirReader: DirectoryReader = null
 
   /**
     * Closes all used resources
     */
   def close(): Unit = {
-    directory.close()
+    if (dirReader != null) {
+      dirReader.close()
+      dirReader = null
+    }
   }
 
   /**
     * Forces the reopen of the DirectoryReader
     */
   def refresh(): Unit = {
-    oldReader = null
+    dirReader = null
 
     val path = Paths.get(indexPath)
 
@@ -109,17 +111,18 @@ class SimDocsSearch(indexPath: String) {
    * @return an DirectoryReader reflecting all changes made in the Lucene index
    */
   private def getReader(): DirectoryReader = {
-    if (oldReader == null) {
-      oldReader = DirectoryReader.open(directory)
+    if (dirReader == null) {
+      val directory = FSDirectory.open(new File(indexPath).toPath())
+      dirReader = DirectoryReader.open(directory)
     } else {
-      val reader = DirectoryReader.openIfChanged(oldReader)
-      if (reader == null) oldReader
+      val reader = DirectoryReader.openIfChanged(dirReader)
+      if (reader == null) dirReader
       else {
-        oldReader.close()
-        oldReader = reader
+        dirReader.close()
+        dirReader = reader
       }
     }
-    oldReader
+    dirReader
   }
 
   /**
