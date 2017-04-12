@@ -128,10 +128,10 @@ class DocsIndex(docIndex: String,
       val doc = new Document()
       doc.add(new StringField("id", id, Field.Store.YES))
       doc.add(new StoredField("is_new", if (isNew) "true" else "false"))
-      sdIds.foreach(sdId => doc.add(new StoredField("sd_id", sdId)))
+      if (total > 0)
+        sdIds.foreach(sdId => doc.add(new StoredField("sd_id", sdId)))
       doc.add(new StoredField("__total", total))
-      if (isNew) doc_writer.addDocument(doc)
-      else doc_writer.updateDocument(new Term("id", id), doc)
+      doc_writer.updateDocument(new Term("id", id), doc)
       doc_writer.commit()
     }
 
@@ -191,25 +191,27 @@ class DocsIndex(docIndex: String,
     val doc_reader = DirectoryReader.open(doc_writer)
     val doc_searcher = new IndexSearcher(doc_reader)
     val topDocs = doc_searcher.search(new TermQuery(new Term("id", id)), 1)
-
+    val oldDoc = topDocs.scoreDocs(0).doc
     val total = if (topDocs.totalHits == 0) 0 else
-      doc_searcher.doc(topDocs.scoreDocs(0).doc).getField("__total").
-                                                         numericValue().intValue
+      doc_searcher.doc(oldDoc).getField("__total").numericValue().intValue
 //println(s"TOTAL = $total")
-    if  (total > 0) { // there are personal services documents with this profile
-      val results = simSearch.searchIds(id, idxFldNames, maxDocs, minSim)
-//println(s"results=$results")
-      val doc = new Document()
 
+    // If there are personal services documents with this profile
+    if (total > 0) {
+      val doc = new Document()
       doc.add(new StringField("id", id, Field.Store.YES))
       doc.add(new StoredField("is_new", "false"))
       doc.add(new StoredField("__total", total))
+
+      val results = simSearch.searchIds(id, idxFldNames, maxDocs, minSim)
+//println(s"results=$results")
       results.foreach {
         case (sd_id,_) => doc.add(new StoredField("sd_id", sd_id))
       }
       doc_writer.updateDocument(new Term("id", id), doc)
       doc_writer.commit()
     }
+
     doc_reader.close()
   }
 
@@ -244,7 +246,7 @@ class DocsIndex(docIndex: String,
   /**
     * Updates the sd_id (similar document ids) associated with all docIndex
     *  records: new ones - with is_new field equal to true and old ones -
-    *  with out field is_new field equal to false
+    *  with is_new field equal to false
     *
     * @param idxFldNames names of document fields used to find similar docs
     * @param minSim minimum acceptable similarity between documents
@@ -257,13 +259,13 @@ class DocsIndex(docIndex: String,
     val doc_searcher = new IndexSearcher(doc_reader)
     val max = doc_reader.maxDoc
     (0 until max).foreach (
-      id => {
-        val doc = doc_searcher.doc(id)
+      luceneId => {
+        val doc = doc_searcher.doc(luceneId)
         val total = doc.getField("__total").numericValue().intValue
 
         if (total > 0) {
-          val id2 = doc.getField("id").stringValue()
-          updateRecordDocs(id2, idxFldNames, minSim, maxDocs)
+          val id = doc.getField("id").stringValue()
+          updateRecordDocs(id, idxFldNames, minSim, maxDocs)
         }
       }
     )
