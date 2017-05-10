@@ -15,6 +15,8 @@ import org.bireme.sd.service.TopIndex;
 import scala.collection.mutable.HashSet;
 import scala.collection.mutable.Set;
 
+import java.util.*;
+
 /**
  *
  * @author Heitor Barbieri
@@ -71,17 +73,26 @@ public class SDService extends HttpServlet {
      * @param response servlet response
      * @throws ServletException if a servlet-specific error occurs
      * @throws IOException if an I/O error occurs
-     */    
+     */
     protected void processRequest(final HttpServletRequest request,
                                   final HttpServletResponse response)
                                                         throws ServletException,
                                                                    IOException {
+
+        final Map<String,String[]> paramMap = request.getParameterMap();
+        for (Map.Entry<String,String[]> elem : paramMap.entrySet()) {
+          System.out.println("\nparam=[[" + elem.getKey() + "]]");
+          for (String value: elem.getValue()) {
+            System.out.println("value=[[" + value + "]]");
+          }
+        }
+
         response.setContentType("text/xml;charset=UTF-8");
-        
+
         final ServletContext context = request.getServletContext();
-        final boolean maintenanceMode = 
+        final boolean maintenanceMode =
                               (Boolean)context.getAttribute("MAINTENANCE_MODE");
-        try (PrintWriter out = response.getWriter()) {           
+        try (PrintWriter out = response.getWriter()) {
             final String maintenance = request.getParameter("maintenance");
             if (maintenance == null) {
                 if (maintenanceMode) {
@@ -137,7 +148,7 @@ public class SDService extends HttpServlet {
                 }
             } else {
                 final Boolean maint = Boolean.valueOf(maintenance);
-                
+
                 context.setAttribute("MAINTENANCE_MODE", maint);
                 if (maint) { // maintenance mode is on
                     topIndex.close();
@@ -148,7 +159,7 @@ public class SDService extends HttpServlet {
             }
         }
     }
-    
+
     private void usage(final PrintWriter out) {
         out.println("<SYNTAX>");
         out.println("SDService/?psId=&lt;id&gt;");
