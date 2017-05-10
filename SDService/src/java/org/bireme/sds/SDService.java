@@ -79,14 +79,16 @@ public class SDService extends HttpServlet {
                                                         throws ServletException,
                                                                    IOException {
 
+        /*
+        System.out.println("=========== HEADER =============================");
+        final java.util.Enumeration<String> names = request.getHeaderNames();
+        while(names.hasMoreElements()) {
+            final String name = names.nextElement();
+            System.out.println("[" + name + "]: [" + request.getHeader(name) + "]");              
+        }
         final Map<String,String[]> paramMap = request.getParameterMap();
         for (Map.Entry<String,String[]> elem : paramMap.entrySet()) {
-          System.out.println("=========== HEADER =============================");
-          final java.util.Enumeration<String> names = request.getHeaderNames();
-          while(names.hasMoreElements()) {
-              final String name = names.nextElement();
-              System.out.println("[" + name + "]: [" + request.getHeader(name) + "]");              
-          }
+          
           System.out.println("\n------------------------------------------------");
           System.out.println("param=[[" + elem.getKey() + "]]");
           for (String value: elem.getValue()) {
@@ -94,7 +96,8 @@ public class SDService extends HttpServlet {
           }
           System.out.println();
         }
-
+        */
+        
         response.setContentType("text/xml;charset=UTF-8");
 
         final ServletContext context = request.getServletContext();
