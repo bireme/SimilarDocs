@@ -58,6 +58,10 @@ class TopIndex(sdIndexPath: String,
   "ti_Ru","ti_Fr","ti_De","ti_It","ti_En","ti_Es","ab_en","ab_es","ab_Es",
   "ab_de","ab_De","ab_pt","ab_fr","ab_french")) {
 
+  require((sdIndexPath != null) && (!sdIndexPath.trim.isEmpty))
+  require((docIndexPath != null) && (!docIndexPath.trim.isEmpty))
+  require((topIndexPath != null) && (!topIndexPath.trim.isEmpty))
+
   val lcAnalyzer = new LowerCaseAnalyzer(true)
   val simSearch = new SimDocsSearch(sdIndexPath)
   val docIndex = new DocsIndex(docIndexPath, simSearch)
@@ -103,6 +107,9 @@ class TopIndex(sdIndexPath: String,
     */
   def addProfiles(psId: String,
                   profiles: Map[String,String]): Unit = {
+    require((psId != null) && (!psId.trim.isEmpty))
+    require(profiles != null)
+
     val lpsId = psId.toLowerCase()
 
     // Retrieves or creates the pesonal service document
@@ -133,6 +140,10 @@ class TopIndex(sdIndexPath: String,
   def addProfile(psId: String,
                  name: String,
                  sentence: String): Unit = {
+    require((psId != null) && (!psId.trim.isEmpty))
+    require((name != null) && (!name.trim.isEmpty))
+    require((sentence != null) && (!sentence.trim.isEmpty))
+
     val lpsId = psId.toLowerCase()
 
     // Retrieves or creates the pesonal service document
@@ -170,6 +181,10 @@ class TopIndex(sdIndexPath: String,
   private def addProfile(doc: Document,
                          name: String,
                          sentence: String): Unit = {
+    require(doc != null)
+    require((name != null) && (!name.trim.isEmpty))
+    require((sentence != null) && (!sentence.trim.isEmpty))
+
     val newSentence = uniformString(sentence)
     val oldSentence = doc.get(name)
 
@@ -192,6 +207,8 @@ class TopIndex(sdIndexPath: String,
     * @param psId personal services document identifier
     */
   def deleteProfiles(psId: String): Unit = {
+    require((psId != null) && (!psId.trim.isEmpty))
+
     getDocument(psId) match {
       case Some(doc) => {
         doc.getFields().asScala.foreach(field => deleteProfile(doc, field.name()))
@@ -211,6 +228,9 @@ class TopIndex(sdIndexPath: String,
     */
   def deleteProfile(psId: String,
                     name: String): Boolean = {
+    require((psId != null) && (!psId.trim.isEmpty))
+    require((name != null) && (!name.trim.isEmpty))
+
     val lpsId = psId.toLowerCase()
     getDocument(lpsId) match {
       case Some(doc) => {
@@ -237,6 +257,9 @@ class TopIndex(sdIndexPath: String,
     */
   private def deleteProfile(doc: Document,
                             name: String): Boolean = {
+    require(doc != null)
+    require((name != null) && (!name.trim.isEmpty))
+
     val docId = doc.get(name)
 
     if (name.equals("id") || (docId == null)) false
@@ -256,6 +279,8 @@ class TopIndex(sdIndexPath: String,
     *         can have more than one occurrence
     */
   def getProfilesXml(psId: String): String = {
+    require((psId != null) && (!psId.trim.isEmpty))
+
     val head = """<?xml version="1.0" encoding="UTF-8"?><profiles>"""
 
     getProfiles(psId).foldLeft[String](head) {
@@ -273,6 +298,8 @@ class TopIndex(sdIndexPath: String,
     *         have more than one occurrence
     */
   def getProfiles(psId: String): Map[String,String] = {
+    require((psId != null) && (!psId.trim.isEmpty))
+
     val lpsId = psId.toLowerCase()
 
     getDocument(lpsId) match {
@@ -303,6 +330,11 @@ class TopIndex(sdIndexPath: String,
                     profiles: Set[String],
                     outFields: Set[String],
                     maxDocs: Int): String = {
+    require((psId != null) && (!psId.trim.isEmpty))
+    require(profiles != null)
+    require(outFields != null)
+    require(maxDocs > 0)
+
     val head = """<?xml version="1.0" encoding="UTF-8"?><documents>"""
 
     getSimDocs(psId, profiles, outFields, maxDocs).foldLeft[String] (head) {
@@ -341,6 +373,11 @@ class TopIndex(sdIndexPath: String,
                  profiles: Set[String],
                  outFlds: Set[String],
                  maxDocs: Int): List[Map[String,List[String]]] = {
+    require((psId != null) && (!psId.trim.isEmpty))
+    require(profiles != null)
+    require(outFlds != null)
+    require(maxDocs > 0)
+
     val lpsId = psId.toLowerCase()
 
     getDocument(lpsId) match {
@@ -377,6 +414,9 @@ class TopIndex(sdIndexPath: String,
     */
   private def getDocIds(doc: Document,
                         profiles: Set[String]): List[Set[Int]] = {
+    require(doc != null)
+    require(profiles != null)
+
     profiles.foldLeft[List[Set[Int]]](List()) {
       case (lst, id) => {
         val did = doc.getField(id)
@@ -401,6 +441,10 @@ class TopIndex(sdIndexPath: String,
   private def limitDocs(docs: List[Set[Int]],
                         maxDocs: Int,
                         ids: List[Int]): List[Int] = {
+    require(docs != null)
+    require(maxDocs > 0)
+    require(ids != null)
+
     if (docs.isEmpty) ids.take(maxDocs)
     else {
       val num = maxDocs - ids.size
@@ -430,6 +474,10 @@ class TopIndex(sdIndexPath: String,
   private def getDocFields(id: Int,
                            searcher: IndexSearcher,
                            fields: Set[String]): Map[String,List[String]] = {
+    require(id > 0)
+    require(searcher != null)
+    require(fields != null)
+
     val doc = searcher.doc(id)
 
     if (fields.isEmpty) { // put all fields
@@ -461,6 +509,8 @@ class TopIndex(sdIndexPath: String,
     * @return Lucene Document
     */
   private def getDocument(id: String): Option[Document] = {
+    require((id != null) && (!id.trim.isEmpty))
+
     val topReader = DirectoryReader.open(topWriter)
     val topSearcher = new IndexSearcher(topReader)
     val parser = new QueryParser("id", new KeywordAnalyzer())
@@ -485,6 +535,8 @@ class TopIndex(sdIndexPath: String,
     * @return the string with some characters replaced by entities
     */
   private def cleanString(in: String): String = {
+    require(in != null)
+
     in.replace("\"", "&quot;").replace("&", "&amp;").replace("'", "&apos;").
        replace("<", "&lt;").replace(">", "&gt;")
   }
@@ -498,6 +550,9 @@ class TopIndex(sdIndexPath: String,
     */
   private def readUrlContent(url: String,
                              encoding: String): Try[String] = {
+    require((url != null) && (!url.trim.isEmpty))
+    require((encoding != null) && (!encoding.trim.isEmpty))
+
     val src = Try(Source.fromURL(url, encoding))
 
     src match {
@@ -524,6 +579,8 @@ class TopIndex(sdIndexPath: String,
     * @return the converted string
     */
   private def uniformString(in: String): String = {
+    require(in != null)
+
     val s1 = Normalizer.normalize(in.toLowerCase(), Form.NFD)
     val s2 = s1.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
 
@@ -537,6 +594,8 @@ class TopIndex(sdIndexPath: String,
   * @param doc document whose fields will be printed
   */
   private def showDocFields(doc: Document): Unit = {
+    require(doc != null)
+
     doc.getFields.asScala.foreach {
       field => println(s"${field.name}:: ${field.stringValue}")
     }

@@ -1,9 +1,5 @@
 <!DOCTYPE html>
-<!--
-To change this license header, choose License Headers in Project Properties.
-To change this template file, choose Tools | Templates
-and open the template in the editor.
--->
+
 <html>
     <head>
         <title>Similar Documents Service</title>
@@ -13,21 +9,28 @@ and open the template in the editor.
     <body>
         <h1>SDService</h1>
         <div>This service takes sets of words stored into multiple profiles
-of a Personal Service (PS) record and looks for documents having those words 
-(similar documents) in a database, for example, LILACS+MEDLINE.</div>
+of a Personal Service (PS) record and looks for similar documents (via ngrams) 
+in a database, for example, LILACS+MEDLINE.</div>
         <div></div>
         <h2>Services:</h2>
+        
         <h3>Add profile</h3>
         <div>Add PS service profile words</div>
         <br/>
         <div>Syntax: <b>SDService?psId=&lt;id&gt;&amp;addProfile=&lt;id&gt;&amp;sentence=&lt;sentence&gt;</b></div>
         <br/>
         <div><b>psId:</b> personal service record identifier</div>
-        <div><b>id:</b> profile identifier</div>
+        <div><b>id:</b> profile name</div>
         <div><b>sentence:</b> a sentence with the words stored in the profile</div>
         <br/>
         <div>Example: SDService?psId=Joao Doria&amp;addProfile=books&amp;sentence=my preferences are: romance, adventure, scifi</div>
         <br/>
+        <div>Possible return values:<br/>
+        &nbsp;&nbsp;&lt;result&gt;OK&lt;/result&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'psId' parameter&lt;/ERROR&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'addProfile' parameter&lt;/ERROR&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'sentence' parameter&lt;/ERROR&gt;</div>
+        
         <h3>Delete profile</h3>
         <div>Delete in this service a PS record profile</div>
         <br/>
@@ -38,6 +41,12 @@ of a Personal Service (PS) record and looks for documents having those words
         <br/>
         <div>Example: SDService?psId=Joao Doria&amp;deleteProfile=books</div>
         <br/>
+        <div>Possible return values:<br/>
+        &nbsp;&nbsp;&lt;result&gt;OK&lt;/result&gt;<br/>
+        &nbsp;&nbsp;&lt;result&gt;FAILED&lt;/result&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'psId' parameter&lt;/ERROR&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'deleteProfile' parameter&lt;/ERROR&gt;</div>        
+                
         <h3>Get similar documents</h3>
         <div>Retrieve documents having most of words stored in a set of profiles</div>
         <br/>
@@ -49,6 +58,11 @@ of a Personal Service (PS) record and looks for documents having those words
         <br/>
         <div>Example: SDService?psId=Joao Doria&amp;getSimDocs=books,cars,hobbies&amp;outFields=id,date,name</div>
         <br/>
+        <div>Possible return values:<br/>
+        &nbsp;&nbsp;&lt;documents&gt;...&lt;/documents&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'psId' parameter&lt;/ERROR&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'getSimDocs' parameter&lt;/ERROR&gt;</div>
+        
         <h3>Show profiles</h3>
         <div>Show all profiles and respective words of a PS record</div>
         <br/>  
@@ -56,6 +70,10 @@ of a Personal Service (PS) record and looks for documents having those words
         <br/>
         <div><b>psId:</b> personal service record identifier</div>
         <br/>
-        <div>Example: SDService?psId=Joao Doria&amp;showProfiles=</div>                
+        <div>Example: SDService?psId=Joao Doria&amp;showProfiles=</div>
+        <br/>
+        <div>Possible return values:<br/>
+        &nbsp;&nbsp;&lt;profiles&gt;...&lt;/profiles&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'psId' parameter&lt;/ERROR&gt;</div>
     </body>
 </html>
