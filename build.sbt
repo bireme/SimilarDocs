@@ -10,10 +10,9 @@ lazy val root = (project in file(".")).
     name := "SimilarDocsTrig"
   )
 
-val luceneVersion = "6.5.0"
-//val luceneVersion = "6.2.1"
-val akkaVersion = "2.4.14"
-val httpClientVersion = "4.5.2"
+val luceneVersion = "6.5.1"
+val akkaVersion = "2.5.1" //"2.4.14"
+val httpClientVersion = "4.5.3" //"4.5.2"
 
 libraryDependencies ++= Seq(
   "org.apache.lucene" % "lucene-core" % luceneVersion,

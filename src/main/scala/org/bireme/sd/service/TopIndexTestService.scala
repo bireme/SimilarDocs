@@ -65,7 +65,8 @@ object TopIndexTestService extends App {
   val topIndexPath = otherIndexPath +
                     (if (otherIndexPath.endsWith("/")) "" else "/") + "topIndex"
   val simDocs = new SimDocsSearch(sdIndexPath)
-  val topIndex = new TopIndex(sdIndexPath, docIndexPath, topIndexPath)
+  val docIndex = new DocsIndex(docIndexPath, simDocs, Conf.minSim, Conf.maxDocs)
+  val topIndex = new TopIndex(simDocs, docIndex, topIndexPath, Conf.idxFldNames)
   addProfile match {
     case Some(profile) => {
       val split = profile.trim().split(" *\\= *", 2)
@@ -83,5 +84,6 @@ object TopIndexTestService extends App {
     }
   }
   topIndex.close()
+  docIndex.close()
   simDocs.close()
 }

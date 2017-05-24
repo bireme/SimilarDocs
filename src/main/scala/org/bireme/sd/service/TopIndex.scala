@@ -47,47 +47,24 @@ import scala.util.{Try, Success, Failure}
   * and its content is a sentence used to look for similar documents stored
   * at documents in SDIndex (Similar Documents Lucene Index).
   *
+  * @param idxFldNames names of document fields used to find similar docs
+  *
   * @author: Heitor Barbieri
   * date: 20170110
 */
-class TopIndex(sdIndexPath: String,
-               docIndexPath: String,
+class TopIndex(simSearch: SimDocsSearch,
+               docIndex: DocsIndex,
                topIndexPath: String,
-               idxFldNames: Set[String] = Set(
-  "ti","ti_pt","ti_ru","ti_fr","ti_de","ti_it","ti_en","ti_es","ti_eng","ti_Pt",
-  "ti_Ru","ti_Fr","ti_De","ti_It","ti_En","ti_Es","ab_en","ab_es","ab_Es",
-  "ab_de","ab_De","ab_pt","ab_fr","ab_french")) {
-
-  require((sdIndexPath != null) && (!sdIndexPath.trim.isEmpty))
-  require((docIndexPath != null) && (!docIndexPath.trim.isEmpty))
+               idxFldNames: Set[String] = Conf.idxFldNames) {
+  require(simSearch != null)
+  require(docIndex != null)
   require((topIndexPath != null) && (!topIndexPath.trim.isEmpty))
 
   val lcAnalyzer = new LowerCaseAnalyzer(true)
-  val simSearch = new SimDocsSearch(sdIndexPath)
-  val docIndex = new DocsIndex(docIndexPath, simSearch)
-
   var topDirectory = FSDirectory.open(Paths.get(topIndexPath))
   var topWriter =  new IndexWriter(topDirectory,
                                    new IndexWriterConfig(lcAnalyzer))
   topWriter.commit()
-
-  /**
-    * Forces the reopen of the IndexWriter
-    */
-  def refresh(): Unit = {
-    close()
-    val path = Paths.get(topIndexPath)
-
-    // Force lock file deletion
-    val file = new File(path.toFile(), "write.lock")
-    if (file.isFile()) file.delete()
-
-    topDirectory = FSDirectory.open(path)
-    topWriter =  new IndexWriter(topDirectory,
-                                 new IndexWriterConfig(lcAnalyzer))
-    simSearch.refresh()
-    docIndex.refresh()
-  }
 
   /**
     * Closes all open resources
@@ -95,8 +72,6 @@ class TopIndex(sdIndexPath: String,
   def close(): Unit = {
     topWriter.close()
     topDirectory.close()
-    simSearch.close()
-    docIndex.close()
   }
 
   /**
@@ -190,13 +165,13 @@ class TopIndex(sdIndexPath: String,
 
     if (oldSentence == null) { // new profile
       doc.add(new StoredField(name, newSentence))
-      docIndex.newRecord(newSentence, idxFldNames) // create a new document at docIndex
+      docIndex.newRecord(newSentence) // create a new document at docIndex
     } else { // there was already a profile with the same name
       if (! oldSentence.equals(newSentence)) { // same profile but with different sentence
         doc.removeField(name)  // only one occurrence for profile
         doc.add(new StoredField(name, newSentence))
         docIndex.deleteRecord(oldSentence, onlyIfUnique=true)
-        docIndex.newRecord(newSentence, idxFldNames) // create a new document at docIndex
+        docIndex.newRecord(newSentence) // create a new document at docIndex
       }
     }
   }
@@ -386,7 +361,7 @@ class TopIndex(sdIndexPath: String,
         if (docIds.isEmpty) List()
         else {
           val sdReader = DirectoryReader.open(
-                                       FSDirectory.open(Paths.get(sdIndexPath)))
+                               FSDirectory.open(Paths.get(simSearch.indexPath)))
           val sdSearcher = new IndexSearcher(sdReader)
           val list = limitDocs(docIds, maxDocs, List()).
                               foldLeft[List[Map[String,List[String]]]](List()) {
@@ -421,7 +396,7 @@ class TopIndex(sdIndexPath: String,
       case (lst, id) => {
         val did = doc.getField(id)
         if (did == null) lst else {
-          val ids = docIndex.getDocIds(did.stringValue())
+          val ids = docIndex.getDocIds(did.stringValue(), idxFldNames)
           if (ids.isEmpty) lst else lst :+ ids
         }
       }

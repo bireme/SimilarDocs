@@ -5,6 +5,8 @@ export J2SDKDIR=$JAVA_HOME
 export J2REDIR=$JAVA_HOME/jre
 export PATH=$JAVA_HOME/bin:$PATH
 
+export SIM_DOCS_SERVER=http://serverofi5.bireme.br:8080/SDService/SDService
+
 # Vai para diretório da aplicação SimilarDcs
 cd /home/javaapps/sbt-projects/SimilarDocs
 
@@ -17,7 +19,7 @@ rm -r indexes/tmp/sdIndex/*
 sbt 'run-main org.bireme.sd.LuceneIndexAkka indexes/tmp/sdIndex /bases/iahx/xml-inbox/regional "-xmlFileFilter=(lil_regional.xml|mdl\\d\\d_regional.xml)" -indexedFields=ti,ti_pt,ti_ru,ti_fr,ti_de,ti_it,ti_en,ti_es,ti_eng,ti_Pt,ti_Ru,ti_Fr,ti_De,ti_It,ti_En,ti_Es,ab,ab_en,ab_es,ab_Es,ab_de,ab_De,ab_pt,ab_fr,ab_french -storedFields=au,la -decs=/bases/dec.000/dec.dec/decs -encoding=ISO-8859-1'
 
 # Trava o servidor para atualizações
-sbt "run-main org.bireme.sd.service.MaintenanceMode http://serverofi5.bireme.br:8080/SDService/SDService set"
+sbt "run-main org.bireme.sd.service.MaintenanceMode $SIM_DOCS_SERVER set"
 
 # Espera 30 secondos
 sleep 30s
@@ -30,7 +32,7 @@ mv indexes/tmp/sdIndex indexes
 
 # Atualiza todos os perfis do serviço personalizado para apontarem para documentos
 # atualizados no índice criado no comando anterior.
-sbt "run-main org.bireme.sd.service.UpdaterBatchService -sdIndexPath=/home/javaapps/sbt-projects/SimilarDocs/indexes/sdIndex -topIndexPath=/home/javaapps/sbt-projects/SimilarDocs/indexes/topIndex -docIndexPath=/home/javaapps/sbt-projects/SimilarDocs/indexes/docIndex -updAllDay=0"
+#sbt "run-main org.bireme.sd.service.UpdaterBatchService -sdIndexPath=/home/javaapps/sbt-projects/SimilarDocs/indexes/sdIndex -topIndexPath=/home/javaapps/sbt-projects/SimilarDocs/indexes/topIndex -docIndexPath=/home/javaapps/sbt-projects/SimilarDocs/indexes/docIndex -updAllDay=0"
 
 # Apaga arquivos 'write.lock' dos índices
 rm -f indexes/docIndex/write.lock
@@ -38,6 +40,6 @@ rm -f indexes/topIndex/write.lock
 rm -f indexes/sdIndex/write.lock
 
 # Destrava o servidor para atualizações
-sbt "run-main org.bireme.sd.service.MaintenanceMode http://serverofi5.bireme.br:8080/SDService/SDService reset"
+sbt "run-main org.bireme.sd.service.MaintenanceMode $SIM_DOCS_SERVER reset"
 
 cd -

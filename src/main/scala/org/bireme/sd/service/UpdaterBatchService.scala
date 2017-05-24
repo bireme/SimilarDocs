@@ -45,10 +45,8 @@ object UpdaterBatchService extends App {
     )
     System.exit(1)
   }
-
   if (args.length != 4) usage()
 
-  val minSim = 0.5f
   val parameters = args.foldLeft[Map[String,String]](Map()) {
     case (map,par) => {
       val split = par.split(" *= *", 2)
@@ -65,18 +63,21 @@ object UpdaterBatchService extends App {
   val updAllDay = parameters("updAllDay").toInt
   val updateAll = ((updAllDay == 0) ||
                   (Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == updAllDay))
-  val idxFldName = Set("ti","ti_pt","ti_ru","ti_fr","ti_de","ti_it","ti_en",
-                       "ti_es","ti_eng","ti_Pt","ti_Ru","ti_Fr","ti_De","ti_It",
-                       "ti_En","ti_Es","ab_en","ab_es","ab_Es","ab_de","ab_De",
-                       "ab_pt","ab_fr","ab_french", "ab")
+  val docIndex = new DocsIndex(docIndexPath, sdSearcher, Conf.minSim, Conf.maxDocs)
 
-  val docIndex = new DocsIndex(docIndexPath, sdSearcher)
-  if (updateAll) docIndex.updateAllRecordDocs(idxFldName, minSim)
-  else docIndex.updateNewRecordDocs(idxFldName, minSim)
+  update(sdSearcher, docIndex, topIndexPath, updateAll)
 
   docIndex.close()
   sdSearcher.close()
 
-// Only to create the top index if it does not exist.
-  new TopIndex(sdIndexPath, docIndexPath, topIndexPath, idxFldName).close()
+  def update(sdSearcher: SimDocsSearch,
+             docIndex: DocsIndex,
+             topIndexPath: String,
+             updateAll: Boolean): Unit = {
+    if (updateAll) docIndex.updateAllRecordDocs(Conf.idxFldNames)
+    else docIndex.updateNewRecordDocs(Conf.idxFldNames)
+
+    // Only to create the top index if it does not exist.
+    new TopIndex(sdSearcher, docIndex, topIndexPath, Conf.idxFldNames).close()
+  }
 }

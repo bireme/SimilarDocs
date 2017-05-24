@@ -30,12 +30,14 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.bireme.sd.SimDocsSearch;
+import org.bireme.sd.service.Conf;
+import org.bireme.sd.service.DocsIndex;
+import org.bireme.sd.service.UpdaterService;
 import org.bireme.sd.service.TopIndex;
 
 import scala.collection.mutable.HashSet;
 import scala.collection.mutable.Set;
-
-import java.util.*;
 
 /**
  *
@@ -44,7 +46,10 @@ import java.util.*;
  */
 public class SDService extends HttpServlet {
     private TopIndex topIndex;
-
+    private UpdaterService updaterService;
+    private SimDocsSearch simSearch;
+    private DocsIndex docIndex;
+    
     @Override
     public void init(final ServletConfig config) throws ServletException {
         super.init(config);
@@ -61,28 +66,18 @@ public class SDService extends HttpServlet {
                          (otherIndexPath.endsWith("/") ? "" : "/") + "docIndex";
         final String topIndexPath = otherIndexPath +
                          (otherIndexPath.endsWith("/") ? "" : "/") + "topIndex";
-        Set<String> fields = new HashSet<>();
-        fields.add("ti");
-        fields.add("ti_de");
-        fields.add("ti_en");
-        fields.add("ti_es");
-        fields.add("ti_fr");
-        fields.add("ti_it");
-        fields.add("ti_pt");
-        fields.add("ab");
-        fields.add("ab_de");
-        fields.add("ab_en");
-        fields.add("ab_es");
-        fields.add("ab_fr");
-        fields.add("ab_it");
-        fields.add("ab_pt");
 
+        Tools.deleteLockFile(sdIndexPath);
         Tools.deleteLockFile(docIndexPath);
         Tools.deleteLockFile(topIndexPath);
 
-        topIndex = new TopIndex(sdIndexPath, docIndexPath, topIndexPath,
-                                                                fields.toSet());
+        simSearch = new SimDocsSearch(sdIndexPath);
+        docIndex = new DocsIndex(docIndexPath, simSearch, Conf.minSim(), Conf.maxDocs());
+        topIndex = new TopIndex(simSearch, docIndex, topIndexPath, Conf.idxFldNames());
+        updaterService = new UpdaterService(docIndex, Conf.idxFldNames());
+
         context.setAttribute("MAINTENANCE_MODE", Boolean.FALSE);
+        updaterService.start();
     }
 
     /**
@@ -130,9 +125,9 @@ public class SDService extends HttpServlet {
 
                 context.setAttribute("MAINTENANCE_MODE", maint);
                 if (maint) { // maintenance mode is on
-                    topIndex.close();
+                    updaterService.stop();
                 } else { // maintenance mode is off
-                    topIndex.refresh();
+                    updaterService.start();
                 }
                 out.println("<result>MAINTENANCE_MODE=" + maint + "</result>");
                 return;

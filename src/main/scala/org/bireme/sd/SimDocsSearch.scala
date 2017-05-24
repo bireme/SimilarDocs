@@ -36,7 +36,7 @@ import org.apache.lucene.store.FSDirectory
 
 /** Class that looks for similar documents to a given ones
   */
-class SimDocsSearch(indexPath: String) {
+class SimDocsSearch(val indexPath: String) {
   var dirReader: DirectoryReader = null
 
   /**
