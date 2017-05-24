@@ -106,7 +106,7 @@ class DocsIndex(docIndex: String,
     val total = if (tot_docs.totalHits == 0) { // there is no document with this id
       val doc = new Document()
       doc.add(new StringField("id", id, Field.Store.YES))
-      doc.add(new StoredField("is_new", "true"))
+      doc.add(new StringField("is_new", "true", Field.Store.YES))
       doc.add(new StoredField("__total", 1))
       doc_writer.addDocument(doc)
       1
@@ -138,7 +138,8 @@ class DocsIndex(docIndex: String,
                isNew: Boolean): Unit = {
       val doc = new Document()
       doc.add(new StringField("id", id, Field.Store.YES))
-      doc.add(new StoredField("is_new", if (isNew) "true" else "false"))
+      doc.add(new StringField("is_new", if (isNew) "true" else "false",
+                                                               Field.Store.YES))
       if (total > 0)
         sdIds.foreach(sdId => doc.add(new StoredField("sd_id", sdId)))
       doc.add(new StoredField("__total", total))
@@ -260,7 +261,7 @@ class DocsIndex(docIndex: String,
 
         doc.removeField("is_new")
         doc.removeFields("sd_id")
-        doc.add(new StoredField("is_new", "true"))
+        doc.add(new StringField("is_new", "true", Field.Store.YES))
 
         doc_writer.updateDocument(new Term("id", id), doc)
       }
@@ -282,7 +283,7 @@ class DocsIndex(docIndex: String,
     doc.removeField("is_new")
     doc.removeFields("sd_id")
 
-    doc.add(new StoredField("is_new", "false"))
+    doc.add(new StringField("is_new", "false", Field.Store.YES))
     simSearch.searchIds(id, idxFldNames, maxDocs, minSim).foreach {
       case (sd_id,_) => doc.add(new StoredField("sd_id", sd_id))
     }
