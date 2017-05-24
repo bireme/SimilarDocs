@@ -279,13 +279,15 @@ class DocsIndex(docIndex: String,
   private[service] def updateSdIds(doc: Document,
                                    idxFldNames: Set[String]): Unit = {
     val id = doc.getField("id").stringValue()
+    val total = doc.getField("__total").numericValue().intValue
 
     doc.removeField("is_new")
     doc.removeFields("sd_id")
 
     doc.add(new StringField("is_new", "false", Field.Store.YES))
-    simSearch.searchIds(id, idxFldNames, maxDocs, minSim).foreach {
-      case (sd_id,_) => doc.add(new StoredField("sd_id", sd_id))
-    }
+    if (total > 0)
+      simSearch.searchIds(id, idxFldNames, maxDocs, minSim).foreach {
+        case (sd_id,_) => doc.add(new StoredField("sd_id", sd_id))
+      }
   }
 }
