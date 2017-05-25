@@ -188,7 +188,7 @@ class DocsIndex(docIndex: String,
       doc.getFields("sd_id").foldLeft[Set[Int]] (Set()) {
         case (set, fld) =>
           val sd_id =  fld.numericValue().intValue
-println(s"=> inserindo sd_id=$sd_id")          
+println(s"=> inserindo sd_id=$sd_id")
           set + sd_id
       }
     }
@@ -281,6 +281,7 @@ println(s"=> inserindo sd_id=$sd_id")
     */
   private[service] def updateSdIds(doc: Document,
                                    idxFldNames: Set[String]): Unit = {
+println("entrando no updateSdIds")
     val id = doc.getField("id").stringValue()
     val total = doc.getField("__total").numericValue().intValue
 
@@ -288,6 +289,7 @@ println(s"=> inserindo sd_id=$sd_id")
     doc.removeFields("sd_id")
 
     doc.add(new StringField("is_new", "false", Field.Store.YES))
+println("total=$total")
     if (total > 0)
       simSearch.searchIds(id, idxFldNames, maxDocs, minSim).foreach {
         case (sd_id,_) => doc.add(new StoredField("sd_id", sd_id))
