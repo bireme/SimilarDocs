@@ -100,9 +100,11 @@ class SimDocsSearch(val indexPath: String) {
                                            new NGramAnalyzer(NGSize.ngram_size))
     val query =  mqParser.parse(text)
     val searcher = new IndexSearcher(getReader())
-
-    searcher.search(query, maxDocs).scoreDocs.filter(_.score >= minSim).
+println("### antes do 'searcher.search'")
+    val lst = searcher.search(query, maxDocs).scoreDocs.filter(_.score >= minSim).
                                              map(sd => (sd.doc,sd.score)).toList
+println("### depois do 'searcher.search'")
+    lst
   }
 
  /**
