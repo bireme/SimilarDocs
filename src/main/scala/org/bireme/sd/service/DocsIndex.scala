@@ -186,7 +186,10 @@ class DocsIndex(docIndex: String,
         doc_writer.commit()
       }
       doc.getFields("sd_id").foldLeft[Set[Int]] (Set()) {
-        case (set, fld) => set + fld.numericValue().intValue
+        case (set, fld) =>
+          val sd_id =  fld.numericValue().intValue
+println(s"=> inserindo sd_id=$sd_id")          
+          set + sd_id
       }
     }
     doc_reader.close()

@@ -103,7 +103,7 @@ class SimDocsSearch(val indexPath: String) {
 println("### antes do 'searcher.search'")
     val lst = searcher.search(query, maxDocs).scoreDocs.filter(_.score >= minSim).
                                              map(sd => (sd.doc,sd.score)).toList
-println("### depois do 'searcher.search'")
+println(s"### depois do 'searcher.search' Ids=$lst")
     lst
   }
 
