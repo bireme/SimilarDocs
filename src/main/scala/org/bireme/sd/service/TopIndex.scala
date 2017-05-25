@@ -449,7 +449,7 @@ class TopIndex(simSearch: SimDocsSearch,
   private def getDocFields(id: Int,
                            searcher: IndexSearcher,
                            fields: Set[String]): Map[String,List[String]] = {
-    require(id > 0)
+    require(id >= 0)
     require(searcher != null)
     require(fields != null)
 

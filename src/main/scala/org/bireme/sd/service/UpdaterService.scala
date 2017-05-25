@@ -49,9 +49,10 @@ println("###'start' function called")
 
     Future {
       while (running) {
-        if (!updateOne()) // if there is not new document wait 1 minute
+        if (!updateOne()) {  // if there is not new document wait 1 minute
 println("### waiting for a new document !!!")
-          //Thread.sleep(60000)
+          Thread.sleep(60000)
+        }
       }
     }
   }
@@ -68,7 +69,7 @@ println("### waiting for a new document !!!")
     * @return true if a new document was found and updated and false otherwise
     */
   private def updateOne(): Boolean = {
-println("### entering 'updateOne' function")    
+println("### entering 'updateOne' function")
     val indexWriter = docIndex.getIndexWriter()
     val indexReader = DirectoryReader.open(indexWriter)
     val indexSearcher = new IndexSearcher(indexReader)

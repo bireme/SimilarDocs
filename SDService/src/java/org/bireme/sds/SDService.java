@@ -80,6 +80,12 @@ public class SDService extends HttpServlet {
         System.out.println("I will call 'updaterService.start()'");
         updaterService.start();
     }
+    
+    @Override
+    public void destroy() {
+        updaterService.stop();
+        super.destroy();
+    }
 
     /**
      * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
