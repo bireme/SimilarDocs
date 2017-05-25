@@ -77,6 +77,7 @@ public class SDService extends HttpServlet {
         updaterService = new UpdaterService(docIndex, Conf.idxFldNames());
 
         context.setAttribute("MAINTENANCE_MODE", Boolean.FALSE);
+        System.out.println("I will call 'updaterService.start()'");
         updaterService.start();
     }
 
