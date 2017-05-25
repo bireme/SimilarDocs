@@ -49,6 +49,7 @@ println("###'start' function called")
 
     Future {
       while (running) {
+println("### antes do 'updateOne()'")        
         if (!updateOne()) {  // if there is not new document wait 1 minute
 println("### waiting for a new document !!!")
           Thread.sleep(60000)
@@ -71,20 +72,26 @@ println("### waiting for a new document !!!")
   private def updateOne(): Boolean = {
 println("### entering 'updateOne' function")
     val indexWriter = docIndex.getIndexWriter()
+println("### step0")
     val indexReader = DirectoryReader.open(indexWriter)
+println("### step1")
     val indexSearcher = new IndexSearcher(indexReader)
+println("### step2")
     val topDocs = indexSearcher.search(query, 1)
-
+println("### step3")
     val found = (topDocs.totalHits > 0)
     if (found) { // There is a document with is_new flag setted
+println("### step4")
       val luceneId = topDocs.scoreDocs(0).doc
       val doc = indexSearcher.doc(luceneId)
       val id = doc.getField("id").stringValue()
-
+println("### step5")
       docIndex.updateSdIds(doc, sd_idFldNames) // Updated sd_id fields
 println(s"### updating document id=$id")
       indexWriter.updateDocument(new Term("id", id), doc) // Update the document
+println("### step6")
       indexWriter.commit()
+println("### step7")
     }
     indexReader.close()
     found
