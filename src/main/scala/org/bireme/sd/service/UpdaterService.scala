@@ -49,8 +49,8 @@ class UpdaterService(docIndex: DocsIndex,
     Future {
       while (running) {
         if (!updateOne()) // if there is not new document wait 1 minute
-println("### waiting for a new document !!!")        
-          Thread.sleep(60000)
+println("### waiting for a new document !!!")
+          //Thread.sleep(60000)
       }
     }
   }
