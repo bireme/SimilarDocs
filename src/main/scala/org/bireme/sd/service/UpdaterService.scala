@@ -49,7 +49,7 @@ println("###'start' function called")
 
     Future {
       while (running) {
-println("### antes do 'updateOne()'")        
+println("### antes do 'updateOne()'")
         if (!updateOne()) {  // if there is not new document wait 1 minute
 println("### waiting for a new document !!!")
           Thread.sleep(60000)
@@ -83,6 +83,7 @@ println("### step3")
     if (found) { // There is a document with is_new flag setted
 println("### step4")
       val luceneId = topDocs.scoreDocs(0).doc
+println(s"### luceneId=$luceneId")      
       val doc = indexSearcher.doc(luceneId)
       val id = doc.getField("id").stringValue()
 println("### step5")
