@@ -96,10 +96,12 @@ class SimDocsSearch(val indexPath: String) {
                 fields: Set[String],
                 maxDocs: Int,
                 minSim: Float): List[(Int,Float)] = {
-println("entrando no searchIds / SimDocsSearch")                  
+println("entrando no searchIds / SimDocsSearch")
     val mqParser = new MultiFieldQueryParser(fields.toArray,
                                            new NGramAnalyzer(NGSize.ngram_size))
+println(s"text=$text")                                           
     val query =  mqParser.parse(text)
+println("### antes do new IndexSearcher")
     val searcher = new IndexSearcher(getReader())
 println("### antes do 'searcher.search'")
     val lst = searcher.search(query, maxDocs).scoreDocs.filter(_.score >= minSim).

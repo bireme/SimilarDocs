@@ -289,7 +289,7 @@ println("entrando no updateSdIds")
     doc.removeFields("sd_id")
 
     doc.add(new StringField("is_new", "false", Field.Store.YES))
-println("total=$total")
+println(s"total=$total")
     if (total > 0)
       simSearch.searchIds(id, idxFldNames, maxDocs, minSim).foreach {
         case (sd_id,_) => doc.add(new StoredField("sd_id", sd_id))
