@@ -49,6 +49,7 @@ class UpdaterService(docIndex: DocsIndex,
     Future {
       while (running) {
         if (!updateOne()) // if there is not new document wait 1 minute
+println("### waiting for a new document !!!")        
           Thread.sleep(60000)
       }
     }
@@ -78,6 +79,7 @@ class UpdaterService(docIndex: DocsIndex,
       val id = doc.getField("id").stringValue()
 
       docIndex.updateSdIds(doc, sd_idFldNames) // Updated sd_id fields
+println(s"### updating document id=$id")
       indexWriter.updateDocument(new Term("id", id), doc) // Update the document
       indexWriter.commit()
     }
