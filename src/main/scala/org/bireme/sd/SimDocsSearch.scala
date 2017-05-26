@@ -39,30 +39,7 @@ import org.apache.lucene.store.FSDirectory
 class SimDocsSearch(val indexPath: String) {
   require(indexPath != null)
 
-  var dirReader: DirectoryReader = null
-
-  /**
-    * Closes all used resources
-    */
-  def close(): Unit = {
-    if (dirReader != null) {
-      dirReader.close()
-      dirReader = null
-    }
-  }
-
-  /**
-    * Forces the reopen of the DirectoryReader
-    */
-  def refresh(): Unit = {
-    dirReader = null
-
-    val path = Paths.get(indexPath)
-
-    // Force lock file deletion
-    val file = new File(path.toFile(), "write.lock")
-    if (file.isFile()) file.delete()
-  }
+  val directory = FSDirectory.open(new File(indexPath).toPath())
 
   /**
     * Searches for documents having a string in some fields
@@ -114,11 +91,13 @@ println("entrando no searchIds / SimDocsSearch")
 println(s"text=$text")
     val query =  mqParser.parse(text)
 println("### antes do new IndexSearcher")
-    val searcher = new IndexSearcher(getReader())
+    val dirReader = getReader()
+    val searcher = new IndexSearcher(dirReader)
 println("### antes do 'searcher.search'")
     val lst = searcher.search(query, maxDocs).scoreDocs.filter(_.score >= minSim).
                                              map(sd => (sd.doc,sd.score)).toList
 println(s"### depois do 'searcher.search' Ids=$lst")
+    dirReader.close()
     lst
   }
 
@@ -127,20 +106,7 @@ println(s"### depois do 'searcher.search' Ids=$lst")
    *
    * @return an DirectoryReader reflecting all changes made in the Lucene index
    */
-  private def getReader(): DirectoryReader = {
-    if (dirReader == null) {
-      val directory = FSDirectory.open(new File(indexPath).toPath())
-      dirReader = DirectoryReader.open(directory)
-    } else {
-      val reader = DirectoryReader.openIfChanged(dirReader)
-      if (reader == null) dirReader
-      else {
-        dirReader.close()
-        dirReader = reader
-      }
-    }
-    dirReader
-  }
+  private def getReader(): DirectoryReader = DirectoryReader.open(directory)
 
   /**
     * Loads the document content given its id and desired fields
@@ -154,13 +120,17 @@ println(s"### depois do 'searcher.search' Ids=$lst")
     require(id > 0)
     require(fields != null)
 
-    asScalaBuffer[IndexableField](getReader().document(id).getFields()).
+    val dirReader = getReader()
+    val map = asScalaBuffer[IndexableField](dirReader.document(id).getFields()).
                                     foldLeft[Map[String,List[String]]] (Map()) {
       case (map,fld) =>
         val name = fld.name()
         val lst = map.getOrElse(name, List())
         map + ((name, fld.stringValue() :: lst))
     }
+
+    dirReader.close()
+    map
   }
 }
 
@@ -217,7 +187,7 @@ object SimDocsSearch extends App {
                              fNames: Set[String]): String = {
     require(doc != null)
     require(fNames != null)
-    
+
     fNames.foldLeft[String]("") {
       case (str, name) => doc.get(name) match {
         case Some(content) => str + " " + content

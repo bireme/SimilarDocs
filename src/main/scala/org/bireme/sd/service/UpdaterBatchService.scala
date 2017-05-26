@@ -66,9 +66,7 @@ object UpdaterBatchService extends App {
   val docIndex = new DocsIndex(docIndexPath, sdSearcher, Conf.minSim, Conf.maxDocs)
 
   update(sdSearcher, docIndex, topIndexPath, updateAll)
-
   docIndex.close()
-  sdSearcher.close()
 
   def update(sdSearcher: SimDocsSearch,
              docIndex: DocsIndex,

@@ -64,8 +64,8 @@ class TopIndex(simSearch: SimDocsSearch,
   require((topIndexPath != null) && (!topIndexPath.trim.isEmpty))
 
   val lcAnalyzer = new LowerCaseAnalyzer(true)
-  var topDirectory = FSDirectory.open(Paths.get(topIndexPath))
-  var topWriter =  new IndexWriter(topDirectory,
+  val topDirectory = FSDirectory.open(Paths.get(topIndexPath))
+  val topWriter =  new IndexWriter(topDirectory,
                                    new IndexWriterConfig(lcAnalyzer))
   topWriter.commit()
 

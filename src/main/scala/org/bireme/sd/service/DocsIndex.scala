@@ -56,8 +56,8 @@ class DocsIndex(docIndex: String,
                 minSim: Float = Conf.minSim,
                 maxDocs: Int = Conf.maxDocs) {
   val lc_analyzer = new LowerCaseAnalyzer(true)
-  var doc_directory = FSDirectory.open(Paths.get(docIndex))
-  var doc_writer =  new IndexWriter(doc_directory,
+  val doc_directory = FSDirectory.open(Paths.get(docIndex))
+  val doc_writer =  new IndexWriter(doc_directory,
                                     new IndexWriterConfig(lc_analyzer))
   doc_writer.commit()
 
@@ -67,23 +67,6 @@ class DocsIndex(docIndex: String,
   def close(): Unit = {
     doc_writer.close()
     doc_directory.close()
-  }
-
-  /**
-    * Forces the reopen of the IndexWriter
-    */
-  def refresh(): Unit = {
-    close()
-
-    val path = Paths.get(docIndex)
-
-    // Force lock file deletion
-    val file = new File(path.toFile(), "write.lock")
-    if (file.isFile()) file.delete()
-
-    doc_directory = FSDirectory.open(Paths.get(docIndex))
-    doc_writer =  new IndexWriter(doc_directory,
-                                  new IndexWriterConfig(lc_analyzer))
   }
 
   /**
@@ -176,13 +159,14 @@ class DocsIndex(docIndex: String,
                 idxFldNames: Set[String]): Set[Int] = {
     val doc_reader = DirectoryReader.open(doc_writer)
     val doc_searcher = new IndexSearcher(doc_reader)
-    val topDocs = doc_searcher.search(new TermQuery(new Term("id", id)), 1)
+    val tid = new Term("id", id)
+    val topDocs = doc_searcher.search(new TermQuery(tid), 1)
 
     val retSet = if (topDocs.totalHits == 0) Set[Int]() else {
       val doc = doc_searcher.doc(topDocs.scoreDocs(0).doc)
       if ("true".equals(doc.get("is_new"))) {  // document is new, update it with similar doc ids
         updateSdIds(doc, idxFldNames)
-        doc_writer.updateDocument(new Term("id", id), doc)
+        doc_writer.updateDocument(tid, doc)
         doc_writer.commit()
       }
       doc.getFields("sd_id").foldLeft[Set[Int]] (Set()) {
