@@ -85,4 +85,5 @@ object TopIndexTestService extends App {
   }
   topIndex.close()
   docIndex.close()
+  simDocs.close()
 }

@@ -67,6 +67,7 @@ object UpdaterBatchService extends App {
 
   update(sdSearcher, docIndex, topIndexPath, updateAll)
   docIndex.close()
+  sdSearcher.close()
 
   def update(sdSearcher: SimDocsSearch,
              docIndex: DocsIndex,

@@ -41,6 +41,8 @@ class SimDocsSearch(val indexPath: String) {
 
   val directory = FSDirectory.open(new File(indexPath).toPath())
 
+  def close() = directory.close()
+
   /**
     * Searches for documents having a string in some fields
     *

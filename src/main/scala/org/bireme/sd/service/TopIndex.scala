@@ -368,8 +368,8 @@ class TopIndex(simSearch: SimDocsSearch,
         val docIds = getDocIds(doc, profiles)
         if (docIds.isEmpty) List()
         else {
-          val sdReader = DirectoryReader.open(
-                               FSDirectory.open(Paths.get(simSearch.indexPath)))
+          val sdDirectory = FSDirectory.open(Paths.get(simSearch.indexPath))
+          val sdReader = DirectoryReader.open(sdDirectory)
           val sdSearcher = new IndexSearcher(sdReader)
           val list = limitDocs(docIds, maxDocs, List()).
                               foldLeft[List[Map[String,List[String]]]](List()) {
@@ -379,6 +379,7 @@ class TopIndex(simSearch: SimDocsSearch,
             }
           }
           sdReader.close()
+          sdDirectory.close()
           list
         }
       }

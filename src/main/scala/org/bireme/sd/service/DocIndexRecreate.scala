@@ -79,7 +79,9 @@ object DocIndexRecreate extends App {
         }
     }
     topReader.close()
+    topDirectory.close()
     docWriter.close()
+    docDirectory.close()
   }
 
   /**
