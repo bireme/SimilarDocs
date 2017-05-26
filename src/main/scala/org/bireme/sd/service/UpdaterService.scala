@@ -45,14 +45,14 @@ class UpdaterService(docIndex: DocsIndex,
     * is called
     */
   def start(): Unit = {
-println("###'start' function called")
+//println("###'start' function called")
     running = true
 
     Future {
       while (running) {
-println("### antes do 'updateOne()'")
+//println("### antes do 'updateOne()'")
         if (!updateOne()) {  // if there is not new document wait 1 minute
-println("### waiting for a new document !!!")
+//println("### waiting for a new document !!!")
           Thread.sleep(WAIT_TIME)
         }
       }
@@ -72,29 +72,29 @@ println("### waiting for a new document !!!")
     * @return true if a new document was found and updated and false otherwise
     */
   private def updateOne(): Boolean = {
-println("### entering 'updateOne' function")
+//println("### entering 'updateOne' function")
     val indexWriter = docIndex.getIndexWriter()
-println("### step0")
+//println("### step0")
     val indexReader = DirectoryReader.open(indexWriter)
-println("### step1")
+//println("### step1")
     val indexSearcher = new IndexSearcher(indexReader)
-println("### step2")
+//println("### step2")
     val topDocs = indexSearcher.search(query, 1)
-println("### step3")
+//println("### step3")
     val found = (topDocs.totalHits > 0)
     if (found) { // There is a document with is_new flag setted
-println("### step4")
+//println("### step4")
       val luceneId = topDocs.scoreDocs(0).doc
-println(s"### luceneId=$luceneId")
+//println(s"### luceneId=$luceneId")
       val doc = indexSearcher.doc(luceneId)
       val id = doc.getField("id").stringValue()
-println(s"### step5 id=$id")
+//println(s"### step5 id=$id")
       docIndex.updateSdIds(doc, sd_idFldNames) // Updated sd_id fields
-println(s"### updating document")
+//println(s"### updating document")
       indexWriter.updateDocument(new Term("id", id), doc) // Update the document
-println("### step6")
+//println("### step6")
       indexWriter.commit()
-println("### step7")
+//println("### step7")
     }
     indexReader.close()
     found
