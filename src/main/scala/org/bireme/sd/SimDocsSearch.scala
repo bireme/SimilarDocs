@@ -37,6 +37,8 @@ import org.apache.lucene.store.FSDirectory
 /** Class that looks for similar documents to a given ones
   */
 class SimDocsSearch(val indexPath: String) {
+  require(indexPath != null)
+
   var dirReader: DirectoryReader = null
 
   /**
@@ -77,6 +79,11 @@ class SimDocsSearch(val indexPath: String) {
              fields: Set[String],
              maxDocs: Int,
              minSim: Float): List[(Float,Map[String,List[String]])] = {
+    require((text != null) && (!text.isEmpty))
+    require(fields != null)
+    require(maxDocs > 0)
+    require(minSim > 0)
+
     searchIds(text, fields, maxDocs, minSim).map {
       case (id,score) => (score,loadDoc(id, fields))
     }
@@ -96,10 +103,15 @@ class SimDocsSearch(val indexPath: String) {
                 fields: Set[String],
                 maxDocs: Int,
                 minSim: Float): List[(Int,Float)] = {
+    require((text != null) && (!text.isEmpty))
+    require(fields != null)
+    require(maxDocs > 0)
+    require(minSim > 0)
+
 println("entrando no searchIds / SimDocsSearch")
     val mqParser = new MultiFieldQueryParser(fields.toArray,
                                            new NGramAnalyzer(NGSize.ngram_size))
-println(s"text=$text")                                           
+println(s"text=$text")
     val query =  mqParser.parse(text)
 println("### antes do new IndexSearcher")
     val searcher = new IndexSearcher(getReader())
@@ -139,6 +151,9 @@ println(s"### depois do 'searcher.search' Ids=$lst")
     */
   private def loadDoc(id: Int,
                       fields: Set[String]): Map[String,List[String]] = {
+    require(id > 0)
+    require(fields != null)
+
     asScalaBuffer[IndexableField](getReader().document(id).getFields()).
                                     foldLeft[Map[String,List[String]]] (Map()) {
       case (map,fld) =>
@@ -200,6 +215,9 @@ object SimDocsSearch extends App {
 
   private def getSimilarText(doc: Map[String,List[String]],
                              fNames: Set[String]): String = {
+    require(doc != null)
+    require(fNames != null)
+    
     fNames.foldLeft[String]("") {
       case (str, name) => doc.get(name) match {
         case Some(content) => str + " " + content
@@ -217,6 +235,9 @@ object SimDocsSearch extends App {
     */
   private def getNGrams(text: String,
                         analyzer: Analyzer): Set[String] = {
+    require(text != null)
+    require(analyzer != null)
+
     val tokenStream = analyzer.tokenStream(null, text)
     val cattr = tokenStream.addAttribute(classOf[CharTermAttribute])
 
@@ -240,6 +261,10 @@ object SimDocsSearch extends App {
   private def getTokens(tokenStream: TokenStream,
                         cattr: CharTermAttribute,
                         auxSet: Set[String]): Set[String] = {
+    require(tokenStream != null)
+    require(cattr != null)
+    require(auxSet != null)
+
     if (tokenStream.incrementToken()) {
       val tok = cattr.toString()
       getTokens(tokenStream, cattr, auxSet + tok)

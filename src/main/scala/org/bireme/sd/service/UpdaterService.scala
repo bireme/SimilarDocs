@@ -83,12 +83,12 @@ println("### step3")
     if (found) { // There is a document with is_new flag setted
 println("### step4")
       val luceneId = topDocs.scoreDocs(0).doc
-println(s"### luceneId=$luceneId")      
+println(s"### luceneId=$luceneId")
       val doc = indexSearcher.doc(luceneId)
       val id = doc.getField("id").stringValue()
-println("### step5")
+println(s"### step5 id=$id")
       docIndex.updateSdIds(doc, sd_idFldNames) // Updated sd_id fields
-println(s"### updating document id=$id")
+println(s"### updating document")
       indexWriter.updateDocument(new Term("id", id), doc) // Update the document
 println("### step6")
       indexWriter.commit()
