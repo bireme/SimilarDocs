@@ -24,11 +24,15 @@ package org.bireme.sd.service
 import collection.JavaConverters._
 
 import java.nio.file.Paths
+import java.text.Normalizer
+import java.text.Normalizer.Form
 
 import org.apache.lucene.document.{Document, Field, StringField, StoredField}
 import org.apache.lucene.index.{DirectoryReader, IndexReader, IndexWriter, IndexWriterConfig, Term}
 import org.apache.lucene.search.{IndexSearcher, MatchAllDocsQuery, TermQuery}
 import org.apache.lucene.store.FSDirectory
+
+import scala.collection.immutable.TreeSet
 
 object DocIndexRecreate extends App {
 
@@ -57,8 +61,6 @@ object DocIndexRecreate extends App {
     val docWriter =  new IndexWriter(docDirectory,
                                 new IndexWriterConfig(new LowerCaseAnalyzer()).
                                 setOpenMode(IndexWriterConfig.OpenMode.CREATE))
-    val docReader = DirectoryReader.open(docWriter)
-    val docSearcher =  new IndexSearcher(docReader)
     val topDirectory = FSDirectory.open(Paths.get(topIndexPath))
     val topReader = DirectoryReader.open(topDirectory)
     val topSearcher = new IndexSearcher(topReader)
@@ -73,11 +75,10 @@ object DocIndexRecreate extends App {
             val fname = fld.name
             println(s"+++ [$fname]")
             if (!fname.equals("id"))
-              newRecord(fld.stringValue(), docSearcher, docWriter)
+              newRecord(uniformString(fld.stringValue()), docWriter)
         }
     }
     topReader.close()
-    docReader.close()
     docWriter.close()
   }
 
@@ -90,8 +91,9 @@ object DocIndexRecreate extends App {
     *         this one
     */
   private def newRecord(id: String,
-                        docSearcher: IndexSearcher,
                         docWriter: IndexWriter): Int = {
+    val docReader = DirectoryReader.open(docWriter)
+    val docSearcher =  new IndexSearcher(docReader)
     val totDocs = docSearcher.search(new TermQuery(new Term("id", id)), 1) // searches skip deleted documents
     val total = if (totDocs.totalHits == 0) { // there is no document with this id
       val doc = new Document()
@@ -109,6 +111,24 @@ object DocIndexRecreate extends App {
       tot + 1
     }
     docWriter.commit()
+    docReader.close()
     total
+  }
+
+  /**
+    * Converts all input charactes into a-z, 0-9 and spaces. Removes adjacent
+    * whites and sort the words.
+    *
+    * @param in input string to be converted
+    * @return the converted string
+    */
+  private def uniformString(in: String): String = {
+    require(in != null)
+
+    val s1 = Normalizer.normalize(in.toLowerCase(), Form.NFD)
+    val s2 = s1.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
+
+    TreeSet(s2.replaceAll("\\W", " ").trim().split(" +"): _*).
+                                             filter(_.length >= 3).mkString(" ")
   }
 }
