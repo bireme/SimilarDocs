@@ -93,7 +93,7 @@ println(s"text=$text")
 println("### antes do new IndexSearcher")
     val dirReader = getReader()
     val searcher = new IndexSearcher(dirReader)
-println("### antes do 'searcher.search'")
+println(s"### antes do 'searcher.search' maxDocs=$maxDocs minSim=$minSim query=$query")
     val lst = searcher.search(query, maxDocs).scoreDocs.filter(_.score >= minSim).
                                              map(sd => (sd.doc,sd.score)).toList
 println(s"### depois do 'searcher.search' Ids=$lst")

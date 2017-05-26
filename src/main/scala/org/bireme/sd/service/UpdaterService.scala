@@ -37,6 +37,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 */
 class UpdaterService(docIndex: DocsIndex,
                      sd_idFldNames: Set[String]) {
+  val WAIT_TIME = 60000
   val query = new TermQuery(new Term("is_new", "true"))
   var running = false
 
@@ -52,7 +53,7 @@ println("###'start' function called")
 println("### antes do 'updateOne()'")
         if (!updateOne()) {  // if there is not new document wait 1 minute
 println("### waiting for a new document !!!")
-          Thread.sleep(60000)
+          Thread.sleep(WAIT_TIME)
         }
       }
     }
@@ -62,6 +63,7 @@ println("### waiting for a new document !!!")
     */
   def stop(): Unit = {
     running = false
+    Thread.sleep(WAIT_TIME)
   }
 
   /**
