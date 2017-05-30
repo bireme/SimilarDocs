@@ -37,7 +37,7 @@ import scala.collection.immutable.TreeSet
 object DocIndexRecreate extends App {
 
   private def usage(): Unit = {
-    Console.err.println("usage: docIndexRecreate\n" +
+    Console.err.println("usage: DocIndexRecreate\n" +
       "\n\t-topIndexPath=<path> : top docs Lucene index path" +
       "\n\t-docIndexPath=<path> : doc Lucene index path"
     )
@@ -45,7 +45,18 @@ object DocIndexRecreate extends App {
   }
 
   if (args.length != 2) usage()
-  recreateIndex(args(0), args(1))
+
+  val parameters = args.foldLeft[Map[String,String]](Map()) {
+    case (map,par) => {
+      val split = par.split(" *= *", 2)
+      if (split.length == 2) map + ((split(0).substring(1), split(1)))
+      else map + ((split(0).substring(2), ""))
+    }
+  }
+  val topIndexPath = parameters("topIndexPath")
+  val docIndexPath = parameters("docIndexPath")
+
+  recreateIndex(topIndexPath, docIndexPath)
 
   /**
     * Recreates the DocsIndex index from a TopIndex index.
