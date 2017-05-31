@@ -88,14 +88,14 @@ class TopIndex(simSearch: SimDocsSearch,
     require((psId != null) && (!psId.trim.isEmpty))
     require(profiles != null)
 
-    val lpsId = psId.trim.toLowerCase()
+    val tpsId = psId.trim()
 
     // Retrieves or creates the pesonal service document
-    val doc = getDocument(lpsId) match {
+    val doc = getDocument(tpsId) match {
       case Some(doc) => doc
       case None => {
         val doc2 = new Document()
-        doc2.add(new StringField("id", lpsId, Field.Store.YES))
+        doc2.add(new StringField("id", tpsId, Field.Store.YES))
         doc2
       }
     }
@@ -104,7 +104,7 @@ class TopIndex(simSearch: SimDocsSearch,
       case (name,sentence) => addProfile(doc, name, sentence)
     }
     // Saves document
-    topWriter.updateDocument(new Term("id", lpsId), doc)
+    topWriter.updateDocument(new Term("id", tpsId), doc)
     topWriter.commit()
   }
 
@@ -122,14 +122,14 @@ class TopIndex(simSearch: SimDocsSearch,
     require((name != null) && (!name.trim.isEmpty))
     require((sentence != null) && (!sentence.trim.isEmpty))
 
-    val lpsId = psId.trim.toLowerCase()
+    val tpsId = psId.trim()
 
     // Retrieves or creates the pesonal service document
-    val (doc,isNew) = getDocument(lpsId) match {
+    val (doc,isNew) = getDocument(tpsId) match {
       case Some(doc) => (doc,false)
       case None =>
         val doc2 = new Document()
-        doc2.add(new StringField("id", lpsId, Field.Store.YES))
+        doc2.add(new StringField("id", tpsId, Field.Store.YES))
         (doc2,true)
     }
     // Adds profile to the document
@@ -140,11 +140,11 @@ class TopIndex(simSearch: SimDocsSearch,
 
     // Avoid Lucene makes id tokenized (workarround)
     doc.removeField("id")
-    doc.add(new StringField("id", lpsId, Field.Store.YES))
+    doc.add(new StringField("id", tpsId, Field.Store.YES))
 
     // Saves document
     if (isNew) topWriter.addDocument(doc)
-    else topWriter.updateDocument(new Term("id", lpsId), doc)
+    else topWriter.updateDocument(new Term("id", tpsId), doc)
     topWriter.commit()
   }
 
@@ -164,16 +164,16 @@ class TopIndex(simSearch: SimDocsSearch,
     require((sentence != null) && (!sentence.trim.isEmpty))
 
     val newSentence = uniformString(sentence)
-    val lname = name.trim.toLowerCase()
-    val oldSentence = doc.get(lname)
+    val tname = name.trim()
+    val oldSentence = doc.get(tname)
 
     if (oldSentence == null) { // new profile
-      doc.add(new StoredField(lname, newSentence))
+      doc.add(new StoredField(tname, newSentence))
       docIndex.newRecord(newSentence) // create a new document at docIndex
     } else { // there was already a profile with the same name
       if (! oldSentence.equals(newSentence)) { // same profile but with different sentence
-        doc.removeField(lname)  // only one occurrence for profile
-        doc.add(new StoredField(lname, newSentence))
+        doc.removeField(tname)  // only one occurrence for profile
+        doc.add(new StoredField(tname, newSentence))
         docIndex.deleteRecord(oldSentence, onlyIfUnique=true)
         docIndex.newRecord(newSentence) // create a new document at docIndex
       }
@@ -188,11 +188,11 @@ class TopIndex(simSearch: SimDocsSearch,
   def deleteProfiles(psId: String): Unit = {
     require((psId != null) && (!psId.trim.isEmpty))
 
-   val lpsId = psId.trim.toLowerCase()
-    getDocument(lpsId) match {
+   val tpsId = psId.trim()
+    getDocument(tpsId) match {
       case Some(doc) => {
         doc.getFields().asScala.foreach(field => deleteProfile(doc, field.name()))
-        topWriter.updateDocument(new Term("id", lpsId), doc)
+        topWriter.updateDocument(new Term("id", tpsId), doc)
         topWriter.commit()
       }
       case None => ()
@@ -211,17 +211,17 @@ class TopIndex(simSearch: SimDocsSearch,
     require((psId != null) && (!psId.trim.isEmpty))
     require((name != null) && (!name.trim.isEmpty))
 
-    val lpsId = psId.trim.toLowerCase()
-    val lname = name.trim.toLowerCase()
+    val tpsId = psId.trim()
+    val tname = name.trim()
 
-    getDocument(lpsId) match {
+    getDocument(tpsId) match {
       case Some(doc) => {
-        if (deleteProfile(doc, lname)) {
+        if (deleteProfile(doc, tname)) {
           // Avoid Lucene makes id tokenized (workarround)
           doc.removeField("id")
-          doc.add(new StringField("id", lpsId, Field.Store.YES))
+          doc.add(new StringField("id", tpsId, Field.Store.YES))
 
-          topWriter.updateDocument(new Term("id", lpsId), doc)
+          topWriter.updateDocument(new Term("id", tpsId), doc)
           topWriter.commit()
           true
         } else false
@@ -242,12 +242,12 @@ class TopIndex(simSearch: SimDocsSearch,
     require(doc != null)
     require((name != null) && (!name.trim.isEmpty))
 
-    val lname = name.trim.toLowerCase()
-    val docId = doc.get(lname)
+    val tname = name.trim()
+    val docId = doc.get(tname)
 
-    if (lname.equals("id") || (docId == null)) false
+    if (tname.equals("id") || (docId == null)) false
     else {
-      doc.removeField(lname)
+      doc.removeField(tname)
       docIndex.deleteRecord(docId, onlyIfUnique=true)
       true
     }
@@ -283,9 +283,9 @@ class TopIndex(simSearch: SimDocsSearch,
   def getProfiles(psId: String): Map[String,String] = {
     require((psId != null) && (!psId.trim.isEmpty))
 
-    val lpsId = psId.trim.toLowerCase()
+    val tpsId = psId.trim()
 
-    getDocument(lpsId) match {
+    getDocument(tpsId) match {
       case Some(doc) => doc.getFields.asScala.
         foldLeft[Map[String,String]] (Map()) {
           case (map, field) =>
@@ -361,9 +361,9 @@ class TopIndex(simSearch: SimDocsSearch,
     require(outFlds != null)
     require(maxDocs > 0)
 
-    val lpsId = psId.trim.toLowerCase()
+    val tpsId = psId.trim()
 
-    getDocument(lpsId) match {
+    getDocument(tpsId) match {
       case Some(doc) => {
         val docIds = getDocIds(doc, profiles)
         if (docIds.isEmpty) List()
