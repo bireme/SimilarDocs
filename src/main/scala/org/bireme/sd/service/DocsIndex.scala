@@ -95,11 +95,15 @@ class DocsIndex(docIndex: String,
       1
     } else {                                // there is a document with this id
       val doc = doc_searcher.doc(tot_docs.scoreDocs(0).doc)
-      val tot = doc.getField("__total").numericValue().intValue
+      val tot = doc.getField("__total").numericValue().intValue + 1
       doc.removeField("__total")
-      doc.add(new StoredField("__total", tot + 1))
+      doc.add(new StoredField("__total", tot))
+      if (tot == 1) {
+        doc.removeField("is_new")
+        doc.add(new StringField("is_new", "true", Field.Store.YES))
+      }
       doc_writer.updateDocument(new Term("id", id), doc)
-      tot + 1
+      tot
     }
     doc_writer.commit()
 //println(s"newRecord total=$total")
@@ -171,7 +175,7 @@ class DocsIndex(docIndex: String,
       }
       doc.getFields("sd_id").foldLeft[Set[Int]] (Set()) {
         case (set, fld) =>
-          val sd_id =  fld.numericValue().intValue
+          val sd_id = fld.numericValue().intValue
 //println(s"=> inserindo sd_id=$sd_id")
           set + sd_id
       }

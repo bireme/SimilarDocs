@@ -23,6 +23,7 @@ package org.bireme.sd.service
 
 object Conf {
   val minSim = 0.5f
+  //val minSim = 0.0000001f
 
   val maxDocs: Int = 10
 
