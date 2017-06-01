@@ -175,6 +175,7 @@ class DocsIndex(docIndex: String,
       }
       doc.getFields("sd_id").foldLeft[Set[Int]] (Set()) {
         case (set, fld) =>
+println(s"field=${fld.toString} fld.numericValue()=${fld.numericValue()}")        
           val sd_id = fld.numericValue().intValue
 //println(s"=> inserindo sd_id=$sd_id")
           set + sd_id
