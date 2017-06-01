@@ -121,7 +121,7 @@ class DocsIndex(docIndex: String,
   def deleteRecord(id: String,
                    onlyIfUnique: Boolean = false): Unit = {
     def delDoc(total: Int,
-               sdIds: Array[String],
+               sdIds: Set[Int],
                isNew: Boolean): Unit = {
       val doc = new Document()
       doc.add(new StringField("id", id, Field.Store.YES))
@@ -141,7 +141,9 @@ class DocsIndex(docIndex: String,
     if (tot_docs.totalHits > 0) {
       val doc = doc_searcher.doc(tot_docs.scoreDocs(0).doc)
       val isNew = "true".equals(doc.get("is_new"))
-      val sdIds = doc.getValues("sd_id")
+      val sdIds = doc.getFields("sd_id").foldLeft[Set[Int]](Set()) {
+        case (set,fld) => set + fld.numericValue().intValue()
+      }
 
       if (onlyIfUnique) {
         val total = doc.getField("__total").numericValue().intValue
@@ -175,8 +177,7 @@ class DocsIndex(docIndex: String,
       }
       doc.getFields("sd_id").foldLeft[Set[Int]] (Set()) {
         case (set, fld) =>
-println(s"field=${fld.toString} fld.numericValue()=${fld.numericValue()}")        
-          val sd_id = fld.numericValue().intValue
+          val sd_id = fld.numericValue().intValue()
 //println(s"=> inserindo sd_id=$sd_id")
           set + sd_id
       }
