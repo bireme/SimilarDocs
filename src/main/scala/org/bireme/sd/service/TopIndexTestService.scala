@@ -33,7 +33,7 @@ object TopIndexTestService extends App {
   private def usage(): Unit = {
     Console.err.println("usage: TopIndexTestService\n" +
       "\n\t-sdIndexPath=<path>         : documents Lucene index path" +
-      "\n\t-otherIndexPath=<path>      : other indexes directory path" +
+      "\n\t-topIndexPath=<path>        : top Lucene index path" +
       "\n\t-psId=<id>                  : personal service identification" +
       "\n\t\n--- and one of the following options: ---\n" +
       "\n\t-addProfile=<name>=<sentence> : add user profile" +
@@ -54,19 +54,14 @@ object TopIndexTestService extends App {
     }
   }
   val sdIndexPath = parameters("sdIndexPath")
-  val otherIndexPath = parameters("otherIndexPath")
+  val topIndexPath = parameters("topIndexPath")
   val psId = parameters("psId")
   val addProfile = parameters.get("addProfile")
   val delProfile = parameters.get("deleteProfile")
   val getSimDocs = parameters.get("getSimDocs")
   val showProfiles = parameters.contains("showProfiles")
-  val docIndexPath = otherIndexPath +
-                    (if (otherIndexPath.endsWith("/")) "" else "/") + "docIndex"
-  val topIndexPath = otherIndexPath +
-                    (if (otherIndexPath.endsWith("/")) "" else "/") + "topIndex"
   val simDocs = new SimDocsSearch(sdIndexPath)
-  val docIndex = new DocsIndex(docIndexPath, simDocs, Conf.minSim, Conf.maxDocs)
-  val topIndex = new TopIndex(simDocs, docIndex, topIndexPath, Conf.idxFldNames)
+  val topIndex = new TopIndex(simDocs, topIndexPath, Conf.idxFldNames)
   addProfile match {
     case Some(profile) => {
       val split = profile.trim().split(" *\\= *", 2)
@@ -84,6 +79,5 @@ object TopIndexTestService extends App {
     }
   }
   topIndex.close()
-  docIndex.close()
   simDocs.close()
 }

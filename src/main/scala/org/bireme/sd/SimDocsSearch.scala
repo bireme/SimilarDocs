@@ -22,7 +22,6 @@
 package org.bireme.sd
 
 import java.io.File
-import java.nio.file.Paths
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.TreeSet
@@ -30,8 +29,8 @@ import scala.collection.immutable.TreeSet
 import org.apache.lucene.analysis.{Analyzer,TokenStream}
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import org.apache.lucene.index.{DirectoryReader,IndexableField}
-import org.apache.lucene.queryparser.classic.{MultiFieldQueryParser,QueryParser}
-import org.apache.lucene.search.{IndexSearcher, TermQuery}
+import org.apache.lucene.queryparser.classic.{MultiFieldQueryParser}
+import org.apache.lucene.search.{IndexSearcher}
 import org.apache.lucene.store.FSDirectory
 
 /** Class that looks for similar documents to a given ones

@@ -23,7 +23,7 @@ package org.bireme.sd
 
 import java.io.File
 
-import org.apache.lucene.document.{Document,Field,StoredField,TextField}
+import org.apache.lucene.document.{Document,Field,TextField}
 import org.apache.lucene.index.{IndexWriter,IndexWriterConfig}
 import org.apache.lucene.store.FSDirectory
 

@@ -32,7 +32,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.bireme.sd.SimDocsSearch;
 import org.bireme.sd.service.Conf;
-import org.bireme.sd.service.DocsIndex;
 import org.bireme.sd.service.UpdaterService;
 import org.bireme.sd.service.TopIndex;
 
@@ -48,7 +47,6 @@ public class SDService extends HttpServlet {
     private TopIndex topIndex;
     private UpdaterService updaterService;
     private SimDocsSearch simSearch;
-    private DocsIndex docIndex;
     
     @Override
     public void init(final ServletConfig config) throws ServletException {
@@ -72,9 +70,8 @@ public class SDService extends HttpServlet {
         Tools.deleteLockFile(topIndexPath);
 
         simSearch = new SimDocsSearch(sdIndexPath);
-        docIndex = new DocsIndex(docIndexPath, simSearch, Conf.minSim(), Conf.maxDocs());
-        topIndex = new TopIndex(simSearch, docIndex, topIndexPath, Conf.idxFldNames());
-        updaterService = new UpdaterService(docIndex, Conf.idxFldNames());
+        topIndex = new TopIndex(simSearch, topIndexPath, Conf.idxFldNames());
+        updaterService = new UpdaterService(topIndex);
 
         context.setAttribute("MAINTENANCE_MODE", Boolean.FALSE);
         //System.out.println("I will call 'updaterService.start()'");
@@ -84,8 +81,8 @@ public class SDService extends HttpServlet {
     
     @Override
     public void destroy() {
-        docIndex.close();
         topIndex.close();
+        simSearch.close();
         updaterService.stop();
         super.destroy();
     }
@@ -173,10 +170,9 @@ public class SDService extends HttpServlet {
             if (deleteProfile != null) {
                 if (deleteProfile.trim().isEmpty()) {
                     out.println("<ERROR>missing 'deleteProfile' parameter</ERROR>");
-                } else if (topIndex.deleteProfile(psId, deleteProfile)) {
-                    out.println("<result>OK</result>");
                 } else {
-                    out.println("<result>FAILED</result>");
+                    topIndex.deleteProfile(psId, deleteProfile);
+                    out.println("<result>OK</result>");
                 }
                 return;
             }

@@ -21,24 +21,20 @@
 
 package org.bireme.sd.service
 
-import java.io.{File,IOException}
 import java.nio.file.Paths
 import java.text.Normalizer
 import java.text.Normalizer.Form
+import java.util.Date
 
-import org.apache.lucene.analysis.core.KeywordAnalyzer
-import org.apache.lucene.document.{Document, Field, StringField, StoredField}
+import org.apache.lucene.document.{Document, Field, LongPoint, StringField, StoredField}
 import org.apache.lucene.index.{DirectoryReader, IndexWriter, IndexWriterConfig, Term}
-import org.apache.lucene.queryparser.classic.QueryParser
-import org.apache.lucene.search.{IndexSearcher,TermQuery,TopDocs}
+import org.apache.lucene.search.{IndexSearcher, TermQuery}
 import org.apache.lucene.store.FSDirectory
 
 import org.bireme.sd.SimDocsSearch
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.TreeSet
-import scala.io.Source
-import scala.util.{Try, Success, Failure}
 
 /** This class represents a personal service document that indexed by Lucene
   * engine. Each document has two kinds of fields:
@@ -48,20 +44,25 @@ import scala.util.{Try, Success, Failure}
   * at documents in SDIndex (Similar Documents Lucene Index).
   *
   * @param simSearch similar documents search engine object
-  * @param docIndex key to similar docs Lucene index
   * @param topIndexPath path/name of the TopIndex Lucene index
   * @param idxFldNames names of document fields used to find similar docs
   *
   * @author: Heitor Barbieri
-  * date: 20170110
+  * date: 20170601
 */
 class TopIndex(simSearch: SimDocsSearch,
-               docIndex: DocsIndex,
                topIndexPath: String,
                idxFldNames: Set[String] = Conf.idxFldNames) {
   require(simSearch != null)
-  require(docIndex != null)
   require((topIndexPath != null) && (!topIndexPath.trim.isEmpty))
+
+  val idFldName = "id"                  // Profile identifier
+  val userFldName = "user"              // Personal service user id
+  val nameFldName = "prof_name"         // Profile name
+  val contentFldName = "prof_content"   // Profile content
+  val creationFldName = "creation_time" // Profile creation time
+  val updateFldName = "update_time"     // Profile update time
+  val sdIdFldName = "sd_id"             // Similar document Lucene doc id
 
   val lcAnalyzer = new LowerCaseAnalyzer(true)
   val topDirectory = FSDirectory.open(Paths.get(topIndexPath))
@@ -78,73 +79,53 @@ class TopIndex(simSearch: SimDocsSearch,
   }
 
   /**
-    * Adds profile instances to a personal services document
-    *
-    * @param psId personal services document identifier
-    * @param profiles collection of profile name and content
-    */
-  def addProfiles(psId: String,
-                  profiles: Map[String,String]): Unit = {
-    require((psId != null) && (!psId.trim.isEmpty))
-    require(profiles != null)
-
-    val tpsId = psId.trim()
-
-    // Retrieves or creates the pesonal service document
-    val doc = getDocument(tpsId) match {
-      case Some(doc) => doc
-      case None => {
-        val doc2 = new Document()
-        doc2.add(new StringField("id", tpsId, Field.Store.YES))
-        doc2
-      }
-    }
-    // Adds profiles to the document
-    profiles.foreach {
-      case (name,sentence) => addProfile(doc, name, sentence)
-    }
-    // Saves document
-    topWriter.updateDocument(new Term("id", tpsId), doc)
-    topWriter.commit()
-  }
-
-  /**
     * Adds a profile instance to a personal services document
     *
-    * @param psId personal services document identifier
+    * @param user personal services document identifier
     * @param name profile name
-    * @param sentence profile content
+    * @param content profile content
     */
-  def addProfile(psId: String,
+  def addProfile(user: String,
                  name: String,
-                 sentence: String): Unit = {
-    require((psId != null) && (!psId.trim.isEmpty))
+                 content: String): Unit = {
+    require((user != null) && (!user.trim.isEmpty))
     require((name != null) && (!name.trim.isEmpty))
-    require((sentence != null) && (!sentence.trim.isEmpty))
+    require((content != null) && (!content.trim.isEmpty))
 
-    val tpsId = psId.trim()
+    val tuser = user.trim()
+    val tname = name.trim()
+    val id = s"${tuser}_${tname}"
+    val updateTime = new Date().getTime()
 
     // Retrieves or creates the pesonal service document
-    val (doc,isNew) = getDocument(tpsId) match {
-      case Some(doc) => (doc,false)
+    val (doc, isNew) = getDocuments(idFldName, id) match {
+      case Some(lst) =>
+        val doc2 = lst(0)
+        doc2.removeField(idFldName)   // Avoid Lucene makes id tokenized (workarround)
+        doc2.removeField(userFldName) // Avoid Lucene makes id tokenized (workarround)
+        doc2.removeField(updateFldName)
+        (doc2, false)
       case None =>
         val doc2 = new Document()
-        doc2.add(new StringField("id", tpsId, Field.Store.YES))
-        (doc2,true)
+        doc2.add(new StoredField(nameFldName, tname))
+        doc2.add(new StoredField(creationFldName, updateTime))
+        (doc2, true)
     }
-    // Adds profile to the document
-    addProfile(doc, name, sentence)
 
-//doc.getFields().asScala.foreach(field => println(s"name:${field.name()} content:${field.stringValue()}"))
-//println(s"addProfile psId=$psId doc=[$doc]")
+    // Add id and user fields
+    doc.add(new StringField(idFldName, id, Field.Store.YES))
+    doc.add(new StringField(userFldName, tuser, Field.Store.YES))
 
-    // Avoid Lucene makes id tokenized (workarround)
-    doc.removeField("id")
-    doc.add(new StringField("id", tpsId, Field.Store.YES))
+    // Add update_time field
+    doc.add(new LongPoint(updateFldName, updateTime))
+    doc.add(new StoredField(updateFldName, updateTime))
+
+    // Add profile content field and similar docs id fields to the document
+    addProfile(doc, content)
 
     // Saves document
     if (isNew) topWriter.addDocument(doc)
-    else topWriter.updateDocument(new Term("id", tpsId), doc)
+    else topWriter.updateDocument(new Term(idFldName, id), doc)
     topWriter.commit()
   }
 
@@ -153,29 +134,37 @@ class TopIndex(simSearch: SimDocsSearch,
     * a profile with the same name, then replace it;
     *
     * @param doc personal services document
-    * @param name profile name
-    * @param sentence profile content
+    * @param content profile content
+    * @param minSim minimum acceptable similarity between documents
+    * @param maxDocs maximum number of similar documents to be retrieved
     */
   private def addProfile(doc: Document,
-                         name: String,
-                         sentence: String): Unit = {
+                         content: String,
+                         minSim: Float = Conf.minSim,
+                         maxDocs: Int = Conf.maxDocs): Unit = {
     require(doc != null)
-    require((name != null) && (!name.trim.isEmpty))
-    require((sentence != null) && (!sentence.trim.isEmpty))
+    require((content != null) && (!content.trim.isEmpty))
 
-    val newSentence = uniformString(sentence)
-    val tname = name.trim()
-    val oldSentence = doc.get(tname)
+    val newContent = uniformString(content)
+    val oldContent = doc.get(contentFldName)
 
-    if (oldSentence == null) { // new profile
-      doc.add(new StoredField(tname, newSentence))
-      docIndex.newRecord(newSentence) // create a new document at docIndex
+    // Add profile field
+    val getSdIds = if (oldContent == null) { // new profile
+      doc.add(new StoredField(contentFldName, newContent))
+      true
     } else { // there was already a profile with the same name
-      if (! oldSentence.equals(newSentence)) { // same profile but with different sentence
-        doc.removeField(tname)  // only one occurrence for profile
-        doc.add(new StoredField(tname, newSentence))
-        docIndex.deleteRecord(oldSentence, onlyIfUnique=true)
-        docIndex.newRecord(newSentence) // create a new document at docIndex
+      if (oldContent.equals(newContent)) false
+      else {  // same profile but with different sentence
+        doc.removeField(contentFldName)  // only one occurrence for profile
+        doc.add(new StoredField(contentFldName, newContent))
+        true
+      }
+    }
+    // Add similar documents ids
+    if (getSdIds) {
+      doc.removeFields(sdIdFldName)
+      simSearch.searchIds(newContent, idxFldNames, maxDocs, minSim).foreach {
+        case (id,_) => doc.add(new StoredField(sdIdFldName, id))
       }
     }
   }
@@ -183,90 +172,48 @@ class TopIndex(simSearch: SimDocsSearch,
   /**
     * Deletes all profiles from a personal services document
     *
-    * @param psId personal services document identifier
+    * @param user personal services document identifier
     */
-  def deleteProfiles(psId: String): Unit = {
-    require((psId != null) && (!psId.trim.isEmpty))
+  def deleteProfiles(user: String): Unit = {
+    require((user != null) && (!user.trim.isEmpty))
 
-   val tpsId = psId.trim()
-    getDocument(tpsId) match {
-      case Some(doc) => {
-        doc.getFields().asScala.foreach(field => deleteProfile(doc, field.name()))
-        topWriter.updateDocument(new Term("id", tpsId), doc)
-        topWriter.commit()
-      }
-      case None => ()
-    }
+   topWriter.deleteDocuments(new Term(userFldName, user.trim()))
+   topWriter.commit()
   }
 
   /**
     * Deletes a profile from a personal services document
     *
-    * @param psId personal services document identifier
+    * @param user personal services document identifier
     * @param name profile name
-    * @return true if the profile was deleted or false if not
     */
-  def deleteProfile(psId: String,
-                    name: String): Boolean = {
-    require((psId != null) && (!psId.trim.isEmpty))
+  def deleteProfile(user: String,
+                    name: String): Unit = {
+    require((user != null) && (!user.trim.isEmpty))
     require((name != null) && (!name.trim.isEmpty))
 
-    val tpsId = psId.trim()
+    val tuser = user.trim()
     val tname = name.trim()
+    val id = s"${tuser}_${tname}"
 
-    getDocument(tpsId) match {
-      case Some(doc) => {
-        if (deleteProfile(doc, tname)) {
-          // Avoid Lucene makes id tokenized (workarround)
-          doc.removeField("id")
-          doc.add(new StringField("id", tpsId, Field.Store.YES))
-
-          topWriter.updateDocument(new Term("id", tpsId), doc)
-          topWriter.commit()
-          true
-        } else false
-      }
-      case None => false
-    }
-  }
-
-  /**
-    * Deletes a profile from a personal services document
-    *
-    * @param doc personal services document
-    * @param name profile name
-    * @return true if the profile was deleted or false if not
-    */
-  private def deleteProfile(doc: Document,
-                            name: String): Boolean = {
-    require(doc != null)
-    require((name != null) && (!name.trim.isEmpty))
-
-    val tname = name.trim()
-    val docId = doc.get(tname)
-
-    if (tname.equals("id") || (docId == null)) false
-    else {
-      doc.removeField(tname)
-      docIndex.deleteRecord(docId, onlyIfUnique=true)
-      true
-    }
+    topWriter.deleteDocuments(new Term(idFldName, id))
+    topWriter.commit()
   }
 
   /**
     * Given a personal services document, it returns all profiles contents
     * (some fields of that document) represented as a XML document
     *
-    * @param psId personal services document unique id
+    * @param user personal services document unique id
     * @return a XML document having profiles names and its contents. Profiles
     *         can have more than one occurrence
     */
-  def getProfilesXml(psId: String): String = {
-    require((psId != null) && (!psId.trim.isEmpty))
+  def getProfilesXml(user: String): String = {
+    require((user != null) && (!user.trim.isEmpty))
 
     val head = """<?xml version="1.0" encoding="UTF-8"?><profiles>"""
 
-    getProfiles(psId).foldLeft[String](head) {
+    getProfiles(user).foldLeft[String](head) {
       case(str,(name,content)) =>
         s"""$str<profile><name>$name</name><content>$content</content></profile>"""
     } + "</profiles>"
@@ -276,23 +223,22 @@ class TopIndex(simSearch: SimDocsSearch,
     * Given a personal services document, it returns all profiles contents
     * (some fields of that document)
     *
-    * @param psId personal services document unique id
+    * @param user personal services document unique id
     * @return a collection of profiles names and its contents. Profiles can not
     *         have more than one occurrence
     */
-  def getProfiles(psId: String): Map[String,String] = {
-    require((psId != null) && (!psId.trim.isEmpty))
+  def getProfiles(user: String): Map[String,String] = {
+    require((user != null) && (!user.trim.isEmpty))
 
-    val tpsId = psId.trim()
+    val tUser = user.trim()
 
-    getDocument(tpsId) match {
-      case Some(doc) => doc.getFields.asScala.
-        foldLeft[Map[String,String]] (Map()) {
-          case (map, field) =>
-            val id = field.name()
-            if (id.equals("id")) map
-            else map + ((id, field.stringValue()))
-        }
+    getDocuments(userFldName, tUser) match {
+      case Some(lst) => lst.foldLeft[Map[String,String]] (Map()) {
+        case (map, doc) =>
+          val name = doc.getField(nameFldName).stringValue()
+          val content = doc.getField(contentFldName).stringValue()
+          map + ((name, content))
+      }
       case None => Map()
     }
   }
@@ -344,71 +290,51 @@ class TopIndex(simSearch: SimDocsSearch,
     * similar documents fields where the profiles will be compared, returns
     * a list of similar documents
     *
-    * @param psId personal services document id
-    * @param profiles name of profiles used to find similar documents
+    * @param user personal services document id
+    * @param names name of profiles used to find similar documents
     * @param outFlds fields of similar documents to be retrieved
     * @param maxDocs the maximun number of similar documents to be retrieved
     * @return a list of similar documents, where each similar document is a
     *         a collection of field names and its contents. Each fields can
     *         have more than one occurrence
     */
-  def getSimDocs(psId: String,
-                 profiles: Set[String],
+  def getSimDocs(user: String,
+                 names: Set[String],
                  outFlds: Set[String],
                  maxDocs: Int): List[Map[String,List[String]]] = {
-    require((psId != null) && (!psId.trim.isEmpty))
-    require(profiles != null)
+    require((user != null) && (!user.trim.isEmpty))
+    require(names != null)
     require(outFlds != null)
     require(maxDocs > 0)
 
-    val tpsId = psId.trim()
-
-    getDocument(tpsId) match {
-      case Some(doc) => {
-        val docIds = getDocIds(doc, profiles)
-        if (docIds.isEmpty) List()
-        else {
-          val sdDirectory = FSDirectory.open(Paths.get(simSearch.indexPath))
-          val sdReader = DirectoryReader.open(sdDirectory)
-          val sdSearcher = new IndexSearcher(sdReader)
-          val list = limitDocs(docIds, maxDocs, List()).
-                              foldLeft[List[Map[String,List[String]]]](List()) {
-            case (lst, id) => {
-              val fields = getDocFields(id, sdSearcher, outFlds)
-              if (fields.isEmpty) lst else lst :+ fields
+    val tuser = user.trim()
+    val docIds = names.foldLeft[List[Set[Int]]](List()) {
+      case (lst, name) =>
+        val tname = name.trim()
+        val id = s"${tuser}_${tname}"
+        getDocuments(idFldName, id) match {
+          case Some(lst2) =>
+            lst :+ lst2(0).getFields(sdIdFldName).foldLeft[Set[Int]](Set()) {
+              case (set, ifld) => set + ifld.numericValue().intValue()
             }
-          }
-          sdReader.close()
-          sdDirectory.close()
-          list
+          case None => lst
         }
-      }
-      case None => List()
     }
-  }
-
-  /**
-    * Given a document and set of profile names, returns all of its contents
-    * (personel services sentences)
-    *
-    * @param doc Lucene Document object
-    * @param profiles a set of profiles names (fields of the given document)
-    * @return a list with sets of contents of each profile. Profiles can have
-    *         more than one occurrence
-    */
-  private def getDocIds(doc: Document,
-                        profiles: Set[String]): List[Set[Int]] = {
-    require(doc != null)
-    require(profiles != null)
-
-    profiles.foldLeft[List[Set[Int]]](List()) {
-      case (lst, id) => {
-        val did = doc.getField(id)
-        if (did == null) lst else {
-          val ids = docIndex.getDocIds(did.stringValue(), idxFldNames)
-          if (ids.isEmpty) lst else lst :+ ids
+    if (docIds.isEmpty) List()
+    else {
+      val sdDirectory = FSDirectory.open(Paths.get(simSearch.indexPath))
+      val sdReader = DirectoryReader.open(sdDirectory)
+      val sdSearcher = new IndexSearcher(sdReader)
+      val list = limitDocs(docIds, maxDocs, List()).
+                          foldLeft[List[Map[String,List[String]]]](List()) {
+        case (lst, id) => {
+          val fields = getDocFields(id, sdSearcher, outFlds)
+          if (fields.isEmpty) lst else lst :+ fields
         }
       }
+      sdReader.close()
+      sdDirectory.close()
+      list
     }
   }
 
@@ -486,26 +412,29 @@ class TopIndex(simSearch: SimDocsSearch,
   }
 
   /**
-    * Retrieves a Lucene Document object from personal services index,
-    * given its identifier
+    * Retrieves Lucene Document objects given a field name and content
     *
-    * @param id document identifier (personal service document identifier)
-    * @return Lucene Document
+    * @param field document field name
+    * @param content document field content
+    * @return probably a List of Lucene Document
     */
-  private def getDocument(id: String): Option[Document] = {
-    require((id != null) && (!id.trim.isEmpty))
+  private def getDocuments(field: String,
+                           content: String): Option[List[Document]] = {
+    require(field != null)
+    require(content != null)
 
     val topReader = DirectoryReader.open(topWriter)
     val topSearcher = new IndexSearcher(topReader)
-    val parser = new QueryParser("id", new KeywordAnalyzer())
-    val query0 = parser.parse(id);
-    val query = new TermQuery(new Term("id", id))
+    val query = new TermQuery(new Term(field, content))
+
 //println(s"query=$query")
-    val docs = topSearcher.search(query, 1)
+    val docs = topSearcher.search(query, Integer.MAX_VALUE)
 //println(s"totalHits=${docs.totalHits} id=[$id] query=[$query]")
     val result = docs.totalHits match {
       case 0 => None
-      case _ => Some(topSearcher.doc(docs.scoreDocs(0).doc))
+      case _ => docs.scoreDocs.foldLeft[Option[List[Document]]] (Some(List[Document]())) {
+        case (slst, sdoc) => slst.map(_ :+ topSearcher.doc(sdoc.doc))
+      }
     }
 
     topReader.close()
@@ -526,36 +455,6 @@ class TopIndex(simSearch: SimDocsSearch,
   }
 
   /**
-    * Reads the content of a internet package
-    *
-    * @param url the address of the internet package
-    * @param encoding the character enconding of the internet package
-    * @return the page content or the error message
-    */
-  private def readUrlContent(url: String,
-                             encoding: String): Try[String] = {
-    require((url != null) && (!url.trim.isEmpty))
-    require((encoding != null) && (!encoding.trim.isEmpty))
-
-    val src = Try(Source.fromURL(url, encoding))
-
-    src match {
-      case Success(bsource) =>
-        val content = bsource.mkString
-        val title = """<title>(.+?)</title>""".r
-        val h1 = """<h1>(.+?)</h1>""".r
-        val s1 = title.findFirstMatchIn(content).map(_.group(1)).getOrElse("")
-        val s2 = h1.findFirstMatchIn(content).map(_.group(1)).getOrElse("")
-        val s3 = (s1 + " " + s2).trim
-
-        bsource.close()
-        if (s3.isEmpty) Failure(new IOException("empty title, h1 and h2"))
-        else Success(s3)
-      case Failure(x) => Failure(x)
-    }
-  }
-
-  /**
     * Converts all input charactes into a-z, 0-9 and spaces. Removes adjacent
     * whites and sort the words.
     *
@@ -572,16 +471,53 @@ class TopIndex(simSearch: SimDocsSearch,
                                              filter(_.length >= 3).mkString(" ")
   }
 
-/**
-  * Prints all document fields.
-  *
-  * @param doc document whose fields will be printed
-  */
-  private def showDocFields(doc: Document): Unit = {
-    require(doc != null)
+  /**
+    * Update sdIdFldName fields of one document whose update time is outdated
+    *
+    * @param minSim minimum acceptable similarity between documents
+    * @param maxDocs maximum number of similar documents to be retrieved
+    * @return true if there was an update and false if not
+    */
+  def updateSimilarDocs(minSim: Float = Conf.minSim,
+                        maxDocs: Int = Conf.maxDocs): Boolean = {
+    val updateTime = new Date().getTime()
+    val deltaTime =  (1000 * 60 * 60 * 2)  // 2 hours
+    val query = LongPoint.newRangeQuery(updateFldName, 0, updateTime  - deltaTime) // all documents updated before one hour from now
+    val topReader = DirectoryReader.open(topWriter)
+    val topSearcher = new IndexSearcher(topReader)
+    val topDocs = topSearcher.search(query, 1)
+//println(s"###documentos a serem atualizados:${topDocs.totalHits} 0<=x<=${updateTime  - deltaTime}")
 
-    doc.getFields.asScala.foreach {
-      field => println(s"${field.name}:: ${field.stringValue}")
+    // Update 'update time' field
+    val retSet = if (topDocs.totalHits == 0) false else {
+      val doc = topSearcher.doc(topDocs.scoreDocs(0).doc)
+      doc.removeField(updateFldName)
+      doc.add(new LongPoint(updateFldName, updateTime))
+      doc.add(new StoredField(updateFldName, updateTime))
+
+      // Lucene bug
+      val id = doc.getField(idFldName).stringValue()
+      doc.removeField(idFldName)
+      doc.add(new StringField(idFldName, id, Field.Store.YES))
+
+      // Lucene bug
+      val user = doc.getField(userFldName).stringValue()
+      doc.removeField(userFldName)
+      doc.add(new StringField(userFldName, user, Field.Store.YES))
+
+      // Include new similar doc id fields
+      doc.removeFields(sdIdFldName)
+      val content = doc.getField(contentFldName).stringValue()
+      simSearch.searchIds(content, idxFldNames, maxDocs, minSim).foreach {
+        case (sdId,_) => doc.add(new StoredField(sdIdFldName, sdId))
+      }
+
+      // Update document
+      topWriter.updateDocument(new Term(idFldName, id), doc)
+      topWriter.commit()
+      true
     }
+    topReader.close()
+    retSet
   }
 }

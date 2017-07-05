@@ -23,8 +23,6 @@ package org.bireme.sd
 
 import org.apache.lucene.analysis.Analyzer
 import org.apache.lucene.analysis.core.{StopFilter,WhitespaceTokenizer}
-import org.apache.lucene.analysis.miscellaneous.ASCIIFoldingFilter
-import org.apache.lucene.analysis.ngram.NGramTokenizer
 import org.apache.lucene.analysis.Analyzer.TokenStreamComponents
 
 /** Lucene analyzer that creates a token stream with tokens having

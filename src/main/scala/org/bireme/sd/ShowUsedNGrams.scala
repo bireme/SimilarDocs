@@ -111,7 +111,7 @@ object ShowUsedNGrams extends App {
                      searcher: IndexSearcher,
                      analyzer: Analyzer): Map[String,Int] = {
     getNGrams(text, analyzer).filter {
-      case (tok,qtt) => hasToken(tok,fields,searcher,analyzer)
+      case (tok,_) => hasToken(tok,fields,searcher,analyzer)
     }
   }
 

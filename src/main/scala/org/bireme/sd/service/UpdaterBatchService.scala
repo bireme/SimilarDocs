@@ -21,13 +21,7 @@
 
 package org.bireme.sd.service
 
-import java.nio.file.Paths
-import java.util.Calendar
-
 import org.bireme.sd.SimDocsSearch
-
-import org.apache.lucene.search.IndexSearcher
-import org.apache.lucene.store.FSDirectory
 
 /** Application to regularly update all similar documents into lucene indexes
 *
@@ -38,10 +32,7 @@ object UpdaterBatchService extends App {
   private def usage(): Unit = {
     Console.err.println("usage: UpdateBatchService:\n" +
       "\n\t-sdIndexPath=<path>     : documents Lucene index path" +
-      "\n\t-topIndexPath=<path>    : top indexes directory path" +
-      "\n\t-docIndexPath=<path>    : doc indexes directory path" +
-      "\n\t-updAllDay=<day-number> : day to update all similar documents " +
-                                       "index 0-today 1-sunday 7-saturday"
+      "\n\t-topIndexPath=<path>    : top indexes directory path"
     )
     System.exit(1)
   }
@@ -55,28 +46,19 @@ object UpdaterBatchService extends App {
     }
   }
   val topIndexPath = parameters("topIndexPath")
-  val docIndexPath = parameters("docIndexPath")
-
   val sdIndexPath = parameters("sdIndexPath")
   val sdSearcher = new SimDocsSearch(sdIndexPath)
 
-  val updAllDay = parameters("updAllDay").toInt
-  val updateAll = ((updAllDay == 0) ||
-                  (Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == updAllDay))
-  val docIndex = new DocsIndex(docIndexPath, sdSearcher, Conf.minSim, Conf.maxDocs)
-
-  update(sdSearcher, docIndex, topIndexPath, updateAll)
-  docIndex.close()
+  update(sdSearcher, topIndexPath)
   sdSearcher.close()
 
   def update(sdSearcher: SimDocsSearch,
-             docIndex: DocsIndex,
-             topIndexPath: String,
-             updateAll: Boolean): Unit = {
-    if (updateAll) docIndex.updateAllRecordDocs(Conf.idxFldNames)
-    else docIndex.updateNewRecordDocs(Conf.idxFldNames)
+             topIndexPath: String): Unit = {
+    val topIndex = new TopIndex(sdSearcher, topIndexPath, Conf.idxFldNames)
+
+    topIndex.updateSimilarDocs()
 
     // Only to create the top index if it does not exist.
-    new TopIndex(sdSearcher, docIndex, topIndexPath, Conf.idxFldNames).close()
+    topIndex.close()
   }
 }

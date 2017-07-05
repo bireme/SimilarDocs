@@ -21,8 +21,8 @@ sbt 'run-main org.bireme.sd.LuceneIndexAkka indexes/tmp/sdIndex /bases/iahx/xml-
 # Trava o servidor para atualizações
 sbt "run-main org.bireme.sd.service.MaintenanceMode $SIM_DOCS_SERVER set"
 
-# Espera 30 secondos
-sleep 30s
+# Espera 60 secondos
+sleep 60s
 
 # Apaga o diretório do índice dos documentos similares
 rm -fr indexes/sdIndex
@@ -35,9 +35,9 @@ mv indexes/tmp/sdIndex indexes
 #sbt "run-main org.bireme.sd.service.UpdaterBatchService -sdIndexPath=/home/javaapps/sbt-projects/SimilarDocs/indexes/sdIndex -topIndexPath=/home/javaapps/sbt-projects/SimilarDocs/indexes/topIndex -docIndexPath=/home/javaapps/sbt-projects/SimilarDocs/indexes/docIndex -updAllDay=0"
 
 # Apaga arquivos 'write.lock' dos índices
-rm -f indexes/docIndex/write.lock
-rm -f indexes/topIndex/write.lock
-rm -f indexes/sdIndex/write.lock
+#rm -f indexes/docIndex/write.lock
+#rm -f indexes/topIndex/write.lock
+#rm -f indexes/sdIndex/write.lock
 
 # Destrava o servidor para atualizações
 sbt "run-main org.bireme.sd.service.MaintenanceMode $SIM_DOCS_SERVER reset"

@@ -22,9 +22,8 @@
 package org.bireme.sd
 
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem}
-import akka.actor.{ExtendedActorSystem, PoisonPill, Props, Terminated}
-import akka.routing.{ ActorRefRoutee, Broadcast, RoundRobinRoutingLogic, Router,
-                                                   SmallestMailboxRoutingLogic }
+import akka.actor.{PoisonPill, Props, Terminated}
+import akka.routing.{ ActorRefRoutee, Broadcast, RoundRobinRoutingLogic, Router}
 import bruma.master._
 
 import java.io.File

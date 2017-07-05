@@ -21,9 +21,7 @@
 
 package org.bireme.sd.service
 
-import java.io.Reader
-
-import org.apache.lucene.analysis.{Analyzer,LowerCaseFilter,TokenStream}
+import org.apache.lucene.analysis.{Analyzer,LowerCaseFilter}
 import org.apache.lucene.analysis.core.KeywordTokenizer
 import org.apache.lucene.analysis.Analyzer.TokenStreamComponents
 

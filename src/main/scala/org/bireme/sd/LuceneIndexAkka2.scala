@@ -22,7 +22,7 @@
 package org.bireme.sd
 
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem}
-import akka.actor.{ExtendedActorSystem, PoisonPill, Props, Terminated}
+import akka.actor.{PoisonPill, Props, Terminated}
 import akka.routing.{ ActorRefRoutee, Broadcast, RoundRobinRoutingLogic, Router,
                                                    SmallestMailboxRoutingLogic }
 import java.io.File
