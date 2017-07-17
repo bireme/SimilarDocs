@@ -67,7 +67,9 @@ class TopIndex(simSearch: SimDocsSearch,
   val lcAnalyzer = new LowerCaseAnalyzer(true)
   val topDirectory = FSDirectory.open(Paths.get(topIndexPath))
   val topWriter =  new IndexWriter(topDirectory,
-                                   new IndexWriterConfig(lcAnalyzer))
+                                   new IndexWriterConfig(lcAnalyzer).
+                                  setOpenMode(IndexWriterConfig.OpenMode.
+                                                              CREATE_OR_APPEND))
   topWriter.commit()
 
   /**
@@ -429,7 +431,7 @@ class TopIndex(simSearch: SimDocsSearch,
 
 //println(s"query=$query")
     val docs = topSearcher.search(query, Integer.MAX_VALUE)
-//println(s"totalHits=${docs.totalHits} id=[$id] query=[$query]")
+//println(s"totalHits=${docs.totalHits} query=[$query]")
     val result = docs.totalHits match {
       case 0 => None
       case _ => docs.scoreDocs.foldLeft[Option[List[Document]]] (Some(List[Document]())) {
