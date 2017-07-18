@@ -483,7 +483,7 @@ class TopIndex(simSearch: SimDocsSearch,
   def updateSimilarDocs(minSim: Float = Conf.minSim,
                         maxDocs: Int = Conf.maxDocs): Boolean = {
     val updateTime = new Date().getTime()
-    val deltaTime =  (1000 * 60 * 60 * 2)  // 2 hours
+    val deltaTime =  (1000 * 60 * 60 * 12)  // 12 hours
     val query = LongPoint.newRangeQuery(updateFldName, 0, updateTime  - deltaTime) // all documents updated before deltaTime from now
     val topReader = DirectoryReader.open(topWriter)
     val topSearcher = new IndexSearcher(topReader)

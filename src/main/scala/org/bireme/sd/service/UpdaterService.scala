@@ -43,10 +43,8 @@ class UpdaterService(topDocs: TopIndex) {
 
     Future {
       while (running) {
-        if (!topDocs.updateSimilarDocs()) {
-          // if there is not new document wait WAIT_TIME
-          Thread.sleep(WAIT_TIME)
-        }
+        topDocs.updateSimilarDocs()
+        if (running) Thread.sleep(WAIT_TIME)
       }
     }
   }
