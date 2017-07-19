@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <web-app version="3.1" xmlns="http://xmlns.jcp.org/xml/ns/javaee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd">
     <context-param>
-        <param-name>SD_INDEX_PATH</param-name>        
-        <!--param-value>/home/javaapps/sbt-projects/SimilarDocs/indexes/sdIndex</param-value-->
-        <param-value>/home/heitor/sbt-projects/SimilarDocs/indexes/sdIndex</param-value>
+        <param-name>SD_INDEX_PATH</param-name>
+        <param-value>/home/javaapps/sbt-projects/SimilarDocs/indexes/sdIndex</param-value>
+        <!--param-value>/home/heitor/sbt-projects/SimilarDocs/indexes/sdIndex</param-value-->
     </context-param>
     <context-param>
         <param-name>OTHER_INDEX_PATH</param-name>
-        <!--param-value>/home/javaapps/sbt-projects/SimilarDocs/indexes</param-value-->
-        <param-value>/home/heitor/sbt-projects/SimilarDocs/indexes</param-value>
+        <param-value>/home/javaapps/sbt-projects/SimilarDocs/indexes</param-value>
+        <!--param-value>/home/heitor/sbt-projects/SimilarDocs/indexes</param-value-->
     </context-param>
     <servlet>
         <servlet-name>SDService</servlet-name>

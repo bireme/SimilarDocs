@@ -78,7 +78,8 @@ class SDServiceTest extends FlatSpec {
     }
   }
 
-  val service = "http://serverofi5.bireme.br:8180/SDService"
+  val service = "http://basalto01.bireme.br:8180/SDService"
+  //val service = "http://serverofi5.bireme.br:8180/SDService"
   //val service = "http://localhost:8084"
 
   val id = "Téster!@paho.org"
