@@ -7,7 +7,7 @@ lazy val commonSettings = Seq(
 lazy val root = (project in file(".")).
   settings(commonSettings: _*).
   settings(
-    name := "SimilarDocsTrig"
+    name := "SimilarDocs"
   )
 
 val luceneVersion = "6.6.0" //"6.5.1"
@@ -25,7 +25,7 @@ libraryDependencies ++= Seq(
   //"com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
   "org.apache.httpcomponents" % "httpclient" % httpClientVersion,
   "org.scalactic" %% "scalactic" % scalaTestVersion,
-  "org.scalatest" %% "scalatest" % scalaTestVersion % "test",
+  "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
 )
 
 logBuffered in Test := false
