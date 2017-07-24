@@ -29,5 +29,6 @@ libraryDependencies ++= Seq(
 )
 
 logBuffered in Test := false
+trapExit :=  false  // To allow System.exit() without an exception (TestIndex.scala)
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-Ywarn-unused")
