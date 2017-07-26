@@ -89,7 +89,7 @@ object LuceneIndex extends App {
 
     val writer = new IndexWriter(directory, config)
 
-    (new File(xmlDir)).listFiles().foreach {
+    (new File(xmlDir)).listFiles().sorted.foreach {
       file =>
         if (file.isFile()) {
           matcher.reset(file.getName())

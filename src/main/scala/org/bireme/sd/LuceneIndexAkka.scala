@@ -36,9 +36,13 @@ import org.apache.lucene.index.{IndexWriter,IndexWriterConfig}
 import org.apache.lucene.store.FSDirectory
 
 import scala.collection.JavaConverters._
+import scala.language.postfixOps
+import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
+
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class LuceneIndexMain(indexPath: String,
                       xmlDir: String,
@@ -74,7 +78,7 @@ class LuceneIndexMain(indexPath: String,
   var activeIdx  = idxWorkers
 
 
-  (new File(xmlDir)).listFiles().foreach {
+  (new File(xmlDir)).listFiles().sorted.foreach {
     file =>
       if (file.isFile()) {
         matcher.reset(file.getName())
@@ -265,9 +269,13 @@ object LuceneIndexAkka extends App {
     val app = system.actorOf(props, "app")
     val stopped: Future[Boolean] = gracefulStop(app, 5 hours)
 
-    Await.result(stopped, 5 hours)
+    //Await.result(stopped, 5 hours)
     //val terminator = system.actorOf(Props(classOf[Terminator], app),
     //                                                "app-terminator")
+    stopped onComplete {
+      case Success(_) => system.terminate()
+      case Failure(ex) => system.terminate(); throw ex
+    }
   } catch {
     case NonFatal(e) ⇒ system.terminate(); throw e
   }
