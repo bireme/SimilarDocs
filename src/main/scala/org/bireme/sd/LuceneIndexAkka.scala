@@ -24,6 +24,8 @@ package org.bireme.sd
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem}
 import akka.actor.{PoisonPill, Props, Terminated}
 import akka.routing.{ ActorRefRoutee, Broadcast, RoundRobinRoutingLogic, Router}
+import akka.pattern.gracefulStop
+
 import bruma.master._
 
 import java.io.File
@@ -35,6 +37,8 @@ import org.apache.lucene.store.FSDirectory
 
 import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.duration._
 
 class LuceneIndexMain(indexPath: String,
                       xmlDir: String,
@@ -259,8 +263,11 @@ object LuceneIndexAkka extends App {
     val props = Props(classOf[LuceneIndexMain], args(0), args(1), xmlFileFilter,
                                    fldIdxNames, fldStrdNames, decsDir, encoding)
     val app = system.actorOf(props, "app")
-    val terminator = system.actorOf(Props(classOf[Terminator], app),
-                                                               "app-terminator")
+    val stopped: Future[Boolean] = gracefulStop(app, 5 hours)
+
+    Await.result(stopped, 5 hours)
+    //val terminator = system.actorOf(Props(classOf[Terminator], app),
+    //                                                "app-terminator")
   } catch {
     case NonFatal(e) ⇒ system.terminate(); throw e
   }
