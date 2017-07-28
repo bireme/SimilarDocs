@@ -39,6 +39,7 @@ import scala.language.postfixOps
 import scala.util.control.NonFatal
 import scala.concurrent.Await
 import scala.concurrent.duration._
+//import scala.concurrent.ExecutionContext.Implicits.global
 
 class LuceneIndexMain(indexPath: String,
                       xmlDir: String,
@@ -275,8 +276,10 @@ object LuceneIndexAkka extends App {
 
   val system = ActorSystem("Main")
   try {
-    Props(classOf[LuceneIndexMain], indexPath, xmlDir, xmlFileFilter,
+    val props = Props(classOf[LuceneIndexMain], indexPath, xmlDir, xmlFileFilter,
                                    fldIdxNames, fldStrdNames, decsDir, encoding)
+    system.actorOf(props, "app")
+
     //val app = system.actorOf(props, "app")
     //val stopped: Future[Boolean] = gracefulStop(app, 5 hours)
 
