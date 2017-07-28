@@ -100,7 +100,7 @@ class LuceneIndexMain(indexPath: String,
 
   private def indexFile(xmlFile: String,
                         encoding: String): Unit = {
-    log.info("Requesting the ndexing of the file file:" + xmlFile)
+    log.info("File to be indexed:" + xmlFile)
 
     routerIdx.route((xmlFile, encoding), self)
   }
