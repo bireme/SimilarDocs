@@ -53,8 +53,8 @@ echo $hits > work/flag.txt
 
 # Trava o servidor para atualizações
 sbt "run-main org.bireme.sd.service.MaintenanceMode $SIM_DOCS_SERVER set"
-hits="$?"
-if [ "$hits" -eq 0 ]; then
+result="$?"
+if [ "$result" -ne 0 ]; then
   sendemail -f appofi@bireme.org -u "Similar Documents Service - Service shutdown ERROR - `date '+%Y%m%d'`" -m "Similar Documents Service - Erro no bloqueio do serviço" -t barbieri@paho.org -cc mourawil@paho.org -s esmeralda.bireme.br -xu serverofi -xp bir@2012#
   exit 1
 fi
@@ -64,8 +64,8 @@ sleep 120s
 
 # Destrava o servidor para atualizações
 sbt "run-main org.bireme.sd.service.MaintenanceMode $SIM_DOCS_SERVER reset"
-hits="$?"
-if [ "$hits" -eq 0 ]; then
+result="$?"
+if [ "$result" -ne 0 ]; then
   sendemail -f appofi@bireme.org -u "Similar Documents Service - Service restart ERROR - `date '+%Y%m%d'`" -m "Similar Documents Service - Erro no desbloqueio" -t barbieri@paho.org -cc mourawil@paho.org -s esmeralda.bireme.br -xu serverofi -xp bir@2012#
   exit 1
 fi

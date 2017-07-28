@@ -51,7 +51,8 @@ object IahxXmlParser {
           val lin = src.getLines()
           (src, lin)
         }
-      case None => (source,lines)
+      case None =>
+        (source,lines)
     }
 
     docsStream(fldNames.map(_.trim.toLowerCase()), map, source2, lines2)
