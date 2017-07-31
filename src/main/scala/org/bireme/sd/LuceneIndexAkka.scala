@@ -68,7 +68,7 @@ class LuceneIndexMain(indexPath: String,
     //Router(SmallestMailboxRoutingLogic(), routees)
   }
   val matcher = Pattern.compile(xmlFileFilter).matcher("")
-  var activeIdx  = idxWorkers
+  //var activeIdx  = idxWorkers
 
 
   (new File(xmlDir)).listFiles().sorted.foreach {
@@ -80,7 +80,8 @@ class LuceneIndexMain(indexPath: String,
   }
 
   // finishing Actors
-  routerIdx.route(Broadcast(PoisonPill), self)
+  //routerIdx.route(Broadcast(PoisonPill), self)
+  self ! PoisonPill
 
   override def postStop(): Unit = {
     log.info("Optimizing index")
@@ -93,9 +94,9 @@ class LuceneIndexMain(indexPath: String,
   def receive = {
     case Terminated(actor) =>
       log.debug(s"actor[$actor.path.name] has terminated")
-      activeIdx -= 1
-      log.debug(s"active index actors = $activeIdx")
-      if (activeIdx == 0) self ! PoisonPill
+      //activeIdx -= 1
+      //log.debug(s"active index actors = $activeIdx")
+      //if (activeIdx == 0) self ! PoisonPill
   }
 
   private def indexFile(xmlFile: String,
@@ -231,14 +232,14 @@ class LuceneIndexActor(indexWriter: IndexWriter,
 
 object LuceneIndexAkka extends App {
 
-  class Terminator(app: ActorRef) extends Actor with ActorLogging {
+  /*class Terminator(app: ActorRef) extends Actor with ActorLogging {
     context watch app
     def receive = {
       case Terminated(_) =>
         //log.info("Terminator - application supervisor has terminated, shutting down")
         context.system.terminate()
     }
-  }
+  }*/
 
   private def usage(): Unit = {
     Console.err.println("usage: LuceneIndexAkka" +
