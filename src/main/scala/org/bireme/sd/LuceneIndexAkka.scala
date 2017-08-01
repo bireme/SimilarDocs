@@ -21,9 +21,9 @@
 
 package org.bireme.sd
 
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem}
+import akka.actor.{Actor, ActorLogging, ActorSystem}
 import akka.actor.{PoisonPill, Props, Terminated}
-import akka.routing.{ ActorRefRoutee, Broadcast, RoundRobinRoutingLogic, Router}
+import akka.routing.{ActorRefRoutee, Broadcast, RoundRobinRoutingLogic, Router}
 
 import bruma.master._
 
@@ -40,6 +40,8 @@ import scala.util.control.NonFatal
 import scala.concurrent.Await
 import scala.concurrent.duration._
 //import scala.concurrent.ExecutionContext.Implicits.global
+
+case class Finishing()
 
 class LuceneIndexMain(indexPath: String,
                       xmlDir: String,
@@ -68,8 +70,7 @@ class LuceneIndexMain(indexPath: String,
     //Router(SmallestMailboxRoutingLogic(), routees)
   }
   val matcher = Pattern.compile(xmlFileFilter).matcher("")
-  //var activeIdx  = idxWorkers
-
+  var activeIdx  = idxWorkers
 
   (new File(xmlDir)).listFiles().sorted.foreach {
     file =>
@@ -81,7 +82,8 @@ class LuceneIndexMain(indexPath: String,
 
   // finishing Actors
   //routerIdx.route(Broadcast(PoisonPill), self)
-  self ! PoisonPill
+  //self ! PoisonPill
+  routerIdx.route(Broadcast(Finishing()), self)
 
   override def postStop(): Unit = {
     log.info("Optimizing index")
@@ -93,10 +95,10 @@ class LuceneIndexMain(indexPath: String,
 
   def receive = {
     case Terminated(actor) =>
-      log.debug(s"actor[$actor.path.name] has terminated")
-      //activeIdx -= 1
-      //log.debug(s"active index actors = $activeIdx")
-      //if (activeIdx == 0) self ! PoisonPill
+      log.debug(s"actor[${actor.path.name}] has terminated")
+      activeIdx -= 1
+      log.debug(s"active index actors = $activeIdx")
+      if (activeIdx == 0) self ! PoisonPill
   }
 
   private def indexFile(xmlFile: String,
@@ -173,16 +175,12 @@ class LuceneIndexActor(indexWriter: IndexWriter,
       }
       log.debug(s"[${self.path.name}] finished my task")
     }
-    case msg:String =>
-      log.debug(s"recebi mensagem [$msg]")
-      doc.clear()
-      doc.add(new TextField("msg", msg,  Field.Store.YES))
-      indexWriter.addDocument(doc)
+    case _:Finishing => self ! PoisonPill
     case el => log.debug(s"LuceneIndexActor - recebi uma mensagem inesperada [$el]")
   }
 
   override def postStop(): Unit = {
-    log.debug("LuceneIndexActor is now finishing")
+    log.debug(s"LuceneIndexActor[${self.path.name}] is now finishing")
   }
 
   /**
