@@ -150,7 +150,6 @@ class LuceneIndexActor(indexWriter: IndexWriter,
                        fldStrdNames: Set[String],
                        decsMap: Map[Int,Set[String]]) extends Actor with ActorLogging {
   val regexp = """\^d\d+""".r
-  val doc = new Document()
   val fldMap = fldIdxNames.foldLeft[Map[String,Float]](Map[String,Float]()) {
     case (map,fname) =>
       val split = fname.split(" *: *", 2)
@@ -167,7 +166,7 @@ class LuceneIndexActor(indexWriter: IndexWriter,
             if (idx % 50000 == 0) {
               log.info(s"[$fname] - $idx")
             }
-            indexWriter.addDocument(map2doc(map.toMap, doc))
+            indexWriter.addDocument(map2doc(map.toMap))
           }
         }
       } catch  {
@@ -190,9 +189,8 @@ class LuceneIndexActor(indexWriter: IndexWriter,
     * @param doc a work Document object
     * @return a lucene document
     */
-  private def map2doc(map: Map[String,List[String]],
-                      doc: Document): Document = {
-    doc.clear()
+  private def map2doc(map: Map[String,List[String]]): Document = {
+    val doc = new Document()
 
     map.foreach {
       case (tag,lst) =>
