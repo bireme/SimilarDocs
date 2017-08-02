@@ -310,14 +310,15 @@ class TopIndex(simSearch: SimDocsSearch,
     require(maxDocs > 0)
 
     val tuser = user.trim()
-    val docIds = names.foldLeft[List[Set[Int]]](List()) {
+    val docIds = names.foldLeft[List[List[Int]]](List()) {
       case (lst, name) =>
         val tname = name.trim()
         val id = s"${tuser}_${tname}"
         getDocuments(idFldName, id) match {
           case Some(lst2) =>
-            lst :+ lst2(0).getFields(sdIdFldName).foldLeft[Set[Int]](Set()) {
-              case (set, ifld) => set + ifld.numericValue().intValue()
+            val sdIds = lst2(0).getFields().asScala.filter(_.name().equals(sdIdFldName))
+            lst :+ sdIds.foldLeft[List[Int]](List()) {
+              case (lst3, ifld) => lst3 :+ ifld.numericValue().intValue()
             }
           case None => lst
         }
@@ -350,7 +351,7 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param ids auxiliary id list
     * @return a list of similiar document ids
     */
-  private def limitDocs(docs: List[Set[Int]],
+  private def limitDocs(docs: List[List[Int]],
                         maxDocs: Int,
                         ids: List[Int]): List[Int] = {
     require(docs != null)
@@ -361,13 +362,13 @@ class TopIndex(simSearch: SimDocsSearch,
     else {
       val num = maxDocs - ids.size
       if (num > 0) {
-        val newIds = docs.foldLeft[Set[Int]](Set()) {
-          case (outSet,lstSet) => if (lstSet.isEmpty) outSet
-                                  else  outSet + lstSet.head
+        val newIds = docs.foldLeft[List[Int]](List()) {
+          case (outLst,lstD) => if (lstD.isEmpty) outLst
+                                  else  outLst :+ lstD.head
         }
-        val newDocs = docs.foldLeft[List[Set[Int]]](List()) {
-          case (lst,set) => if ((set.isEmpty)||(set.tail.isEmpty)) lst
-                            else lst :+ set.tail
+        val newDocs = docs.foldLeft[List[List[Int]]](List()) {
+          case (lst,lstD) => if ((lstD.isEmpty)||(lstD.tail.isEmpty)) lst
+                            else lst :+ lstD.tail
         }
         limitDocs(newDocs, maxDocs, (ids ++ newIds.take(num)))
       } else ids.take(maxDocs)

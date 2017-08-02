@@ -43,7 +43,7 @@ object ShowUsedNGrams extends App {
       "\n\t<field>,...,<field> - document field names used to look for text similarities" +
       "\n\t<text> - original text used to look for similar documents" +
       "\n\t<similar> - similar document content" +
-      "\n\t[<ngramsize>] - size of ngram used in the algoritm, usually 3")
+      "\n\t[<ngramsize>] - size of ngram used in the algorithm. The default value is NGSize.ngram_size")
     System.exit(1)
   }
 
