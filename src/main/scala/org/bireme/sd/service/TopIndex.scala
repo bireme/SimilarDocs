@@ -28,7 +28,7 @@ import java.util.Date
 
 import org.apache.lucene.document.{Document, Field, LongPoint, StringField, StoredField}
 import org.apache.lucene.index.{DirectoryReader, IndexWriter, IndexWriterConfig, Term}
-import org.apache.lucene.search.{IndexSearcher, TermQuery}
+import org.apache.lucene.search.{IndexSearcher, MatchAllDocsQuery, TermQuery}
 import org.apache.lucene.store.FSDirectory
 
 import org.bireme.sd.SimDocsSearch
@@ -484,7 +484,7 @@ class TopIndex(simSearch: SimDocsSearch,
   def updateSimilarDocs(minSim: Float = Conf.minSim,
                         maxDocs: Int = Conf.maxDocs): Boolean = {
     val updateTime = new Date().getTime()
-    val deltaTime =  (1000 * 60 * 60 * 12)  // 12 hours
+    val deltaTime =  (1000 * 60 * 60 * 8)  // 8 hours
     val query = LongPoint.newRangeQuery(updateFldName, 0, updateTime  - deltaTime) // all documents updated before deltaTime from now
     val topReader = DirectoryReader.open(topWriter)
     val topSearcher = new IndexSearcher(topReader)
@@ -522,5 +522,52 @@ class TopIndex(simSearch: SimDocsSearch,
     }
     topReader.close()
     retSet
+  }
+
+  /**
+    * Reset the update time field of all documents
+    *
+    * @param minSim minimum acceptable similarity between documents
+    * @param maxDocs maximum number of similar documents to be retrieved
+    */
+  def resetAllTimes(minSim: Float = Conf.minSim,
+                    maxDocs: Int = Conf.maxDocs): Unit = {
+    val updateTime = 0
+    val query = new MatchAllDocsQuery()
+
+    val topReader = DirectoryReader.open(topWriter)
+    val topSearcher = new IndexSearcher(topReader)
+    val topDocs = topSearcher.search(query, Integer.MAX_VALUE)
+
+    // Update 'update time' field
+    topDocs.scoreDocs.foreach {
+      scoreDoc =>
+        val doc = topSearcher.doc(scoreDoc.doc)
+        doc.removeField(updateFldName)
+        doc.add(new LongPoint(updateFldName, updateTime))
+        doc.add(new StoredField(updateFldName, updateTime))
+
+        // Lucene bug
+        val id = doc.getField(idFldName).stringValue()
+        doc.removeField(idFldName)
+        doc.add(new StringField(idFldName, id, Field.Store.YES))
+
+        // Lucene bug
+        val user = doc.getField(userFldName).stringValue()
+        doc.removeField(userFldName)
+        doc.add(new StringField(userFldName, user, Field.Store.YES))
+
+        // Include new similar doc id fields
+        doc.removeFields(sdIdFldName)
+        val content = doc.getField(contentFldName).stringValue()
+        simSearch.searchIds(content, idxFldNames, maxDocs, minSim).foreach {
+          case (sdId,_) => doc.add(new StoredField(sdIdFldName, sdId))
+        }
+
+        // Update document
+        topWriter.updateDocument(new Term(idFldName, id), doc)
+    }
+    topWriter.commit()
+    topReader.close()
   }
 }

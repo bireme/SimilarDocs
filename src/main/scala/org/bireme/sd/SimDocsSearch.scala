@@ -58,7 +58,7 @@ class SimDocsSearch(val indexPath: String) {
              maxDocs: Int,
              minSim: Float): List[(Float,Map[String,List[String]])] = {
     require((text != null) && (!text.isEmpty))
-    require(fields != null)
+    require((fields != null) && (!fields.isEmpty))
     require(maxDocs > 0)
     require(minSim > 0)
 
@@ -82,7 +82,7 @@ class SimDocsSearch(val indexPath: String) {
                 maxDocs: Int,
                 minSim: Float): List[(Int,Float)] = {
     require((text != null) && (!text.isEmpty))
-    require(fields != null)
+    require((fields != null) && (!fields.isEmpty))
     require(maxDocs > 0)
     require(minSim > 0)
 
@@ -120,7 +120,7 @@ class SimDocsSearch(val indexPath: String) {
   private def loadDoc(id: Int,
                       fields: Set[String]): Map[String,List[String]] = {
     require(id > 0)
-    require(fields != null)
+    require((fields != null) && (!fields.isEmpty))
 
     val dirReader = getReader()
     val map = asScalaBuffer[IndexableField](dirReader.document(id).getFields()).
@@ -141,13 +141,13 @@ object SimDocsSearch extends App {
     Console.err.println("usage: SimDocsSearch" +
     "\n\t<indexPath> - lucene Index where the similar document will be searched" +
     "\n\t<text> - text used to look for similar documents" +
-    "\n\t[-fields=<field>,<field>,...,<field>] - document fields used to look for similarities" +
+    "\n\t-fields=<field>,<field>,...,<field> - document fields used to look for similarities" +
     "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
     "\n\t[-minSim=<num>] - minimum similarity level (0 to 1.0) accepted ")
     System.exit(1)
   }
 
-  if (args.length < 2) usage()
+  if (args.length < 3) usage()
 
   val parameters = args.drop(2).foldLeft[Map[String,String]](Map()) {
     case (map,par) => {
@@ -155,9 +155,8 @@ object SimDocsSearch extends App {
       map + ((split(0).substring(1), split(1)))
     }
   }
-  val sFields = parameters.getOrElse("fields", "")
-  val fldNames = if (sFields.isEmpty) Set[String]()
-                 else sFields.split(" *, *").toSet
+  val sFields = parameters("fields")
+  val fldNames = sFields.split(" *, *").toSet
   val maxDocs = parameters.getOrElse("maxDocs", "10").toInt
   val minSim = parameters.getOrElse("minSim", "0.5").toFloat
   val search = new SimDocsSearch(args(0))

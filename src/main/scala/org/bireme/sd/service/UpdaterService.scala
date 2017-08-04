@@ -31,28 +31,36 @@ import scala.concurrent.ExecutionContext.Implicits.global
 * date: 20170524
 */
 class UpdaterService(topDocs: TopIndex) {
-  val WAIT_TIME = 1000 * 60 * 10 // 10 minutes
-  var running = false
+  class Executor {
+    val WAIT_TIME = 1000 * 60 * 10 // 10 minutes
+    var running = true
+
+    Future {
+      while (running) {
+        val updated = topDocs.updateSimilarDocs()  // Update one document
+        if (running && !updated) Thread.sleep(WAIT_TIME)
+      }
+    }
+
+    def stop(): Unit = {
+      running = false
+    }
+  }
+
+  var executor: Executor = null
 
   /** Start the update of sd_id fields of new documents until the stop function
     * is called
     */
-  def start(): Unit = {
-//println("###'start' function called")
-    running = true
-
-    Future {
-      while (running) {
-        topDocs.updateSimilarDocs()
-        if (running) Thread.sleep(WAIT_TIME)
-      }
-    }
-  }
+  def start(): Unit = if (executor == null) executor = new Executor()
 
   /** Stop the service
     */
   def stop(): Unit = {
-    running = false
-    //Thread.sleep(WAIT_TIME)
+    if (executor != null) {
+      executor.stop()
+      executor = null
+    }
+    topDocs.resetAllTimes()
   }
 }
