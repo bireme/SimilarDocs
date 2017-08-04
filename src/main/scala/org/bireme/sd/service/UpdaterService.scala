@@ -48,6 +48,7 @@ class UpdaterService(topDocs: TopIndex) {
   }
 
   var executor: Executor = null
+  topDocs.resetAllTimes()
 
   /** Start the update of sd_id fields of new documents until the stop function
     * is called
