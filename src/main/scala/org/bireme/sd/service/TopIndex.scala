@@ -316,7 +316,10 @@ class TopIndex(simSearch: SimDocsSearch,
         val id = s"${tuser}_${tname}"
         getDocuments(idFldName, id) match {
           case Some(lst2) =>
-            val sdIds = lst2(0).getFields().asScala.filter(_.name().equals(sdIdFldName))
+            val doc = lst2(0)
+            if (doc.getField(updateFldName).stringValue().toInt == 0)
+              updateSimilarDocs(doc, Conf.minSim, maxDocs)
+            val sdIds = doc.getFields().asScala.filter(_.name().equals(sdIdFldName))
             lst :+ sdIds.foldLeft[List[Int]](List()) {
               case (lst3, ifld) => lst3 :+ ifld.numericValue().intValue()
             }
@@ -494,30 +497,7 @@ class TopIndex(simSearch: SimDocsSearch,
     // Update 'update time' field
     val retSet = if (topDocs.totalHits == 0) false else {
       val doc = topSearcher.doc(topDocs.scoreDocs(0).doc)
-      doc.removeField(updateFldName)
-      doc.add(new LongPoint(updateFldName, updateTime))
-      doc.add(new StoredField(updateFldName, updateTime))
-
-      // Lucene bug
-      val id = doc.getField(idFldName).stringValue()
-      doc.removeField(idFldName)
-      doc.add(new StringField(idFldName, id, Field.Store.YES))
-
-      // Lucene bug
-      val user = doc.getField(userFldName).stringValue()
-      doc.removeField(userFldName)
-      doc.add(new StringField(userFldName, user, Field.Store.YES))
-
-      // Include new similar doc id fields
-      doc.removeFields(sdIdFldName)
-      val content = doc.getField(contentFldName).stringValue()
-      simSearch.searchIds(content, idxFldNames, maxDocs, minSim).foreach {
-        case (sdId,_) => doc.add(new StoredField(sdIdFldName, sdId))
-      }
-
-      // Update document
-      topWriter.updateDocument(new Term(idFldName, id), doc)
-      topWriter.commit()
+      updateSimilarDocs(doc, minSim, maxDocs)
       true
     }
     topReader.close()
@@ -525,13 +505,49 @@ class TopIndex(simSearch: SimDocsSearch,
   }
 
   /**
-    * Reset the update time field of all documents
+    * Update sdIdFldName fields of one document whose update time is outdated
     *
+    * @param doc document to be updated
     * @param minSim minimum acceptable similarity between documents
     * @param maxDocs maximum number of similar documents to be retrieved
     */
-  def resetAllTimes(minSim: Float = Conf.minSim,
-                    maxDocs: Int = Conf.maxDocs): Unit = {
+  def updateSimilarDocs(doc: Document,
+                        minSim: Float,
+                        maxDocs: Int): Unit = {
+    val updateTime = new Date().getTime()
+
+    // Update 'update time' field
+    doc.removeField(updateFldName)
+    doc.add(new LongPoint(updateFldName, updateTime))
+    doc.add(new StoredField(updateFldName, updateTime))
+
+    // Lucene bug
+    val id = doc.getField(idFldName).stringValue()
+    doc.removeField(idFldName)
+    doc.add(new StringField(idFldName, id, Field.Store.YES))
+
+    // Lucene bug
+    val user = doc.getField(userFldName).stringValue()
+    doc.removeField(userFldName)
+    doc.add(new StringField(userFldName, user, Field.Store.YES))
+
+    // Include new similar doc id fields
+    doc.removeFields(sdIdFldName)
+    val content = doc.getField(contentFldName).stringValue()
+    simSearch.searchIds(content, idxFldNames, maxDocs, minSim).foreach {
+      case (sdId,_) => doc.add(new StoredField(sdIdFldName, sdId))
+    }
+
+    // Update document
+    topWriter.updateDocument(new Term(idFldName, id), doc)
+    topWriter.commit()
+  }
+
+  /**
+    * Reset the update time field of all documents
+    *
+    */
+  def resetAllTimes(): Unit = {
     val updateTime = 0
     val query = new MatchAllDocsQuery()
 
@@ -557,12 +573,8 @@ class TopIndex(simSearch: SimDocsSearch,
         doc.removeField(userFldName)
         doc.add(new StringField(userFldName, user, Field.Store.YES))
 
-        // Include new similar doc id fields
+        // Remove similar doc id fields
         doc.removeFields(sdIdFldName)
-        val content = doc.getField(contentFldName).stringValue()
-        simSearch.searchIds(content, idxFldNames, maxDocs, minSim).foreach {
-          case (sdId,_) => doc.add(new StoredField(sdIdFldName, sdId))
-        }
 
         // Update document
         topWriter.updateDocument(new Term(idFldName, id), doc)
