@@ -317,7 +317,7 @@ class TopIndex(simSearch: SimDocsSearch,
         getDocuments(idFldName, id) match {
           case Some(lst2) =>
             val doc = lst2(0)
-            if (doc.getField(updateFldName).stringValue().toInt == 0)
+            if (doc.getField(updateFldName).stringValue().equals("0"))
               updateSimilarDocs(doc, Conf.minSim, maxDocs)
             val sdIds = doc.getFields().asScala.filter(_.name().equals(sdIdFldName))
             lst :+ sdIds.foldLeft[List[Int]](List()) {
