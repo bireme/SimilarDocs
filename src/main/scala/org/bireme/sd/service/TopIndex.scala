@@ -317,9 +317,11 @@ class TopIndex(simSearch: SimDocsSearch,
         getDocuments(idFldName, id) match {
           case Some(lst2) =>
             val doc = lst2(0)
-            if (doc.getField(updateFldName).stringValue().equals("0"))
-              updateSimilarDocs(doc, Conf.minSim, maxDocs)
-            val sdIds = doc.getFields().asScala.filter(_.name().equals(sdIdFldName))
+            val ndoc =
+              if (doc.getField(updateFldName).stringValue().equals("0")) {
+                updateSimilarDocs(doc, Conf.minSim, maxDocs)
+              } else doc
+            val sdIds = ndoc.getFields().asScala.filter(_.name().equals(sdIdFldName))
             lst :+ sdIds.foldLeft[List[Int]](List()) {
               case (lst3, ifld) => lst3 :+ ifld.numericValue().intValue()
             }
@@ -482,10 +484,10 @@ class TopIndex(simSearch: SimDocsSearch,
     *
     * @param minSim minimum acceptable similarity between documents
     * @param maxDocs maximum number of similar documents to be retrieved
-    * @return true if there was an update and false if not
+    * @return Some(document) if there was an update otherwise false
     */
   def updateSimilarDocs(minSim: Float = Conf.minSim,
-                        maxDocs: Int = Conf.maxDocs): Boolean = {
+                        maxDocs: Int = Conf.maxDocs): Option[Document] = {
     val updateTime = new Date().getTime()
     val deltaTime =  (1000 * 60 * 60 * 8)  // 8 hours
     val query = LongPoint.newRangeQuery(updateFldName, 0, updateTime  - deltaTime) // all documents updated before deltaTime from now
@@ -495,10 +497,10 @@ class TopIndex(simSearch: SimDocsSearch,
 //println(s"###documentos a serem atualizados:${topDocs.totalHits} 0<=x<=${updateTime  - deltaTime}")
 
     // Update 'update time' field
-    val retSet = if (topDocs.totalHits == 0) false else {
+    val retSet = if (topDocs.totalHits == 0) None else {
       val doc = topSearcher.doc(topDocs.scoreDocs(0).doc)
-      updateSimilarDocs(doc, minSim, maxDocs)
-      true
+      val ndoc = updateSimilarDocs(doc, minSim, maxDocs)
+      Some(ndoc)
     }
     topReader.close()
     retSet
@@ -510,38 +512,47 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param doc document to be updated
     * @param minSim minimum acceptable similarity between documents
     * @param maxDocs maximum number of similar documents to be retrieved
+    * @return document with its similar doc fields updated
     */
   def updateSimilarDocs(doc: Document,
                         minSim: Float,
-                        maxDocs: Int): Unit = {
+                        maxDocs: Int): Document = {
     val updateTime = new Date().getTime()
     val ndoc = new Document()
 
     // Include 'id' field
-    val id = doc.getField(idFldName)
-    ndoc.add(id)
+    val id = doc.getField(idFldName).stringValue()
+    ndoc.add(new StringField(idFldName, id, Field.Store.YES))
 
     // Include 'creation time' field
-    ndoc.add(doc.getField(creationFldName))
+    val ctime = doc.getField(creationFldName).stringValue().toLong
+    ndoc.add(new StoredField(creationFldName, ctime))
 
     // Include 'update time' field
     ndoc.add(new LongPoint(updateFldName, updateTime))
     ndoc.add(new StoredField(updateFldName, updateTime))
 
     // Include 'user' field
-    ndoc.add(doc.getField(userFldName))
+    val user = doc.getField(userFldName).stringValue()
+    ndoc.add(new StringField(userFldName, user, Field.Store.YES))
 
     // Include 'prof_name' field
-    val content = doc.getField(contentFldName)
-    ndoc.add(content)
+    val pname = doc.getField(nameFldName).stringValue()
+    ndoc.add(new StoredField(nameFldName, pname))
+
+    // Include 'prof_content' field
+    val content = doc.getField(contentFldName).stringValue()
+    ndoc.add(new StoredField(contentFldName, content))
 
     // Include 'sd_id' (similar docs) fields
-    simSearch.searchIds(content.stringValue(), idxFldNames, maxDocs, minSim).
+    simSearch.searchIds(content, idxFldNames, maxDocs, minSim).
       foreach { case (sdId,_) => ndoc.add(new StoredField(sdIdFldName, sdId)) }
 
     // Update document
-    topWriter.updateDocument(new Term(idFldName, id.stringValue()), ndoc)
+    topWriter.updateDocument(new Term(idFldName, id), ndoc)
     topWriter.commit()
+
+    ndoc
   }
 
   /**
@@ -560,25 +571,34 @@ class TopIndex(simSearch: SimDocsSearch,
     topDocs.scoreDocs.foreach {
       scoreDoc =>
         val doc = topSearcher.doc(scoreDoc.doc)
-        doc.removeField(updateFldName)
-        doc.add(new LongPoint(updateFldName, updateTime))
-        doc.add(new StoredField(updateFldName, updateTime))
+        val ndoc = new Document()
 
-        // Lucene bug
+        // Include 'id' field
         val id = doc.getField(idFldName).stringValue()
-        doc.removeField(idFldName)
-        doc.add(new StringField(idFldName, id, Field.Store.YES))
+        ndoc.add(new StringField(idFldName, id, Field.Store.YES))
 
-        // Lucene bug
+        // Include 'creation time' field
+        val ctime = doc.getField(creationFldName).stringValue().toLong
+        ndoc.add(new StoredField(creationFldName, ctime))
+
+        // Include 'update time' field
+        ndoc.add(new LongPoint(updateFldName, updateTime))
+        ndoc.add(new StoredField(updateFldName, updateTime))
+
+        // Include 'user' field
         val user = doc.getField(userFldName).stringValue()
-        doc.removeField(userFldName)
-        doc.add(new StringField(userFldName, user, Field.Store.YES))
+        ndoc.add(new StringField(userFldName, user, Field.Store.YES))
 
-        // Remove similar doc id fields
-        doc.removeFields(sdIdFldName)
+        // Include 'prof_name' field
+        val pname = doc.getField(nameFldName).stringValue()
+        ndoc.add(new StoredField(nameFldName, pname))
+
+        // Include 'prof_content' field
+        val content = doc.getField(contentFldName).stringValue()
+        ndoc.add(new StoredField(contentFldName, content))
 
         // Update document
-        topWriter.updateDocument(new Term(idFldName, id), doc)
+        topWriter.updateDocument(new Term(idFldName, id), ndoc)
     }
     topWriter.commit()
     topReader.close()

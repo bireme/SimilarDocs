@@ -37,8 +37,10 @@ class UpdaterService(topDocs: TopIndex) {
 
     Future {
       while (running) {
-        val updated = topDocs.updateSimilarDocs()  // Update one document
-        if (running && !updated) Thread.sleep(WAIT_TIME)
+        topDocs.updateSimilarDocs() match {
+          case Some(_) => () // Updated one document
+          case None => if (running) Thread.sleep(WAIT_TIME)
+        }
       }
     }
 

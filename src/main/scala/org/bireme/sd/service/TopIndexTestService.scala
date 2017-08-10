@@ -39,6 +39,7 @@ object TopIndexTestService extends App {
       "\n\t-addProfile=<name>=<sentence> : add user profile" +
       "\n\t-deleteProfile=<name>         : delete user profile" +
       "\n\t-getSimDocs=<prof>,<prof>,... : get similar documents from profiles" +
+      "\n\t--cleanSimDocs                : erase all similar documents fiels (sd_id) from profiles" +
       "\n\t--showProfiles                : show user profiles"
     )
     System.exit(1)
@@ -59,6 +60,7 @@ object TopIndexTestService extends App {
   val addProfile = parameters.get("addProfile")
   val delProfile = parameters.get("deleteProfile")
   val getSimDocs = parameters.get("getSimDocs")
+  val cleanSimDocs = parameters.contains("cleanSimDocs")
   val showProfiles = parameters.contains("showProfiles")
   val simDocs = new SimDocsSearch(sdIndexPath)
   val topIndex = new TopIndex(simDocs, topIndexPath, Conf.idxFldNames)
@@ -74,6 +76,7 @@ object TopIndexTestService extends App {
         case Some(fields) => println(topIndex.getSimDocsXml(psId,
                                fields.trim().split(" *\\, *").toSet, Set(), 10))
         case None => if (showProfiles) println(topIndex.getProfilesXml(psId))
+                     else if (cleanSimDocs) topIndex.resetAllTimes()
                      else usage()
       }
     }
