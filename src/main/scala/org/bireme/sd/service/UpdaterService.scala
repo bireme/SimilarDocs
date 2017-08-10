@@ -53,7 +53,10 @@ class UpdaterService(topDocs: TopIndex) {
   /** Start the update of sd_id fields of new documents until the stop function
     * is called
     */
-  def start(): Unit = if (executor == null) executor = new Executor()
+  def start(): Unit = {
+    if (executor != null) executor.stop()
+    executor = new Executor()
+  }
 
   /** Stop the service
     */

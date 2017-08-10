@@ -515,31 +515,32 @@ class TopIndex(simSearch: SimDocsSearch,
                         minSim: Float,
                         maxDocs: Int): Unit = {
     val updateTime = new Date().getTime()
+    val ndoc = new Document()
 
-    // Update 'update time' field
-    doc.removeField(updateFldName)
-    doc.add(new LongPoint(updateFldName, updateTime))
-    doc.add(new StoredField(updateFldName, updateTime))
+    // Include 'id' field
+    val id = doc.getField(idFldName)
+    ndoc.add(id)
 
-    // Lucene bug
-    val id = doc.getField(idFldName).stringValue()
-    doc.removeField(idFldName)
-    doc.add(new StringField(idFldName, id, Field.Store.YES))
+    // Include 'creation time' field
+    ndoc.add(doc.getField(creationFldName))
 
-    // Lucene bug
-    val user = doc.getField(userFldName).stringValue()
-    doc.removeField(userFldName)
-    doc.add(new StringField(userFldName, user, Field.Store.YES))
+    // Include 'update time' field
+    ndoc.add(new LongPoint(updateFldName, updateTime))
+    ndoc.add(new StoredField(updateFldName, updateTime))
 
-    // Include new similar doc id fields
-    doc.removeFields(sdIdFldName)
-    val content = doc.getField(contentFldName).stringValue()
-    simSearch.searchIds(content, idxFldNames, maxDocs, minSim).foreach {
-      case (sdId,_) => doc.add(new StoredField(sdIdFldName, sdId))
-    }
+    // Include 'user' field
+    ndoc.add(doc.getField(userFldName))
+
+    // Include 'prof_name' field
+    val content = doc.getField(contentFldName)
+    ndoc.add(content)
+
+    // Include 'sd_id' (similar docs) fields
+    simSearch.searchIds(content.stringValue(), idxFldNames, maxDocs, minSim).
+      foreach { case (sdId,_) => ndoc.add(new StoredField(sdIdFldName, sdId)) }
 
     // Update document
-    topWriter.updateDocument(new Term(idFldName, id), doc)
+    topWriter.updateDocument(new Term(idFldName, id.stringValue()), ndoc)
     topWriter.commit()
   }
 
