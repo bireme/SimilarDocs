@@ -31,7 +31,7 @@ import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 
 /** Lucene filter that converts all letters into lower case,
   * converts graphical accents letters into normal ones a-z and
-  * replaces all caracters that are not a-z 0-9 into spaces
+  * replaces all caracters that are not a-z 0-9 '_' and '-' into spaces
   *
   * @author: Heitor Barbieri
   * date: 20170102
@@ -63,7 +63,7 @@ class UniformFilter(input: TokenStream) extends TokenFilter(input) {
   }
 
   /**
-    * Converts all input charactes into a-z, 0-9 and spaces
+    * Converts all input charactes into a-z, 0-9 '_' '-' and spaces
     *
     * @param in input string to be converted
     * @return the converted string
@@ -72,6 +72,7 @@ class UniformFilter(input: TokenStream) extends TokenFilter(input) {
     val s1 = Normalizer.normalize(in.toLowerCase(), Form.NFD)
     val s2 = s1.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
 
-    s2.replaceAll("\\W", " ")
+    //s2.replaceAll("\\W", " ")
+    s2.replaceAll("[^\\w\\-]", " ")  // Hifen
   }
 }
