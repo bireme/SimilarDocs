@@ -32,7 +32,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.bireme.sd.SimDocsSearch;
 import org.bireme.sd.service.Conf;
-import org.bireme.sd.service.UpdaterService;
+import org.bireme.sd.service.UpdaterServicePar;
 import org.bireme.sd.service.TopIndex;
 
 import scala.collection.mutable.HashSet;
@@ -45,7 +45,7 @@ import scala.collection.mutable.Set;
  */
 public class SDService extends HttpServlet {
     private TopIndex topIndex;
-    private UpdaterService updaterService;
+    private UpdaterServicePar updaterService;
     private SimDocsSearch simSearch;
     
     @Override
@@ -71,7 +71,7 @@ public class SDService extends HttpServlet {
 
         simSearch = new SimDocsSearch(sdIndexPath);
         topIndex = new TopIndex(simSearch, topIndexPath, Conf.idxFldNames());
-        updaterService = new UpdaterService(topIndex);
+        updaterService = new UpdaterServicePar(topIndex);
 
         context.setAttribute("MAINTENANCE_MODE", Boolean.FALSE);
         //System.out.println("I will call 'updaterService.start()'");

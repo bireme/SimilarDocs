@@ -463,8 +463,8 @@ class TopIndex(simSearch: SimDocsSearch,
   }
 
   /**
-    * Converts all input charactes into a-z, 0-9 and spaces. Removes adjacent
-    * whites and sort the words.
+    * Converts all input charactes into a-z, 0-9 '_', '-' and spaces. Removes
+    * adjacent whites and sort the words.
     *
     * @param in input string to be converted
     * @return the converted string
@@ -475,7 +475,7 @@ class TopIndex(simSearch: SimDocsSearch,
     val s1 = Normalizer.normalize(in.toLowerCase(), Form.NFD)
     val s2 = s1.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
 
-    TreeSet(s2.replaceAll("\\W", " ").trim().split(" +"): _*).
+    TreeSet(s2.replaceAll("[^\\w\\-]", " ").trim().split(" +"): _*).
                                              filter(_.length >= 3).mkString(" ")
   }
 
