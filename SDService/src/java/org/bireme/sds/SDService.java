@@ -143,6 +143,25 @@ public class SDService extends HttpServlet {
                 out.println("<WARNING>System in maintenance mode</WARNING>");
                 return;
             }
+                        
+            // Ad hoc Similar Docs
+            final String adhocSimilarDocs = request.getParameter("adhocSimilarDocs");
+            if (adhocSimilarDocs != null) {
+                if (adhocSimilarDocs.trim().isEmpty()) {
+                    out.println("<ERROR>missing 'adhocSimDocs' parameter</ERROR>");
+                } else {
+                    final String outFields = request.getParameter("outFields");
+                    final String[] oFields = (outFields == null)
+                                    ? new String[0]: outFields.split(" *\\, *");
+                    Set<String> fields = new HashSet<>();
+                    for (String fld: oFields) {
+                        fields.add(fld);
+                    }
+                    out.println(simSearch.search(adhocSimilarDocs));
+                }
+                return;          
+            }
+            
             final String psId = request.getParameter("psId");
             if ((psId == null) || (psId.trim().isEmpty())) {
                 out.println("<ERROR>missing 'psId' parameter</ERROR>");
@@ -213,12 +232,13 @@ public class SDService extends HttpServlet {
 
     private void usage(final PrintWriter out) {
         out.println("<SYNTAX>");
-        out.println("SDService/?psId=&lt;id&gt;");
+        out.println("SDService/?");
         out.println("--- and one of the following options: ---");
-        out.println("&amp;addProfile=&lt;id&gt;&amp;sentence=&lt;sentence&gt;");
-        out.println("&amp;deleteProfile=&lt;id&gt;");
-        out.println("&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;&amp;outFields=&lt;field&gt;,...,&lt;field&gt;");
-        out.println("&amp;showProfiles=true");
+        out.println("psId=&lt;id&gt;&amp;addProfile=&lt;id&gt;&amp;sentence=&lt;sentence&gt;");
+        out.println("psId=&lt;id&gt;&amp;deleteProfile=&lt;id&gt;");
+        out.println("psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;&amp;outFields=&lt;field&gt;,...,&lt;field&gt;");
+        out.println("psId=&lt;id&gt;&amp;showProfiles=true");
+        out.println("adhocSimDocs=&lt;sentence&gt;&amp;");
         out.println("</SYNTAX>");
     }
 

@@ -46,6 +46,21 @@ class SimDocsSearch(val indexPath: String) {
     * Searches for documents having a string in some fields
     *
     * @param text the text to be searched
+    * @return a json string of the similar documents
+    */
+  def search(text: String): String = {
+    require((text != null) && (!text.isEmpty))
+
+    doc2xml(search(text,
+                   service.Conf.idxFldNames,
+                   service.Conf.maxDocs,
+                   service.Conf.minSim))
+  }
+
+  /**
+    * Searches for documents having a string in some fields
+    *
+    * @param text the text to be searched
     * @param fields document fields into where the text will be searched
     * @param maxDocs maximum number of returned documents
     * @param minSim minimum similarity between the input text and the retrieved
@@ -103,6 +118,49 @@ class SimDocsSearch(val indexPath: String) {
     lst
   }
 
+  def doc2json(docs: List[(Float,Map[String,List[String]])]): String = {
+    require (docs != null)
+
+    docs.zipWithIndex.foldLeft[String]("{\"documents\":[") {
+      case (str, (doc,idx)) => {
+        val fields = doc._2.toList.zipWithIndex
+        val jflds = fields.foldLeft[String]("") {
+          case (str2, (fld,idx2)) => {
+            val lst = fld._2.zipWithIndex
+            val lstStr = lst.size match {
+              case 0 => ""
+              case 1 => "\"" + lst(0) + "\""
+              case _ => "[" + lst.foldLeft[String]("") {
+                case (str3,(elem,idx3)) =>
+                  str3 + (if (idx3 == 0) "" else ",") + "\"" + elem + "\""
+              } + "]"
+            }
+            str2 + (if (idx2 == 0) "" else ",") +
+            "\"" + fld._1 + "\":" + lstStr
+          }
+        }
+        str + (if (idx == 0) "" else ",") +
+        "{\"score\":" + doc._1 + "," + jflds + "}"
+      }
+    } + "]}"
+  }
+
+  def doc2xml(docs: List[(Float,Map[String,List[String]])]): String = {
+    require (docs != null)
+
+    docs.foldLeft[String]("<documents>") {
+      case (str, doc) => {
+        val fields = doc._2.toList   // List[(String,List[String])]
+        val jflds = fields.foldLeft[String]("") {
+          case (str2, fld) => fld._2.foldLeft[String](str2) {       // fld = (String,List[String])
+            case (str3, content) => str3 + "<" + fld._1 + ">" + content + "</" + fld._1 + ">"
+          }
+        }
+        str + "<document score=\"" + doc._1 + "\">" + jflds + "</document>"
+      }
+    } + "</documents>"
+  }
+
  /**
    * Open a new DirectoryReader if necessary, otherwise use the old one
    *
@@ -141,13 +199,13 @@ object SimDocsSearch extends App {
     Console.err.println("usage: SimDocsSearch" +
     "\n\t<indexPath> - lucene Index where the similar document will be searched" +
     "\n\t<text> - text used to look for similar documents" +
-    "\n\t-fields=<field>,<field>,...,<field> - document fields used to look for similarities" +
+    "\n\t[-fields=<field>,<field>,...,<field>] - document fields used to look for similarities" +
     "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
     "\n\t[-minSim=<num>] - minimum similarity level (0 to 1.0) accepted ")
     System.exit(1)
   }
 
-  if (args.length < 3) usage()
+  if (args.length < 2) usage()
 
   val parameters = args.drop(2).foldLeft[Map[String,String]](Map()) {
     case (map,par) => {
@@ -155,8 +213,11 @@ object SimDocsSearch extends App {
       map + ((split(0).substring(1), split(1)))
     }
   }
-  val sFields = parameters("fields")
-  val fldNames = sFields.split(" *, *").toSet
+
+  val fldNames = parameters.get("fields") match {
+    case Some(sFields) => sFields.split(" *, *").toSet
+    case None => service.Conf.idxFldNames
+  }
   val maxDocs = parameters.getOrElse("maxDocs", "10").toInt
   val minSim = parameters.getOrElse("minSim", "0.5").toFloat
   val search = new SimDocsSearch(args(0))
@@ -183,6 +244,7 @@ object SimDocsSearch extends App {
           }
       }
   }
+  //println(search.doc2json(docs))
 
   private def getSimilarText(doc: Map[String,List[String]],
                              fNames: Set[String]): String = {
