@@ -14,6 +14,8 @@ val luceneVersion = "6.6.0" //"6.5.1"
 val akkaVersion = "2.5.3" //"2.5.2" //"2.5.1" //"2.4.14"
 val httpClientVersion = "4.5.3" //"4.5.2"
 val scalaTestVersion = "3.0.3"
+val casbahVersion = "3.1.1"
+val playVersion = "2.6.3"
 
 libraryDependencies ++= Seq(
   "org.apache.lucene" % "lucene-core" % luceneVersion,
@@ -25,7 +27,9 @@ libraryDependencies ++= Seq(
   //"com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
   "org.apache.httpcomponents" % "httpclient" % httpClientVersion,
   "org.scalactic" %% "scalactic" % scalaTestVersion,
-  "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
+  "org.scalatest" %% "scalatest" % scalaTestVersion % "test",
+  "org.mongodb" %% "casbah" % casbahVersion,
+  "com.typesafe.play" %% "play-json" % playVersion
 )
 
 logBuffered in Test := false
