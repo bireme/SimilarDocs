@@ -129,7 +129,7 @@ class SimDocsSearch(val indexPath: String) {
             val lst = fld._2.zipWithIndex
             val lstStr = lst.size match {
               case 0 => ""
-              case 1 => "\"" + lst(0) + "\""
+              case 1 => "\"" + lst.head + "\""
               case _ => "[" + lst.foldLeft[String]("") {
                 case (str3,(elem,idx3)) =>
                   str3 + (if (idx3 == 0) "" else ",") + "\"" + elem + "\""

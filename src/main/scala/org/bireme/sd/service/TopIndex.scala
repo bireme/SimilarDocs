@@ -102,7 +102,7 @@ class TopIndex(simSearch: SimDocsSearch,
     // Retrieves or creates the pesonal service document
     val (doc, isNew) = getDocuments(idFldName, id) match {
       case Some(lst) =>
-        val doc2 = lst(0)
+        val doc2 = lst.head
         doc2.removeField(idFldName)   // Avoid Lucene makes id tokenized (workarround)
         doc2.removeField(userFldName) // Avoid Lucene makes id tokenized (workarround)
         doc2.removeField(updateFldName)
@@ -276,7 +276,7 @@ class TopIndex(simSearch: SimDocsSearch,
 
             lst.size match {
               case 0 => str2
-              case 1 => str2 + s"<$tag2>${cleanString(lst(0))}</$tag2>"
+              case 1 => str2 + s"<$tag2>${cleanString(lst.head)}</$tag2>"
               case _ => str2 + lst.foldLeft[String]("") {
                 case (str3,elem) => s"$str3<$tag2>${cleanString(elem)}</$tag2>"
               }
@@ -316,7 +316,7 @@ class TopIndex(simSearch: SimDocsSearch,
         val id = s"${tuser}_${tname}"
         getDocuments(idFldName, id) match {
           case Some(lst2) =>
-            val doc = lst2(0)
+            val doc = lst2.head
             val ndoc =
               if (doc.getField(updateFldName).stringValue().equals("0")) {
                 updateSimilarDocs(doc, Conf.minSim, maxDocs)

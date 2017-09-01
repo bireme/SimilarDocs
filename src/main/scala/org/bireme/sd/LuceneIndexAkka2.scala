@@ -27,7 +27,7 @@ import akka.routing.{ ActorRefRoutee, Broadcast, RoundRobinRoutingLogic, Router,
                                                    SmallestMailboxRoutingLogic }
 import java.io.File
 
-import org.apache.lucene.document.{Document,Field,StoredField,TextField}
+import org.apache.lucene.document.{Document,Field,TextField}
 import org.apache.lucene.index.{IndexWriter,IndexWriterConfig}
 import org.apache.lucene.store.FSDirectory
 
@@ -94,7 +94,7 @@ class LuceneIndexMain2(indexPath: String,
   }
 
   def receive = {
-    case Terminated(actor) =>
+    case Terminated(_) =>
       //log.info(s"actor[$actor] has terminated")
       activeIdx -= 1
       //log.info(s"active index actors = $activeIdx")

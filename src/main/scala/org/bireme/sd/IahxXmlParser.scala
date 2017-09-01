@@ -86,13 +86,10 @@ object IahxXmlParser {
   private def getDocEncoding(lines: Iterator[String]): Option[String] = {
     if (lines.hasNext) {
       val line = lines.next().trim()
-      if (line.startsWith("<?xml ")) {
-        """encoding="([^"]+)""".r.findFirstMatchIn(line) match {
-          case Some(mat) => Some(mat.group(1))
-          case None => None
-        }
-      } else if (line.startsWith("<add>")) None
-             else getDocEncoding(lines)
+      if (line.startsWith("<?xml "))
+        """encoding="([^"]+)""".r.findFirstMatchIn(line).map(_.group(1))
+      else if (line.startsWith("<add>")) None
+      else getDocEncoding(lines)
     } else None
   }
 
@@ -135,12 +132,10 @@ object IahxXmlParser {
 
   private def getFieldString(lines: Iterator[String]):
                                                      Option[(String,String)] = {
-    getOpenFieldElem(lines) match {
-      case Some(line) =>
-        if (line.contains("</field>")) Some(parseField(line))
-        else Some(parseField(getUntilCloseFldElem(line, lines)))
-      case None => None
-    }
+    getOpenFieldElem(lines).map(line =>
+      if (line.contains("</field>")) parseField(line)
+      else parseField(getUntilCloseFldElem(line, lines))
+    )
   }
 
   /**

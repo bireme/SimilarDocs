@@ -177,18 +177,15 @@ object LuceneIndex extends App {
         // Add decs descriptors
         if (!decsMap.isEmpty && (tag == "mj")) {
           lst.foreach {
-            fld => regexp.findFirstIn(fld) match {
-              case Some(subd) => {
-                decsMap.get(subd.substring(2).toInt) match {
-                  case Some(lst2) => lst2.foreach {
+            fld => regexp.findFirstIn(fld).foreach {
+              subd =>
+                decsMap.get(subd.substring(2).toInt).foreach {
+                  lst2 => lst2.foreach {
                     descr =>
                       val fld = new TextField("decs", descr, Field.Store.YES)
                       doc.add(fld)
                   }
-                  case None => ()
                 }
-              }
-              case None => ()
             }
           }
         }

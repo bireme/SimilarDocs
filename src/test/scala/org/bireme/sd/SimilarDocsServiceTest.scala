@@ -167,7 +167,7 @@ class SimilarDocsServiceTest extends FlatSpec {
       }
   }
   s"The user '$id'" should
-    s"retrieve documents with at least 10 match profile words" in {
+    "retrieve documents with at least 10 match profile words" in {
       tot should be >= 10
     }
 
