@@ -52,7 +52,8 @@ class LuceneIndexMain(indexPath: String,
                       encoding: String) extends Actor with ActorLogging {
   val idxWorkers = 10 // Number of actors to run concurrently
 
-  val analyzer = new NGramAnalyzer(NGSize.ngram_size)
+  val analyzer = new NGramAnalyzer(NGSize.ngram_min_size,
+                                   NGSize.ngram_max_size)
   val directory = FSDirectory.open(new File(indexPath).toPath())
   val config = new IndexWriterConfig(analyzer)
   config.setOpenMode(IndexWriterConfig.OpenMode.CREATE)

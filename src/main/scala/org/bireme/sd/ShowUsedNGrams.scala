@@ -42,27 +42,28 @@ object ShowUsedNGrams extends App {
       "\n\t<index> - Lucene index path used to look for similar documents" +
       "\n\t<field>,...,<field> - document field names used to look for text similarities" +
       "\n\t<text> - original text used to look for similar documents" +
-      "\n\t<similar> - similar document content" +
-      "\n\t[<ngramsize>] - size of ngram used in the algorithm. The default value is NGSize.ngram_size")
+      "\n\t<similar> - similar document content")
     System.exit(1)
   }
 
   if (args.length < 4) usage()
 
   val fields = args(1).trim.split(" *\\, *").toSet
-  val size = if (args.length > 4) args(4).toInt else NGSize.ngram_size
+  val minSize = NGSize.ngram_min_size
+  val maxSize = NGSize.ngram_max_size
 
-  show(args(2), args(3), fields, args(0), size)
+  show(args(2), args(3), fields, args(0), minSize, maxSize)
 
   def show(text: String,
            similar: String,
            fields: Set[String],
            index: String,
-           size: Int): Unit = {
+           minSize: Int,
+           maxSize: Int): Unit = {
     val directory = FSDirectory.open(new File(index).toPath())
     val reader = DirectoryReader.open(directory)
     val searcher = new IndexSearcher(reader)
-    val analyzer = new NGramAnalyzer(size)
+    val analyzer = new NGramAnalyzer(minSize, maxSize)
     val map1 = getIndexNGrams(similar, fields, searcher, analyzer)
     val map2 = getNGrams(text, analyzer)
     val map3 = getIndexNGrams(text, fields, searcher, analyzer)

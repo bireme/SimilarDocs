@@ -34,21 +34,23 @@ import org.apache.lucene.analysis.Analyzer.TokenStreamComponents
   * @author: Heitor Barbieri
   * date: 20170102
   *
-  * @param size the size of the generated tokens
+  * @param minSize the minimum size of the generated tokens
+  * @param maxSize the maximum size of the generated tokens
 */
-class NGramAnalyzer(size: Int) extends Analyzer {
+class NGramAnalyzer(minSize: Int,
+                    maxSize: Int) extends Analyzer {
   override def createComponents(fieldName: String): TokenStreamComponents = {
      val source = new WhitespaceTokenizer()
      val filter1 = new UniformFilter(source) //new ASCIIFoldingFilter(source)
      val filter2 = new StopFilter(filter1, Stopwords.getStopwords())
      val filter3 = new WhitespaceFilter(filter2)
-     val filter4 = new NGramFilter(filter3, size)
+     val filter4 = new NGramFilter(filter3, minSize, maxSize)
 
      return new TokenStreamComponents(source, filter4)
    }
 
    /* override def createComponents(fieldName: String): TokenStreamComponents = {
-      val source = new NGramTokenizer(size, size)
+      val source = new NGramTokenizer(minSize, maxSize)
       val filter = new UniformFilter(source)
 
       return new TokenStreamComponents(source, filter)

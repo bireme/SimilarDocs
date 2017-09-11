@@ -21,11 +21,12 @@
 
 package org.bireme.sd
 
-/** The default ngram size
+/** The default ngram minimum and maximum sizes
   *
   * @author: Heitor Barbieri
   * date: 20170102
 */
 object NGSize {
-  val ngram_size = 4
+  val ngram_min_size = 4
+  val ngram_max_size = 5
 }

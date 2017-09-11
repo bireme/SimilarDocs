@@ -32,10 +32,12 @@ import scala.collection.mutable.Queue
   * date: 20170102
   *
   * @param input the input token stream
-  * @size the ngram size
+  * @minSize the minimum ngram size
+  * @maxSize the maximum ngram size
 */
 class NGramFilter(input: TokenStream,
-                  size: Int) extends TokenFilter(input) {
+                  minSize: Int,
+                  maxSize: Int) extends TokenFilter(input) {
   private val termAtt = addAttribute(classOf[CharTermAttribute])
   private val queue = new Queue[String]()
 
@@ -77,12 +79,12 @@ class NGramFilter(input: TokenStream,
     * false otherwise
     */
   private def fillQueue(): Boolean = {
-    def fillQueue(size: Int): Boolean = {
-      if (size == 0) true
+    def fillQueue(qsize: Int): Boolean = {
+      if (qsize == 0) true
       else {
         if (input.incrementToken()) {
           splitAndFill()
-          fillQueue(size - 1)
+          fillQueue(qsize - 1)
         } else !queue.isEmpty
       }
     }
@@ -97,15 +99,24 @@ class NGramFilter(input: TokenStream,
     * @return true always
     */
   private def splitAndFill(): Boolean = {
+    def maxTokenSize(bufferLen: Int,
+                     tokSize: Int): Option[Int] = {
+      if (bufferLen < minSize) None
+      else if (bufferLen >= tokSize) Some(tokSize)
+      else maxTokenSize(bufferLen, tokSize - 1)
+    }
+
     val buffer = termAtt.buffer()
     val len = termAtt.length()
 
-    if (size > len) false
-    else {
-      (0 until (len / size)).foreach(pos => queue +=
-                                           new String(buffer, pos * size, size))
-      if (len % size > 0) queue += new String(buffer, len - size, size)
-      true
+    maxTokenSize(len, maxSize) match {
+      case Some(maxTokSize) =>
+        (0 until (len / maxTokSize)).foreach(pos => queue +=
+          new String(buffer, pos * maxTokSize, (pos + 1) * maxTokSize))
+        if (len % maxTokSize > 0) queue +=
+          new String(buffer, len - maxTokSize, len)
+        true
+      case None => false
     }
   }
 }

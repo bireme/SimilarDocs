@@ -10,7 +10,7 @@ lazy val root = (project in file(".")).
     name := "SimilarDocs"
   )
 
-val luceneVersion = "6.6.0"
+val luceneVersion = "6.6.1"
 val akkaVersion = "2.5.4" //"2.5.3"
 val httpClientVersion = "4.5.3"
 val scalaTestVersion = "3.0.4" //"3.0.3"

@@ -81,7 +81,8 @@ object LuceneIndex extends App {
     val decsMap = if (decsDir.isEmpty()) Map[Int,Set[String]]()
                   else decx2Map()
 
-    val analyzer = new NGramAnalyzer(NGSize.ngram_size)
+    val analyzer = new NGramAnalyzer(NGSize.ngram_min_size,
+                                     NGSize.ngram_max_size)
     val directory = FSDirectory.open(new File(indexPath).toPath())
 
     val config = new IndexWriterConfig(analyzer)

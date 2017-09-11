@@ -103,7 +103,7 @@ class SimDocsSearch(val indexPath: String) {
 
 //println("entrando no searchIds / SimDocsSearch")
     val mqParser = new MultiFieldQueryParser(fields.toArray,
-                                           new NGramAnalyzer(NGSize.ngram_size))
+      new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size))
 //println(s"text=$text fields=$fields")
     val query =  mqParser.parse(text)
 //println("### antes do new IndexSearcher")
@@ -223,7 +223,8 @@ object SimDocsSearch extends App {
   val search = new SimDocsSearch(args(0))
   val docs = search.search(args(1), fldNames, maxDocs, minSim)
 
-  val analyzer = new NGramAnalyzer(NGSize.ngram_size)
+  val analyzer = new NGramAnalyzer(NGSize.ngram_min_size,
+                                   NGSize.ngram_max_size)
   val set_text = getNGrams(args(1), analyzer)
 
   docs.foreach {
