@@ -21,9 +21,6 @@
 
 package org.bireme.sd
 
-import java.text.Normalizer
-import java.text.Normalizer.Form
-
 import org.apache.lucene.analysis.TokenFilter
 import org.apache.lucene.analysis.TokenStream
 
@@ -56,23 +53,9 @@ class UniformFilter(input: TokenStream) extends TokenFilter(input) {
     */
   override def incrementToken(): Boolean = {
     if (input.incrementToken()) {
-      val str = uniformString(termAtt.toString())
+      val str = Tools.uniformString(termAtt.toString())
       termAtt.setEmpty().append(str)
       true
     } else false
-  }
-
-  /**
-    * Converts all input charactes into a-z, 0-9 '_' '-' and spaces
-    *
-    * @param in input string to be converted
-    * @return the converted string
-    */
-  private def uniformString(in: String): String = {
-    val s1 = Normalizer.normalize(in.toLowerCase(), Form.NFD)
-    val s2 = s1.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
-
-    //s2.replaceAll("\\W", " ")
-    s2.replaceAll("[^\\w\\-]", " ")  // Hifen
   }
 }

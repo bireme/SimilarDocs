@@ -21,9 +21,6 @@
 
 package org.bireme.sd
 
-import java.text.Normalizer
-import java.text.Normalizer.Form
-
 import scala.collection.JavaConverters._
 import org.apache.lucene.analysis.CharArraySet
 
@@ -112,7 +109,7 @@ object Stopwords {
 "why", "widely", "willing", "wish", "with", "within", "without", "wont", "words",
 "world", "would", "wouldnt", "www", "x", "y", "yes", "yet", "you", "youd", "your",
 "youre", "yours", "yourself", "yourselves", "z", "zero"
-  ).map(uniformString(_))
+  ).map(Tools.uniformString(_))
 
   val Spanish = Set[String](
     "algún", "alguna", "algunas", "alguno", "algunos", "ambos", "ampleamos", "ante",
@@ -137,7 +134,7 @@ object Stopwords {
     "un", "una", "unas", "uno", "unos", "usa", "usais", "usamos", "usan", "usar",
     "usas", "uso", "va", "vais", "valor", "vamos", "van", "vaya", "verdad",
     "verdadera", "verdadero", "vosotras", "vosotros", "voy", "yo"
-  ).map(uniformString(_))
+  ).map(Tools.uniformString(_))
 
   val Portuguese = Set[String](
     "acerca", "agora", "algumas", "alguns", "ali", "ambos", "antes", "apontar",
@@ -158,20 +155,7 @@ object Stopwords {
     "tente", "tentei", "teu", "teve", "tipo", "tive", "todos", "trabalhar",
     "trabalho", "tu", "último", "um", "uma", "umas", "uns", "usa", "usar",
     "valor", "veja", "ver", "verdade", "verdadeiro", "você"
-  ).map(uniformString(_))
+  ).map(Tools.uniformString(_))
 
   val All = English ++ Spanish ++ Portuguese
-
-  /**
-    * Converts all input charactes into a-z, 0-9 and spaces
-    *
-    * @param in input string to be converted
-    * @return the converted string
-    */
-  private def uniformString(in: String): String = {
-    val s1 = Normalizer.normalize(in.trim().toLowerCase(), Form.NFD)
-    val s2 = s1.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
-
-    s2.replaceAll("\\W", " ")
-  }
 }

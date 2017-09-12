@@ -22,8 +22,7 @@
 package org.bireme.sd.service
 
 import java.nio.file.Paths
-import java.text.Normalizer
-import java.text.Normalizer.Form
+
 import java.util.Date
 
 import org.apache.lucene.document.{Document, Field, LongPoint, StringField, StoredField}
@@ -31,10 +30,9 @@ import org.apache.lucene.index.{DirectoryReader, IndexWriter, IndexWriterConfig,
 import org.apache.lucene.search.{IndexSearcher, MatchAllDocsQuery, TermQuery}
 import org.apache.lucene.store.FSDirectory
 
-import org.bireme.sd.SimDocsSearch
+import org.bireme.sd.{SimDocsSearch, Tools}
 
 import scala.collection.JavaConverters._
-import scala.collection.immutable.TreeSet
 
 /** This class represents a personal service document that indexed by Lucene
   * engine. Each document has two kinds of fields:
@@ -147,7 +145,7 @@ class TopIndex(simSearch: SimDocsSearch,
     require(doc != null)
     require((content != null) && (!content.trim.isEmpty))
 
-    val newContent = uniformString(content)
+    val newContent = Tools.strongUniformString(content)
     val oldContent = doc.get(contentFldName)
 
     // Add profile field
@@ -460,23 +458,6 @@ class TopIndex(simSearch: SimDocsSearch,
 
     in.replace("\"", "&quot;").replace("&", "&amp;").replace("'", "&apos;").
        replace("<", "&lt;").replace(">", "&gt;")
-  }
-
-  /**
-    * Converts all input charactes into a-z, 0-9 '_', '-' and spaces. Removes
-    * adjacent whites and sort the words.
-    *
-    * @param in input string to be converted
-    * @return the converted string
-    */
-  private def uniformString(in: String): String = {
-    require(in != null)
-
-    val s1 = Normalizer.normalize(in.toLowerCase(), Form.NFD)
-    val s2 = s1.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
-
-    TreeSet(s2.replaceAll("[^\\w\\-]", " ").trim().split(" +"): _*).
-                                             filter(_.length >= 3).mkString(" ")
   }
 
   /**

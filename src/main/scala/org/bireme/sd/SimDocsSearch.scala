@@ -77,7 +77,9 @@ class SimDocsSearch(val indexPath: String) {
     require(maxDocs > 0)
     require(minSim > 0)
 
-    searchIds(text, fields, maxDocs, minSim).map {
+    val newContent = Tools.strongUniformString(text)
+
+    searchIds(newContent, fields, maxDocs, minSim).map {
       case (id,score) => (score,loadDoc(id, fields))
     }
   }

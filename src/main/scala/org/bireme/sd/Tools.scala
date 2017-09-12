@@ -22,9 +22,15 @@
 package org.bireme.sd
 
 import java.io.File
+
+import java.text.Normalizer
+import java.text.Normalizer.Form
+
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.index.TermsEnum
 import org.apache.lucene.store.FSDirectory
+
+import scala.collection.immutable.TreeSet
 
 /** Collection of helper functions
   *
@@ -32,15 +38,40 @@ import org.apache.lucene.store.FSDirectory
   * date: 20170102
   *
 */
-object Tools extends App {
-  private def usage(): Unit = {
-    Console.err.println("usage: Tools <indexName> <fieldName>")
-    System.exit(1)
+object Tools {
+
+  /**
+    * Converts all input charactes into a-z, 0-9 and spaces
+    *
+    * @param in input string to be converted
+    * @return the converted string
+    */
+  def uniformString(in: String): String = {
+    require (in != null)
+
+    val s1 = Normalizer.normalize(in.trim().toLowerCase(), Form.NFD)
+    val s2 = s1.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
+
+    //s2.replaceAll("\\W", " ")
+    s2.replaceAll("[^\\w\\-]", " ")  // Hifen
   }
 
-  if (args.length != 2) usage();
+  /**
+    * Converts all input charactes into a-z, 0-9 '_', '-' and spaces. Removes
+    * adjacent whites and sort the words.
+    *
+    * @param in input string to be converted
+    * @return the converted string
+    */
+  def strongUniformString(in: String): String = {
+    require(in != null)
 
-  showTerms(args(0), args(1))
+    val s1 = Normalizer.normalize(in.toLowerCase(), Form.NFD)
+    val s2 = s1.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
+
+    TreeSet(s2.replaceAll("[^\\w\\-]", " ").trim().split(" +"): _*).
+                                             filter(_.length >= 3).mkString(" ")
+  }
 
   /**
     * Shows all index terms that are present in a specific fields
@@ -79,4 +110,15 @@ object Tools extends App {
       else next.utf8ToString() #:: getNextTerm(terms)
     }
   }
+}
+
+object ToolsApp extends App {
+  private def usage(): Unit = {
+    Console.err.println("usage: ToolsApp <indexName> <fieldName>")
+    System.exit(1)
+  }
+
+  if (args.length != 2) usage();
+
+  Tools.showTerms(args(0), args(1))
 }
