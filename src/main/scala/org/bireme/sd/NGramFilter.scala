@@ -111,10 +111,11 @@ class NGramFilter(input: TokenStream,
 
     maxTokenSize(len, maxSize) match {
       case Some(maxTokSize) =>
-        (0 until (len / maxTokSize)).foreach(pos => queue +=
-          new String(buffer, pos * maxTokSize, (pos + 1) * maxTokSize))
-        if (len % maxTokSize > 0) queue +=
-          new String(buffer, len - maxTokSize, len)
+        (0 until (len / maxTokSize)).foreach {
+          pos => queue += new String(buffer, pos * maxTokSize, maxTokSize)
+        }
+        if (len % maxTokSize > 0)
+          queue += new String(buffer, len - maxTokSize, maxTokSize)
         true
       case None => false
     }
