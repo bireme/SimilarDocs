@@ -62,6 +62,19 @@ in a database, for example, LILACS+MEDLINE.</div>
         &nbsp;&nbsp;&lt;documents&gt;...&lt;/documents&gt;<br/>
         &nbsp;&nbsp;&lt;ERRROR&gt;missing 'psId' parameter&lt;/ERROR&gt;<br/>
         &nbsp;&nbsp;&lt;ERRROR&gt;missing 'getSimDocs' parameter&lt;/ERROR&gt;</div>
+        
+        <h3>Adhoc similar documents</h3>
+        <div>Retrieve documents having most of words present in an input string</div>
+        <br/>
+        <div>Syntax: <b>SDService?adhocSimilarDocs=&lt;text&gt;</b></div>
+        <br/>
+        <div><b>text:</b> words to be used to look for similar documents</div>
+        <br/>
+        <div>Example: SDService?adhocSimilarDocs=books,cars,hobbies</div>
+        <br/>
+        <div>Possible return values:<br/>
+        &nbsp;&nbsp;&lt;documents&gt;...&lt;/documents&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'adhocSimDocs' parameter&lt;/ERROR&gt;</div>
 
         <h3>Show profiles</h3>
         <div>Show all profiles and respective words of a PS record</div>
