@@ -41,7 +41,7 @@ import scala.collection.immutable.TreeSet
 object Tools {
 
   /**
-    * Converts all input charactes into a-z, 0-9 and spaces
+    * Converts all input charactes into a-z, 0-9, '_', '-' and spaces
     *
     * @param in input string to be converted
     * @return the converted string
@@ -57,7 +57,7 @@ object Tools {
   }
 
   /**
-    * Converts all input charactes into a-z, 0-9 '_', '-' and spaces. Removes
+    * Converts all input charactes into a-z, 0-9, '_', '-' and spaces. Removes
     * adjacent whites and sort the words.
     *
     * @param in input string to be converted

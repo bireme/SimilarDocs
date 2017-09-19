@@ -44,6 +44,7 @@ import scala.concurrent.duration._
 case class Finishing()
 
 class LuceneIndexMain(indexPath: String,
+                      decsIndexPath: String,
                       xmlDir: String,
                       xmlFileFilter: String,
                       fldIdxNames: Set[String],
@@ -73,6 +74,11 @@ class LuceneIndexMain(indexPath: String,
   val matcher = Pattern.compile(xmlFileFilter).matcher("")
   var activeIdx  = idxWorkers
 
+  // Create decs index
+  log.info("Creating decs index")
+  OneWordDecs.createIndex(decsDir, decsIndexPath)
+
+  // Create similar docs index
   (new File(xmlDir)).listFiles().sorted.foreach {
     file =>
       if (file.isFile()) {
@@ -237,7 +243,8 @@ object LuceneIndexAkka extends App {
 
   private def usage(): Unit = {
     Console.err.println("usage: LuceneIndexAkka" +
-      "\n\t<indexPath> - the nmae+path to the lucene index to be created" +
+      "\n\t<indexPath> - the name+path to the lucene index to be created" +
+      "\n\t<decsIndexPath> - the name+path to the lucene index to be created" +
       "\n\t<xmlDir> - directory of xml files used to create the index" +
       "\n\t[-xmlFileFilter=<regExp>] - regular expression used to filter xml files" +
       "\n\t[-indexedFields=<field1>,...,<fieldN>] - xml doc fields to be indexed and stored" +
@@ -247,9 +254,9 @@ object LuceneIndexAkka extends App {
     System.exit(1)
   }
 
-  if (args.length < 2) usage()
+  if (args.length < 3) usage()
 
-  val parameters = args.drop(2).foldLeft[Map[String,String]](Map()) {
+  val parameters = args.drop(3).foldLeft[Map[String,String]](Map()) {
     case (map,par) => {
       val split = par.split(" *= *", 2)
       map + ((split(0).substring(1), split(1)))
@@ -257,7 +264,8 @@ object LuceneIndexAkka extends App {
   }
 
   val indexPath = args(0)
-  val xmlDir = args(1)
+  val decsIndexPath = args(1)
+  val xmlDir = args(2)
   val xmlFileFilter = parameters.getOrElse("xmlFileFilter", ".+\\.xml")
   val sIdxFields = parameters.getOrElse("indexedFields", "")
   val fldIdxNames = (if (sIdxFields.isEmpty) Set[String]()
@@ -271,8 +279,8 @@ object LuceneIndexAkka extends App {
 
   val system = ActorSystem("Main")
   try {
-    val props = Props(classOf[LuceneIndexMain], indexPath, xmlDir, xmlFileFilter,
-                                   fldIdxNames, fldStrdNames, decsDir, encoding)
+    val props = Props(classOf[LuceneIndexMain], indexPath, decsIndexPath, xmlDir,
+                      xmlFileFilter, fldIdxNames, fldStrdNames, decsDir, encoding)
     system.actorOf(props, "app")
 
     //val app = system.actorOf(props, "app")

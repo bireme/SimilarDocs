@@ -34,13 +34,25 @@ import org.apache.lucene.search.{IndexSearcher}
 import org.apache.lucene.store.FSDirectory
 
 /** Class that looks for similar documents to a given ones
+  *
+  * @param sdIndexPath similar documents index path
+  * @param decsIndexPath decs index path
   */
-class SimDocsSearch(val indexPath: String) {
-  require(indexPath != null)
+class SimDocsSearch(val sdIndexPath: String,
+                    val decsIndexPath: String) {
+  require(sdIndexPath != null)
+  require(decsIndexPath != null)
 
-  val directory = FSDirectory.open(new File(indexPath).toPath())
+  val sdDirectory = FSDirectory.open(new File(sdIndexPath).toPath())
+  val decsDirectory = FSDirectory.open(new File(decsIndexPath).toPath())
+  val decsReader = DirectoryReader.open(decsDirectory)
+  val decsSearcher = new IndexSearcher(decsReader)
 
-  def close() = directory.close()
+  def close(): Unit = {
+    sdDirectory.close()
+    decsReader.close()
+    decsDirectory.close()
+  }
 
   /**
     * Searches for documents having a string in some fields
@@ -107,7 +119,8 @@ class SimDocsSearch(val indexPath: String) {
     val mqParser = new MultiFieldQueryParser(fields.toArray,
       new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size))
 //println(s"text=$text fields=$fields")
-    val query =  mqParser.parse(text)
+    val textImproved = OneWordDecs.addDecsSynonyms(text, decsSearcher)
+    val query =  mqParser.parse(textImproved)
 //println("### antes do new IndexSearcher")
     val dirReader = getReader()
     val searcher = new IndexSearcher(dirReader)
@@ -150,7 +163,7 @@ class SimDocsSearch(val indexPath: String) {
   def doc2xml(docs: List[(Float,Map[String,List[String]])]): String = {
     require (docs != null)
 
-    docs.foldLeft[String]("<documents>") {
+    docs.foldLeft[String]("<?xml version=\"1.0\" encoding=\"UTF-8\"?><documents>") {
       case (str, doc) => {
         val fields = doc._2.toList   // List[(String,List[String])]
         val jflds = fields.foldLeft[String]("") {
@@ -168,7 +181,7 @@ class SimDocsSearch(val indexPath: String) {
    *
    * @return an DirectoryReader reflecting all changes made in the Lucene index
    */
-  private def getReader(): DirectoryReader = DirectoryReader.open(directory)
+  private def getReader(): DirectoryReader = DirectoryReader.open(sdDirectory)
 
   /**
     * Loads the document content given its id and desired fields
@@ -199,7 +212,8 @@ class SimDocsSearch(val indexPath: String) {
 object SimDocsSearch extends App {
   private def usage(): Unit = {
     Console.err.println("usage: SimDocsSearch" +
-    "\n\t<indexPath> - lucene Index where the similar document will be searched" +
+    "\n\t<sdIndexPath> - lucene Index where the similar document will be searched" +
+    "\n\t<decsIndexPath> - lucene Index where the one word decs synonyms document will be searched" +
     "\n\t<text> - text used to look for similar documents" +
     "\n\t[-fields=<field>,<field>,...,<field>] - document fields used to look for similarities" +
     "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
@@ -207,9 +221,9 @@ object SimDocsSearch extends App {
     System.exit(1)
   }
 
-  if (args.length < 2) usage()
+  if (args.length < 3) usage()
 
-  val parameters = args.drop(2).foldLeft[Map[String,String]](Map()) {
+  val parameters = args.drop(3).foldLeft[Map[String,String]](Map()) {
     case (map,par) => {
       val split = par.split(" *= *", 2)
       map + ((split(0).substring(1), split(1)))
@@ -222,8 +236,8 @@ object SimDocsSearch extends App {
   }
   val maxDocs = parameters.getOrElse("maxDocs", "10").toInt
   val minSim = parameters.getOrElse("minSim", "0.5").toFloat
-  val search = new SimDocsSearch(args(0))
-  val docs = search.search(args(1), fldNames, maxDocs, minSim)
+  val search = new SimDocsSearch(args(0), args(1))
+  val docs = search.search(args(2), fldNames, maxDocs, minSim)
 
   val analyzer = new NGramAnalyzer(NGSize.ngram_min_size,
                                    NGSize.ngram_max_size)

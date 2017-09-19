@@ -57,19 +57,18 @@ public class SDService extends HttpServlet {
         final String sdIndexPath = context.getInitParameter("SD_INDEX_PATH");
         if (sdIndexPath == null) throw new ServletException(
                                               "empty 'SD_INDEX_PATH' config");
-        final String otherIndexPath = context.getInitParameter("OTHER_INDEX_PATH");
-        if (otherIndexPath == null) throw new ServletException(
-                                              "empty 'OTHER_INDEX_PATH' config");
-        final String docIndexPath = otherIndexPath +
-                         (otherIndexPath.endsWith("/") ? "" : "/") + "docIndex";
-        final String topIndexPath = otherIndexPath +
-                         (otherIndexPath.endsWith("/") ? "" : "/") + "topIndex";
+        final String topIndexPath = context.getInitParameter("TOP_INDEX_PATH");
+        if (topIndexPath == null) throw new ServletException(
+                                              "empty 'TOP_INDEX_PATH' config");
+        final String decsIndexPath = context.getInitParameter("DECS_INDEX_PATH");
+        if (decsIndexPath == null) throw new ServletException(
+                                              "empty 'DECS_INDEX_PATH' config");
 
         Tools.deleteLockFile(sdIndexPath);
-        Tools.deleteLockFile(docIndexPath);
         Tools.deleteLockFile(topIndexPath);
+        Tools.deleteLockFile(decsIndexPath);
 
-        simSearch = new SimDocsSearch(sdIndexPath);
+        simSearch = new SimDocsSearch(sdIndexPath, decsIndexPath);
         topIndex = new TopIndex(simSearch, topIndexPath, Conf.idxFldNames());
         updaterService = new UpdaterServicePar(topIndex);
 

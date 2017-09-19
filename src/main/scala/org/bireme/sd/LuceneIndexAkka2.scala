@@ -41,7 +41,9 @@ case object FinishMessage
 ***/
 
 class LuceneIndexMain2(indexPath: String,
+                       decsIndexPath: String,
                        xmlDir: String,
+                       decsDir: String,
                        fldNames: Set[String],
                        encoding: String) extends Actor with ActorLogging {
   val xmlWorkers = 3 // Number of actors to run concurrently
@@ -76,6 +78,11 @@ class LuceneIndexMain2(indexPath: String,
   var activeIdx  = idxWorkers
   var activeXml  = xmlWorkers
 
+  // Create decs index
+  log.info("Creating decs index")
+  OneWordDecs.createIndex(decsDir, decsIndexPath)
+
+  // Create similar docs index
   (new File(xmlDir)).listFiles().foreach {
     file =>
       val xmlFile = file.getPath()
@@ -187,14 +194,14 @@ object LuceneIndexAkka2 extends App {
   }
 
   private def usage(): Unit = {
-    Console.err.println("usage: LuceneIndexAkka2 <indexPath> <xmlDir>" +
+    Console.err.println("usage: LuceneIndexAkka2 <indexPath> <decsIndexPath> <xmlDir> <decsDir>" +
     "[-fields=<field1>,...,<fieldN>] [-encoding=<str>]")
     System.exit(1)
   }
 
-  if (args.length < 2) usage()
+  if (args.length < 4) usage()
 
-  val parameters = args.drop(2).foldLeft[Map[String,String]](Map()) {
+  val parameters = args.drop(4).foldLeft[Map[String,String]](Map()) {
     case (map,par) => {
       val split = par.split(" *= *", 2)
       map + ((split(0).substring(1), split(1)))
@@ -208,8 +215,8 @@ object LuceneIndexAkka2 extends App {
 
   val system = ActorSystem("Main")
   try {
-    val props = Props(classOf[LuceneIndexMain2], args(0), args(1), fldNames,
-                                                                       encoding)
+    val props = Props(classOf[LuceneIndexMain2], args(0), args(1), args(2),
+                                                     args(3),fldNames, encoding)
     val app = system.actorOf(props, "app")
     val terminator = system.actorOf(Props(classOf[Terminator], app),
                                                                "app-terminator")

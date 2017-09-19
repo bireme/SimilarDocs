@@ -32,11 +32,12 @@ object UpdaterBatchService extends App {
   private def usage(): Unit = {
     Console.err.println("usage: UpdateBatchService:\n" +
       "\n\t-sdIndexPath=<path>     : documents Lucene index path" +
-      "\n\t-topIndexPath=<path>    : top indexes directory path"
+      "\n\t-topIndexPath=<path>    : top indexes directory path" +
+      "\n\t-decsIndexPath=<path>    : decs indexes directory path"
     )
     System.exit(1)
   }
-  if (args.length != 4) usage()
+  if (args.length != 3) usage()
 
   val parameters = args.foldLeft[Map[String,String]](Map()) {
     case (map,par) => {
@@ -47,7 +48,8 @@ object UpdaterBatchService extends App {
   }
   val topIndexPath = parameters("topIndexPath")
   val sdIndexPath = parameters("sdIndexPath")
-  val sdSearcher = new SimDocsSearch(sdIndexPath)
+  val decsIndexPath = parameters("decsIndexPath")
+  val sdSearcher = new SimDocsSearch(sdIndexPath, decsIndexPath)
 
   update(sdSearcher, topIndexPath)
   sdSearcher.close()

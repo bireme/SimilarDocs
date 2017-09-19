@@ -274,9 +274,9 @@ class TopIndex(simSearch: SimDocsSearch,
 
             lst.size match {
               case 0 => str2
-              case 1 => str2 + s"<$tag2>${cleanString(lst.head)}</$tag2>"
+              case 1 => str2 + s"<$tag2>${lst.head}</$tag2>"
               case _ => str2 + lst.foldLeft[String]("") {
-                case (str3,elem) => s"$str3<$tag2>${cleanString(elem)}</$tag2>"
+                case (str3,elem) => s"$str3<$tag2>${elem}</$tag2>"
               }
             }
           }
@@ -328,7 +328,7 @@ class TopIndex(simSearch: SimDocsSearch,
     }
     if (docIds.isEmpty) List()
     else {
-      val sdDirectory = FSDirectory.open(Paths.get(simSearch.indexPath))
+      val sdDirectory = FSDirectory.open(Paths.get(simSearch.sdIndexPath))
       val sdReader = DirectoryReader.open(sdDirectory)
       val sdSearcher = new IndexSearcher(sdReader)
       val list = limitDocs(docIds, maxDocs, List()).
