@@ -23,6 +23,7 @@ package org.bireme.sd
 
 import java.io.File
 
+import scala.collection.SortedMap
 import scala.collection.JavaConverters._
 import scala.collection.immutable.TreeSet
 
@@ -30,7 +31,7 @@ import org.apache.lucene.analysis.{Analyzer,TokenStream}
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import org.apache.lucene.index.{DirectoryReader,IndexableField}
 import org.apache.lucene.queryparser.classic.{MultiFieldQueryParser}
-import org.apache.lucene.search.{IndexSearcher}
+import org.apache.lucene.search.{IndexSearcher,ScoreDoc}
 import org.apache.lucene.store.FSDirectory
 
 /** Class that looks for similar documents to a given ones
@@ -110,10 +111,10 @@ class SimDocsSearch(val sdIndexPath: String,
                 fields: Set[String],
                 maxDocs: Int,
                 minSim: Float): List[(Int,Float)] = {
-    require((text != null) && (!text.isEmpty))
-    require((fields != null) && (!fields.isEmpty))
-    require(maxDocs > 0)
-    require(minSim > 0)
+    require ((text != null) && (!text.isEmpty))
+    require ((fields != null) && (!fields.isEmpty))
+    require (maxDocs > 0)
+    require (minSim > 0)
 
 //println("entrando no searchIds / SimDocsSearch")
     val mqParser = new MultiFieldQueryParser(fields.toArray,
@@ -126,13 +127,68 @@ class SimDocsSearch(val sdIndexPath: String,
     val searcher = new IndexSearcher(dirReader)
 //println(s"### antes do 'searcher.search' maxDocs=$maxDocs minSim=$minSim query=$query")
 //println(s"### totalHits=${searcher.search(query, maxDocs).totalHits}")
-    val lst = searcher.search(query, maxDocs).scoreDocs.filter(_.score >= minSim).
-                                             map(sd => (sd.doc,sd.score)).toList
+    val lst = sortByDate(searcher,
+                         searcher.search(query, 3  * maxDocs).scoreDocs,
+                         maxDocs, minSim)
 //println(s"### depois do 'searcher.search' Ids=$lst")
     dirReader.close()
     lst
   }
 
+  /**
+    * Filter a result of a search by date if their scores are bigger than a
+    * limit otherwise use the default sorting that uses only the score
+    *
+    * @param searcher Lucene index searcher object
+    * @param scoreDocs result of the Lucene search function
+    * @param maxDocs maximum number of returned documents
+    * @param minSim minimum similarity between the input text and the retrieved
+    *               field text
+    * @param minDateSim minimum similarity used to sort documents only by date
+    * @return a list of pairs with document id and document score
+    */
+  private def sortByDate(searcher: IndexSearcher,
+                         scoreDocs: Array[ScoreDoc],
+                         maxDocs: Int,
+                         minSim: Float,
+                         minDateSim: Float = 80.0f): List[(Int,Float)] = {
+    require (searcher != null)
+    require (scoreDocs != null)
+    require (maxDocs > 0)
+    require (minSim > 0)
+    require (minDateSim >= minSim)
+
+    def sortByDate(seq: Seq[ScoreDoc],
+                   curMap: SortedMap[String,(Int,Float)]):
+                                               SortedMap[String,(Int,Float)] = {
+      if ((!seq.isEmpty) && (seq.size < maxDocs)) {
+        val sdoc = seq.head
+        val time = searcher.doc(sdoc.doc, Set("entry_date").asJava).get("entry_date")
+        if (time == null) sortByDate(seq.tail, curMap)
+        else sortByDate(seq.tail, curMap + ((time, (sdoc.doc, sdoc.score))))
+      } else curMap
+    }
+
+    val (timeSeq, othersSeq) = scoreDocs.partition(_.score >= minDateSim)
+    val timeSortedMap = sortByDate(timeSeq, SortedMap())
+    val dateSeq:Seq[ScoreDoc] = othersSeq.filter(_.score >= minSim)
+    val dateList = dateSeq.take(maxDocs - timeSortedMap.size).
+                                           foldLeft[List[(Int,Float)]](List()) {
+      case (lst, sdoc)=> lst :+ (sdoc.doc, sdoc.score)
+    }
+
+    timeSortedMap.foldLeft[List[(Int,Float)]](List()) {
+      case (lst, (_,v)) => lst :+ v
+    } ++ dateList
+  }
+
+  /**
+    * Convert a document represented by a list of (score, map of fields) into
+    * a json String
+    *
+    * @param a list of (score, document[map of fields])
+    * @return a json string representation of the document
+    **/
   def doc2json(docs: List[(Float,Map[String,List[String]])]): String = {
     require (docs != null)
 
@@ -160,6 +216,13 @@ class SimDocsSearch(val sdIndexPath: String,
     } + "]}"
   }
 
+  /**
+    * Convert a document represented by a list of (score, map of fields) into
+    * a xml String
+    *
+    * @param a list of (score, document[map of fields])
+    * @return a xml string representation of the document
+    **/
   def doc2xml(docs: List[(Float,Map[String,List[String]])]): String = {
     require (docs != null)
 

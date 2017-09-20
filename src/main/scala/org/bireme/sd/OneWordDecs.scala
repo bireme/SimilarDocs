@@ -143,9 +143,20 @@ object OneWordDecs {
   }
 }
 
+object OneWordDecsCreate extends App {
+  private def usage(): Unit = {
+    Console.println("usage: OneWordDecsCreate <decsDir> <decsIndex>")
+    System.exit(1)
+  }
+
+  if (args.size != 2) usage()
+
+  OneWordDecs.createIndex(args(0), args(1))
+}
+
 object OneWordDecsTest extends App {
   private def usage(): Unit = {
-    Console.println("usage: <decsIndex> <sentence>")
+    Console.println("usage: OneWordDecsTest <decsIndex> <sentence>")
     System.exit(1)
   }
 
