@@ -161,7 +161,7 @@ class SimDocsSearch(val sdIndexPath: String,
     def sortByDate(seq: Seq[ScoreDoc],
                    curMap: SortedMap[String,(Int,Float)]):
                                                SortedMap[String,(Int,Float)] = {
-      if (seq.isEmpty) curMap.takeRight(maxDocs)
+      if (seq.isEmpty) curMap.take(maxDocs)
       else {
         val sdoc = seq.head
         val time = searcher.doc(sdoc.doc, Set("entry_date").asJava).get("entry_date")
@@ -175,7 +175,12 @@ class SimDocsSearch(val sdIndexPath: String,
     }
 
     val (timeSeq, othersSeq) = scoreDocs.partition(_.score >= minDateSim)
-    val timeSortedMap = sortByDate(timeSeq, SortedMap())
+
+    // Key ordering
+    implicit val Ord = implicitly[Ordering[String]]
+    val timeSortedMap = sortByDate(timeSeq, SortedMap.
+                                         empty[String,(Int,Float)](Ord.reverse))
+
     val dateSeq = othersSeq.filter(_.score >= minSim)
     val dateList = dateSeq.take(maxDocs - timeSortedMap.size).
                                            foldLeft[List[(Int,Float)]](List()) {
