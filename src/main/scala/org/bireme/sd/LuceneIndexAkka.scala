@@ -170,8 +170,8 @@ class LuceneIndexActor(indexWriter: IndexWriter,
                        fldIdxNames: Set[String],
                        fldStrdNames: Set[String],
                        decsMap: Map[Int,Set[String]]) extends Actor with ActorLogging {
-  val isNewIndexReader = DirectoryReader.open(indexWriter)
-  val isNewIndexSearcher = new IndexSearcher(isNewIndexReader)
+//  val isNewIndexReader = DirectoryReader.open(indexWriter)
+//  val isNewIndexSearcher = new IndexSearcher(isNewIndexReader)
 
   val regexp = """\^d\d+""".r
   val fldMap = fldIdxNames.foldLeft[Map[String,Float]](Map[String,Float]()) {
@@ -201,20 +201,26 @@ class LuceneIndexActor(indexWriter: IndexWriter,
   }
 
   override def postStop(): Unit = {
-    isNewIndexReader.close()
+    //isNewIndexReader.close()
     log.debug(s"LuceneIndexActor[${self.path.name}] is now finishing")
   }
 
   private def updateIsNewField(doc: Map[String,List[String]]):
                                                     Map[String,List[String]] = {
+val isNewIndexReader = DirectoryReader.open(indexWriter)
+val isNewIndexSearcher = new IndexSearcher(isNewIndexReader)
+
     val id = doc("id").head
     val topDocs = isNewIndexSearcher.search(new TermQuery(new Term("id",id)), 1)
-    if (topDocs.totalHits == 0) {
+    val newDoc = if (topDocs.totalHits == 0) {
       val newDoc = new Document()
       newDoc.add(new StringField("id", id, Field.Store.YES))
       isNewIndexWriter.addDocument(newDoc)
+isNewIndexWriter.commit()
       doc + ("isNew" -> List("1"))
     } else doc
+isNewIndexReader.close()
+newDoc
   }
 
   /**
