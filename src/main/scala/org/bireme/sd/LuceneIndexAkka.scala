@@ -186,10 +186,7 @@ class LuceneIndexActor(indexWriter: IndexWriter,
       try {
         IahxXmlParser.getElements(fname, encoding, Set()).zipWithIndex.foreach {
           case (map,idx) => {
-            if (idx % 50000 == 0) {
-
-              log.info(s"[$fname] - $idx")
-            }
+            if (idx % 50000 == 0) log.info(s"[$fname] - $idx")
             indexWriter.addDocument(map2doc(updateIsNewField(map.toMap)))
           }
         }
@@ -246,7 +243,7 @@ class LuceneIndexActor(indexWriter: IndexWriter,
             }
           }
         }
-        if (fldIdxNames.contains(tag)) {  // Add indexed fields
+        if (fldIdxNames.contains(tag) || "isNew".equals(tag)) {  // Add indexed fields
           lst.foreach {
             elem => doc.add(new TextField(tag, elem, Field.Store.YES))
           }
