@@ -73,7 +73,8 @@ class LuceneIndexMain(indexPath: String,
   val routerIdx = {
     val routees = Vector.fill(idxWorkers) {
       val r = context.actorOf(Props(classOf[LuceneIndexActor], indexWriter,
-                  isNewIndexWriter, fldIdxNames + "id", fldStrdNames, decsMap))
+                                    isNewIndexWriter, fldIdxNames + "isNew",
+                                    fldStrdNames + "id", decsMap))
       context watch r
       ActorRefRoutee(r)
     }
@@ -212,7 +213,7 @@ class LuceneIndexActor(indexWriter: IndexWriter,
       val newDoc = new Document()
       newDoc.add(new StringField("id", id, Field.Store.YES))
       isNewIndexWriter.addDocument(newDoc)
-      doc + ("isNew" -> List("TRUE"))
+      doc + ("isNew" -> List("1"))
     } else doc
   }
 

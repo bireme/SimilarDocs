@@ -130,7 +130,7 @@ class SimDocsSearch(val sdIndexPath: String,
     val textImproved = OneWordDecs.addDecsSynonyms(text, decsSearcher)
     val query1 =  mqParser.parse(textImproved)
     val query = if (mustBeNew) {
-      val query2 = new TermQuery(new Term("isNew", "TRUE"))
+      val query2 = new TermQuery(new Term("isNew", "1"))
       val builder = new BooleanQuery.Builder()
       builder.add(query1, BooleanClause.Occur.MUST)
       builder.add(query2, BooleanClause.Occur.MUST)
