@@ -1,7 +1,7 @@
 lazy val commonSettings = Seq(
   organization := "br.bireme",
   version := "0.1.0",
-  scalaVersion := "2.12.3" //"2.12.1"
+  scalaVersion := "2.12.4"
 )
 
 lazy val root = (project in file(".")).
@@ -10,12 +10,12 @@ lazy val root = (project in file(".")).
     name := "SimilarDocs"
   )
 
-val luceneVersion = "6.6.1"
-val akkaVersion = "2.5.4" //"2.5.3"
+val luceneVersion = "7.1.0" // "6.6.1"
+val akkaVersion = "2.5.6" // "2.5.4"
 val httpClientVersion = "4.5.3"
-val scalaTestVersion = "3.0.4" //"3.0.3"
+val scalaTestVersion = "3.0.4"
 val casbahVersion = "3.1.1"
-val playVersion = "2.6.3"
+val playVersion = "2.6.6" // "2.6.3"
 val hairyfotrVersion = "0.1.17"
 
 libraryDependencies ++= Seq(

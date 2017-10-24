@@ -50,11 +50,12 @@ in a database, for example, LILACS+MEDLINE.</div>
         <h3>Get similar documents</h3>
         <div>Retrieve documents having most of words stored in a set of profiles</div>
         <br/>
-        <div>Syntax: <b>SDService?psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;&amp;outFields=&lt;field&gt;,...,&lt;field&gt;</b></div>
+        <div>Syntax: <b>SDService?psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;&amp;outFields=&lt;field&gt;,...,&lt;field&gt;[&amp;onlyNewDocs=]</b></div>
         <br/>
         <div><b>psId:</b> personal service record identifier</div>
         <div><b>profile:</b> profile identifier</div>
         <div><b>field:</b> tag of similar doc field to be outputed. If no fields were specified all fields will be outputed</div>
+        <div><b>onlyNewDocs:</b> if present, only new documents will be retrieved. Optional parameter.</div>
         <br/>
         <div>Example: SDService?psId=Joao Doria&amp;getSimDocs=books,cars,hobbies&amp;outFields=id,date,name</div>
         <br/>

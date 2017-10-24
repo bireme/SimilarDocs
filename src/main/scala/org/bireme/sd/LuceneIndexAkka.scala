@@ -30,8 +30,10 @@ import bruma.master._
 import java.io.File
 import java.util.regex.Pattern
 
-import org.apache.lucene.document.{Document,Field,StoredField,TextField}
-import org.apache.lucene.index.{IndexWriter,IndexWriterConfig}
+import org.apache.lucene.analysis.core.KeywordAnalyzer
+import org.apache.lucene.document.{Document,Field,StoredField,StringField,TextField}
+import org.apache.lucene.index.{DirectoryReader,IndexWriter,IndexWriterConfig,Term}
+import org.apache.lucene.search.{IndexSearcher,TermQuery}
 import org.apache.lucene.store.FSDirectory
 
 import scala.collection.JavaConverters._
@@ -55,16 +57,23 @@ class LuceneIndexMain(indexPath: String,
 
   val analyzer = new NGramAnalyzer(NGSize.ngram_min_size,
                                    NGSize.ngram_max_size)
-  val directory = FSDirectory.open(new File(indexPath).toPath())
+  val indexPath2 = new File(indexPath.trim).toPath()
+  val directory = FSDirectory.open(indexPath2)
   val config = new IndexWriterConfig(analyzer)
   config.setOpenMode(IndexWriterConfig.OpenMode.CREATE)
   val indexWriter = new IndexWriter(directory, config)
+  val indexPath3 = new File(indexPath.trim + "_isNew").toPath()
+  val isNewDirectory = FSDirectory.open(indexPath3)
+  val isNewConfig = new IndexWriterConfig(new KeywordAnalyzer)
+  isNewConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
+  val isNewIndexWriter = new IndexWriter(isNewDirectory, isNewConfig)
+
   val decsMap = if (decsDir.isEmpty()) Map[Int,Set[String]]()
                 else decx2Map(decsDir)
   val routerIdx = {
     val routees = Vector.fill(idxWorkers) {
       val r = context.actorOf(Props(classOf[LuceneIndexActor], indexWriter,
-                                            fldIdxNames, fldStrdNames, decsMap))
+                  isNewIndexWriter, fldIdxNames + "id", fldStrdNames, decsMap))
       context watch r
       ActorRefRoutee(r)
     }
@@ -97,6 +106,9 @@ class LuceneIndexMain(indexPath: String,
     indexWriter.forceMerge(1)
     indexWriter.close()
     directory.close()
+    isNewIndexWriter.forceMerge(1)
+    isNewIndexWriter.close()
+    isNewDirectory.close()
     context.system.terminate()
   }
 
@@ -153,9 +165,13 @@ class LuceneIndexMain(indexPath: String,
 }
 
 class LuceneIndexActor(indexWriter: IndexWriter,
+                       isNewIndexWriter: IndexWriter,
                        fldIdxNames: Set[String],
                        fldStrdNames: Set[String],
                        decsMap: Map[Int,Set[String]]) extends Actor with ActorLogging {
+  val isNewIndexReader = DirectoryReader.open(indexWriter)
+  val isNewIndexSearcher = new IndexSearcher(isNewIndexReader)
+
   val regexp = """\^d\d+""".r
   val fldMap = fldIdxNames.foldLeft[Map[String,Float]](Map[String,Float]()) {
     case (map,fname) =>
@@ -171,12 +187,13 @@ class LuceneIndexActor(indexWriter: IndexWriter,
         IahxXmlParser.getElements(fname, encoding, Set()).zipWithIndex.foreach {
           case (map,idx) => {
             if (idx % 50000 == 0) {
+
               log.info(s"[$fname] - $idx")
             }
-            indexWriter.addDocument(map2doc(map.toMap))
+            indexWriter.addDocument(map2doc(updateIsNewField(map.toMap)))
           }
         }
-      } catch  {
+      } catch {
         case ex: Throwable => log.error(s"[$fname] -${ex.toString()}")
       }
       log.debug(s"[${self.path.name}] finished my task")
@@ -186,7 +203,20 @@ class LuceneIndexActor(indexWriter: IndexWriter,
   }
 
   override def postStop(): Unit = {
+    isNewIndexReader.close()
     log.debug(s"LuceneIndexActor[${self.path.name}] is now finishing")
+  }
+
+  private def updateIsNewField(doc: Map[String,List[String]]):
+                                                    Map[String,List[String]] = {
+    val id = doc("id").head
+    val topDocs = isNewIndexSearcher.search(new TermQuery(new Term("id",id)), 1)
+    if (topDocs.totalHits == 0) {
+      val newDoc = new Document()
+      newDoc.add(new StringField("id", id, Field.Store.YES))
+      isNewIndexWriter.addDocument(newDoc)
+      doc + ("isNew" -> List("TRUE"))
+    } else doc
   }
 
   /**
@@ -272,7 +302,7 @@ object LuceneIndexAkka extends App {
                      else sIdxFields.split(" *, *").toSet)
   val sStrdFields = parameters.getOrElse("storedFields", "")
   val fldStrdNames = (if (sStrdFields.isEmpty) Set[String]()
-                      else sStrdFields.split(" *, *").toSet) + "id"
+                      else sStrdFields.split(" *, *").toSet)
 
   val decsDir = parameters.getOrElse("decs", "")
   val encoding = parameters.getOrElse("encoding", "ISO-8859-1")

@@ -109,15 +109,14 @@ class NGramFilter(input: TokenStream,
     val buffer = termAtt.buffer()
     val len = termAtt.length()
 
-    maxTokenSize(len, maxSize) match {
-      case Some(maxTokSize) =>
+    maxTokenSize(len, maxSize) exists {
+      maxTokSize =>
         (0 until (len / maxTokSize)).foreach {
           pos => queue += new String(buffer, pos * maxTokSize, maxTokSize)
         }
         if (len % maxTokSize > 0)
           queue += new String(buffer, len - maxTokSize, maxTokSize)
         true
-      case None => false
     }
   }
 }

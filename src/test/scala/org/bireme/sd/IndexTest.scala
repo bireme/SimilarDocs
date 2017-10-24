@@ -62,6 +62,6 @@ object IndexTest extends App {
         doc.getFields().asScala.map(_.stringValue())
     }
 
-    totalHits
+    totalHits.toInt
   }
 }

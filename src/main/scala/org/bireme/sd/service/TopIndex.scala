@@ -163,7 +163,7 @@ class TopIndex(simSearch: SimDocsSearch,
     // Add similar documents ids
     if (getSdIds) {
       doc.removeFields(sdIdFldName)
-      simSearch.searchIds(newContent, idxFldNames, maxDocs, minSim).foreach {
+      simSearch.searchIds(newContent, idxFldNames, maxDocs, minSim, false).foreach {
         case (id,_) => doc.add(new StoredField(sdIdFldName, id))
       }
     }
@@ -252,13 +252,15 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param profiles name of profiles used to find similar documents
     * @param outFlds fields of similar documents to be retrieved
     * @param maxDocs the maximun number of similar documents to be retrieved
+    * @param onlyNewDocs returns only docs that have the 'isNew' flag set
     * @return an XML document with each desired field and its respective
     *         occurrences, given that fields can have more than one occurrences
     */
   def getSimDocsXml(psId: String,
                     profiles: Set[String],
                     outFields: Set[String],
-                    maxDocs: Int): String = {
+                    maxDocs: Int,
+                    onlyNewDocs: Boolean): String = {
     require((psId != null) && (!psId.trim.isEmpty))
     require(profiles != null)
     require(outFields != null)
@@ -266,7 +268,8 @@ class TopIndex(simSearch: SimDocsSearch,
 
     val head = """<?xml version="1.0" encoding="UTF-8"?><documents>"""
 
-    getSimDocs(psId, profiles, outFields, maxDocs).foldLeft[String] (head) {
+    getSimDocs(psId, profiles, outFields, maxDocs, onlyNewDocs).
+                                                       foldLeft[String] (head) {
       case (str,map) => {
         s"${str}<document>" + map.foldLeft[String]("") {
           case (str2, (tag,lst)) => {
@@ -294,6 +297,7 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param names name of profiles used to find similar documents
     * @param outFlds fields of similar documents to be retrieved
     * @param maxDocs the maximun number of similar documents to be retrieved
+    * @param onlyNewDocs returns only docs that have the 'isNew' flag set
     * @return a list of similar documents, where each similar document is a
     *         a collection of field names and its contents. Each fields can
     *         have more than one occurrence
@@ -301,7 +305,8 @@ class TopIndex(simSearch: SimDocsSearch,
   def getSimDocs(user: String,
                  names: Set[String],
                  outFlds: Set[String],
-                 maxDocs: Int): List[Map[String,List[String]]] = {
+                 maxDocs: Int,
+                 onlyNewDocs: Boolean): List[Map[String,List[String]]] = {
     require((user != null) && (!user.trim.isEmpty))
     require(names != null)
     require(outFlds != null)
@@ -331,7 +336,7 @@ class TopIndex(simSearch: SimDocsSearch,
       val sdDirectory = FSDirectory.open(Paths.get(simSearch.sdIndexPath))
       val sdReader = DirectoryReader.open(sdDirectory)
       val sdSearcher = new IndexSearcher(sdReader)
-      val list = limitDocs(docIds, maxDocs, List()).
+      val list = limitDocs(docIds, maxDocs, onlyNewDocs, List()).
                           foldLeft[List[Map[String,List[String]]]](List()) {
         case (lst, id) => {
           val fields = getDocFields(id, sdSearcher, outFlds)
@@ -351,11 +356,13 @@ class TopIndex(simSearch: SimDocsSearch,
     *
     * @param docs list of ids for each profile
     * @param maxDocs the maximum number of ids to be returned
+    * @param onlyNewDocs returns only docs that have the 'isNew' flag set
     * @param ids auxiliary id list
     * @return a list of similiar document ids
     */
   private def limitDocs(docs: List[List[Int]],
                         maxDocs: Int,
+                        onlyNewDocs: Boolean,
                         ids: List[Int]): List[Int] = {
     require(docs != null)
     require(maxDocs > 0)
@@ -365,17 +372,45 @@ class TopIndex(simSearch: SimDocsSearch,
     else {
       val num = maxDocs - ids.size
       if (num > 0) {
-        val newIds = docs.foldLeft[List[Int]](List()) {
-          case (outLst,lstD) => if (lstD.isEmpty) outLst
-                                  else  outLst :+ lstD.head
+        val newIds = if (onlyNewDocs) {
+          val reader = simSearch.getReader()
+          val searcher = new IndexSearcher(reader)
+          val idList = docs.foldLeft[List[Int]](List()) {
+            case (outLst,lstD) =>
+              if (lstD.isEmpty) outLst
+              else if (isNewDoc(lstD.head, searcher)) outLst :+ lstD.head
+                   else outLst
+          }
+          reader.close()
+          idList
+        } else {
+          docs.foldLeft[List[Int]](List()) {
+            case (outLst,lstD) => if (lstD.isEmpty) outLst
+                                  else outLst :+ lstD.head
+          }
         }
         val newDocs = docs.foldLeft[List[List[Int]]](List()) {
           case (lst,lstD) => if ((lstD.isEmpty)||(lstD.tail.isEmpty)) lst
                             else lst :+ lstD.tail
         }
-        limitDocs(newDocs, maxDocs, (ids ++ newIds.take(num)))
+        limitDocs(newDocs, maxDocs, onlyNewDocs, (ids ++ newIds.take(num)))
       } else ids.take(maxDocs)
     }
+  }
+
+  /**
+    * Check if a document is new or not according to its 'isNew' flag
+    *
+    * @param id document identifier (personal service document identifier)
+    * @param searcher Lucene IndexSearcher object. See Lucene documentation
+    * @return true if this document is new or false if not
+    */
+  private def isNewDoc(id: Int,
+                       searcher: IndexSearcher): Boolean = {
+    require(id >= 0)
+    require(searcher != null)
+
+    "TRUE".equals(searcher.doc(id).get("isNew"))
   }
 
   /**
@@ -453,12 +488,12 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param in the input string
     * @return the string with some characters replaced by entities
     */
-  private def cleanString(in: String): String = {
+  /*private def cleanString(in: String): String = {
     require(in != null)
 
     in.replace("\"", "&quot;").replace("&", "&amp;").replace("'", "&apos;").
        replace("<", "&lt;").replace(">", "&gt;")
-  }
+  }*/
 
   /**
     * Update sdIdFldName fields of one document whose update time is outdated
@@ -526,7 +561,7 @@ class TopIndex(simSearch: SimDocsSearch,
     ndoc.add(new StoredField(contentFldName, content))
 
     // Include 'sd_id' (similar docs) fields
-    simSearch.searchIds(content, idxFldNames, maxDocs, minSim).
+    simSearch.searchIds(content, idxFldNames, maxDocs, minSim, false).
       foreach { case (sdId,_) => ndoc.add(new StoredField(sdIdFldName, sdId)) }
 
     // Update document

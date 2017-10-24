@@ -29,9 +29,9 @@ import scala.collection.immutable.TreeSet
 
 import org.apache.lucene.analysis.{Analyzer,TokenStream}
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
-import org.apache.lucene.index.{DirectoryReader,IndexableField}
+import org.apache.lucene.index.{DirectoryReader,IndexableField,Term}
 import org.apache.lucene.queryparser.classic.{MultiFieldQueryParser}
-import org.apache.lucene.search.{IndexSearcher,ScoreDoc}
+import org.apache.lucene.search.{BooleanClause,BooleanQuery,IndexSearcher,ScoreDoc,TermQuery}
 import org.apache.lucene.store.FSDirectory
 
 /** Class that looks for similar documents to a given ones
@@ -59,15 +59,18 @@ class SimDocsSearch(val sdIndexPath: String,
     * Searches for documents having a string in some fields
     *
     * @param text the text to be searched
+    * @param mustBeNew indicate that the returned docs must have the 'isNew' flag set
     * @return a json string of the similar documents
     */
-  def search(text: String): String = {
+  def search(text: String,
+             mustBeNew: Boolean): String = {
     require((text != null) && (!text.isEmpty))
 
     doc2xml(search(text,
                    service.Conf.idxFldNames,
                    service.Conf.maxDocs,
-                   service.Conf.minSim))
+                   service.Conf.minSim,
+                   mustBeNew))
   }
 
   /**
@@ -78,13 +81,15 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param maxDocs maximum number of returned documents
     * @param minSim minimum similarity between the input text and the retrieved
     *               field text
+    * @param mustBeNew indicate that the returned docs must have the 'isNew' flag set
     * @return a list of pairs with document score and a map of field name and a
     *         list of its contents
     */
   def search(text: String,
              fields: Set[String],
              maxDocs: Int,
-             minSim: Float): List[(Float,Map[String,List[String]])] = {
+             minSim: Float,
+             mustBeNew: Boolean): List[(Float,Map[String,List[String]])] = {
     require((text != null) && (!text.isEmpty))
     require((fields != null) && (!fields.isEmpty))
     require(maxDocs > 0)
@@ -92,7 +97,7 @@ class SimDocsSearch(val sdIndexPath: String,
 
     val newContent = Tools.strongUniformString(text)
 
-    searchIds(newContent, fields, maxDocs, minSim).map {
+    searchIds(newContent, fields, maxDocs, minSim, mustBeNew).map {
       case (id,score) => (score,loadDoc(id, fields))
     }
   }
@@ -105,12 +110,14 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param maxDocs maximum number of returned documents
     * @param minSim minimum similarity between the input text and the retrieved
     *               field text
+    * @param mustBeNew indicate that the returned docs must have the 'isNew' flag set
     * @return a list of pairs with document id and document score
     */
   def searchIds(text: String,
                 fields: Set[String],
                 maxDocs: Int,
-                minSim: Float): List[(Int,Float)] = {
+                minSim: Float,
+                mustBeNew: Boolean): List[(Int,Float)] = {
     require ((text != null) && (!text.isEmpty))
     require ((fields != null) && (!fields.isEmpty))
     require (maxDocs > 0)
@@ -121,7 +128,15 @@ class SimDocsSearch(val sdIndexPath: String,
       new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size))
 //println(s"text=$text fields=$fields")
     val textImproved = OneWordDecs.addDecsSynonyms(text, decsSearcher)
-    val query =  mqParser.parse(textImproved)
+    val query1 =  mqParser.parse(textImproved)
+    val query = if (mustBeNew) {
+      val query2 = new TermQuery(new Term("isNew", "TRUE"))
+      val builder = new BooleanQuery.Builder()
+      builder.add(query1, BooleanClause.Occur.MUST)
+      builder.add(query2, BooleanClause.Occur.MUST)
+      builder.build
+    } else query1
+
 //println("### antes do new IndexSearcher")
     val dirReader = getReader()
     val searcher = new IndexSearcher(dirReader)
@@ -254,7 +269,7 @@ class SimDocsSearch(val sdIndexPath: String,
    *
    * @return an DirectoryReader reflecting all changes made in the Lucene index
    */
-  private def getReader(): DirectoryReader = DirectoryReader.open(sdDirectory)
+  def getReader(): DirectoryReader = DirectoryReader.open(sdDirectory)
 
   /**
     * Loads the document content given its id and desired fields
@@ -290,7 +305,8 @@ object SimDocsSearch extends App {
     "\n\t<text> - text used to look for similar documents" +
     "\n\t[-fields=<field>,<field>,...,<field>] - document fields used to look for similarities" +
     "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
-    "\n\t[-minSim=<num>] - minimum similarity level (0 to 1.0) accepted ")
+    "\n\t[-minSim=<num>] - minimum similarity level (0 to 1.0) accepted ") +
+    "\n\t[--onlyNewDocs] - returns only docs that have the 'isNew' flag set"
     System.exit(1)
   }
 
@@ -299,7 +315,8 @@ object SimDocsSearch extends App {
   val parameters = args.drop(3).foldLeft[Map[String,String]](Map()) {
     case (map,par) => {
       val split = par.split(" *= *", 2)
-      map + ((split(0).substring(1), split(1)))
+      if (split.length == 1) map + ((split(0).substring(2), ""))
+      else map + ((split(0).substring(1), split(1)))
     }
   }
 
@@ -309,8 +326,9 @@ object SimDocsSearch extends App {
   }
   val maxDocs = parameters.getOrElse("maxDocs", "10").toInt
   val minSim = parameters.getOrElse("minSim", "0.5").toFloat
+  val mustBeNew = parameters.contains("onlyNewDocs")
   val search = new SimDocsSearch(args(0), args(1))
-  val docs = search.search(args(2), fldNames, maxDocs, minSim)
+  val docs = search.search(args(2), fldNames, maxDocs, minSim, mustBeNew)
 
   val analyzer = new NGramAnalyzer(NGSize.ngram_min_size,
                                    NGSize.ngram_max_size)

@@ -156,7 +156,7 @@ public class SDService extends HttpServlet {
                     for (String fld: oFields) {
                         fields.add(fld);
                     }
-                    out.println(simSearch.search(adhocSimilarDocs));
+                    out.println(simSearch.search(adhocSimilarDocs, false));
                 }
                 return;          
             }
@@ -213,8 +213,10 @@ public class SDService extends HttpServlet {
                     for (String fld: oFields) {
                         fields.add(fld);
                     }
-                    out.println(topIndex.getSimDocsXml(psId,
-                                         profiles.toSet(), fields.toSet(), 10));
+                    final boolean onlyNewDocs = 
+                                  (request.getParameter("onlyNewDocs") != null);
+                    out.println(topIndex.getSimDocsXml(psId, profiles.toSet(), 
+                                              fields.toSet(), 10, onlyNewDocs));
                 }
                 return;
             }
@@ -235,7 +237,7 @@ public class SDService extends HttpServlet {
         out.println("--- and one of the following options: ---");
         out.println("psId=&lt;id&gt;&amp;addProfile=&lt;id&gt;&amp;sentence=&lt;sentence&gt;");
         out.println("psId=&lt;id&gt;&amp;deleteProfile=&lt;id&gt;");
-        out.println("psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;&amp;outFields=&lt;field&gt;,...,&lt;field&gt;");
+        out.println("psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;&amp;outFields=&lt;field&gt;,...,&lt;field&gt;[&amp;onlyNewDocs=]");
         out.println("psId=&lt;id&gt;&amp;showProfiles=true");
         out.println("adhocSimDocs=&lt;sentence&gt;&amp;");
         out.println("</SYNTAX>");
