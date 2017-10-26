@@ -33,7 +33,7 @@ import java.util.regex.Pattern
 import org.apache.lucene.analysis.core.KeywordAnalyzer
 import org.apache.lucene.document.{Document,Field,StoredField,StringField,TextField}
 import org.apache.lucene.index.{DirectoryReader,IndexWriter,IndexWriterConfig,Term}
-import org.apache.lucene.search.{IndexSearcher,TermQuery}
+import org.apache.lucene.search.{IndexSearcher,TermQuery,TotalHitCountCollector}
 import org.apache.lucene.store.FSDirectory
 
 import scala.collection.JavaConverters._
@@ -107,6 +107,7 @@ class LuceneIndexMain(indexPath: String,
     indexWriter.forceMerge(1)
     indexWriter.close()
     directory.close()
+    isNewIndexWriter.commit()
     isNewIndexWriter.forceMerge(1)
     isNewIndexWriter.close()
     isNewDirectory.close()
@@ -170,7 +171,7 @@ class LuceneIndexActor(indexWriter: IndexWriter,
                        fldIdxNames: Set[String],
                        fldStrdNames: Set[String],
                        decsMap: Map[Int,Set[String]]) extends Actor with ActorLogging {
-  val isNewIndexReader = DirectoryReader.open(indexWriter)
+  val isNewIndexReader = DirectoryReader.open(isNewIndexWriter)
   val isNewIndexSearcher = new IndexSearcher(isNewIndexReader)
 
   val regexp = """\^d\d+""".r
@@ -192,7 +193,7 @@ class LuceneIndexActor(indexWriter: IndexWriter,
           }
         }
       } catch {
-        case ex: Throwable => log.error(s"[$fname] -${ex.toString()}")
+        case ex: Throwable => log.error(s"skipping file: [$fname] -${ex.toString()}")
       }
       log.debug(s"[${self.path.name}] finished my task")
     }
@@ -208,9 +209,10 @@ class LuceneIndexActor(indexWriter: IndexWriter,
   private def updateIsNewField(doc: Map[String,List[String]]):
                                                     Map[String,List[String]] = {
     val id = doc("id").head
-    val topDocs = isNewIndexSearcher.search(new TermQuery(new Term("id",id)), 1)
+    val collector = new TotalHitCountCollector()
 
-    if (topDocs.totalHits == 0) {
+    isNewIndexSearcher.search(new TermQuery(new Term("id",id)), collector)
+    if (collector.getTotalHits() == 0) {
       val newDoc = new Document()
       newDoc.add(new StringField("id", id, Field.Store.YES))
       isNewIndexWriter.addDocument(newDoc)
@@ -247,7 +249,11 @@ class LuceneIndexActor(indexWriter: IndexWriter,
         }
         if (fldIdxNames.contains(tag) || "isNew".equals(tag)) {  // Add indexed fields
           lst.foreach {
-            elem => doc.add(new TextField(tag, elem, Field.Store.YES))
+            elem =>
+              if (elem.size < 10000)  // Bug during indexing. Fix in future. Sorry!
+                doc.add(new TextField(tag, elem, Field.Store.YES))
+              else
+                doc.add(new TextField(tag, elem.substring(10000), Field.Store.YES))
           }
         } else if (fldStrdNames.contains(tag)) { // Add stored fields
           lst.foreach {
