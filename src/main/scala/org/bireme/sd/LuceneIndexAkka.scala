@@ -194,8 +194,11 @@ class LuceneIndexActor(indexWriter: IndexWriter,
             Try(indexWriter.addDocument(map2doc(updateIsNewField(smap))))
               match {
                 case Success(_) => ()
-                case Failure(ex) => log.error(s"skipping documento => file:[$fname]" +
-                  s" id:[${smap.getOrElse("id", "?")}] -${ex.toString()}")
+                case Failure(ex) => {
+                  val did = smap.getOrElse("id", List(s"? docPos=$idx")).head
+                  log.error(s"skipping document => file:[$fname]" +
+                            s" id:[$did] -${ex.toString()}")
+                }
               }
           }
         }
