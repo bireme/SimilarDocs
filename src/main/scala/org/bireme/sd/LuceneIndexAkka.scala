@@ -37,10 +37,11 @@ import org.apache.lucene.search.{IndexSearcher,TermQuery,TotalHitCountCollector}
 import org.apache.lucene.store.FSDirectory
 
 import scala.collection.JavaConverters._
-import scala.language.postfixOps
-import scala.util.control.NonFatal
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.language.postfixOps
+import scala.util.{Try, Success, Failure}
+import scala.util.control.NonFatal
 //import scala.concurrent.ExecutionContext.Implicits.global
 
 case class Finishing()
@@ -189,7 +190,13 @@ class LuceneIndexActor(indexWriter: IndexWriter,
         IahxXmlParser.getElements(fname, encoding, Set()).zipWithIndex.foreach {
           case (map,idx) => {
             if (idx % 50000 == 0) log.info(s"[$fname] - $idx")
-            indexWriter.addDocument(map2doc(updateIsNewField(map.toMap)))
+            val smap = map.toMap
+            Try(indexWriter.addDocument(map2doc(updateIsNewField(smap))))
+              match {
+                case Success(_) => ()
+                case Failure(ex) => log.error(s"skipping documento => file:[$fname]" +
+                  s" id:[${smap.getOrElse("id", "?")}] -${ex.toString()}")
+              }
           }
         }
       } catch {
