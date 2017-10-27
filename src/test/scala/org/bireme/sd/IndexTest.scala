@@ -39,7 +39,9 @@ object IndexTest extends App {
     case Failure(_) => 0
   }
 //println(s"hits=$hits")
-  sys.exit(hits)
+  val retValue = if (hits > 255) 255 else hits
+
+  System.exit(retValue)  // Value exit values 8 bits
 
   private def checkDocs(term: Term,
                         ireader: IndexReader): Int = {

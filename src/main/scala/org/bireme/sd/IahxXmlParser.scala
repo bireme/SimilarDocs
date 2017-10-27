@@ -133,7 +133,8 @@ object IahxXmlParser {
   private def getFieldString(lines: Iterator[String]):
                                                      Option[(String,String)] = {
     getOpenFieldElem(lines).map(line =>
-      if (line.contains("</field>")) parseField(line)
+      if (line.contains("/>")) parseField1(line)
+      else if (line.contains("</field>")) parseField(line)
       else parseField(getUntilCloseFldElem(line, lines))
     )
   }
@@ -195,18 +196,24 @@ object IahxXmlParser {
     * @return name and content of a xml element 'field'
     */
   private def parseField1(str: String): (String, String) = {
-    val pos1 = str.indexOf("<field name=")
-    if (pos1 == -1) throw new IOException(s"parseField [$str]")
+    val openPos = str.indexOf("<field name=\"")
+    if (openPos == -1) throw new IOException(s"parseField [$str]")
 
-    val pos2 = str.indexOf(">", pos1 + 12)
-    if (pos2 == -1) throw new IOException(s"parseField [$str]")
+    val endQuotPos = str.indexOf("\"", openPos + 13)
+    if (endQuotPos == -1) throw new IOException(s"parseField [$str]")
 
-    val pos3 = str.indexOf("</field>", pos2 + 1)
-    if (pos3 == -1) throw new IOException(s"parseField [$str]")
+    val closePos = str.indexOf(">", endQuotPos + 1)
+    if (closePos == -1) throw new IOException(s"parseField [$str]")
 
-    val name = str.substring(pos1 + 13, pos2 - 1)
-    val content = str.substring(pos2 + 1, pos3)
+    val tag = str.substring(openPos + 13, endQuotPos)
 
-    (name, content)
+    if (str.charAt(closePos - 1) == '/')  // <tag/>
+      (tag, "")
+    else {                                // <tag>  </tag>
+      val closeTagPos = str.indexOf("</field>", closePos + 1)
+      if (closeTagPos == -1) throw new IOException(s"parseField [$str]")
+
+      (tag, str.substring(closePos + 1, closeTagPos))
+    }
   }
 }
