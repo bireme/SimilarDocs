@@ -58,13 +58,17 @@ class LuceneIndexMain(indexPath: String,
 
   val analyzer = new NGramAnalyzer(NGSize.ngram_min_size,
                                    NGSize.ngram_max_size)
-  val indexPath2 = new File(indexPath.trim).toPath()
+  val indexPathTrim = indexPath.trim
+  val indexPath1 = if (indexPathTrim.endsWith("/"))
+                     indexPathTrim.substring(0, indexPathTrim.size - 1)
+                   else indexPathTrim
+  val indexPath2 = new File(indexPath1).toPath()
   val directory = FSDirectory.open(indexPath2)
   val config = new IndexWriterConfig(analyzer)
   config.setOpenMode(IndexWriterConfig.OpenMode.CREATE)
   val indexWriter = new IndexWriter(directory, config)
-  val indexPath3 = new File(indexPath.trim + "_isNew").toPath()
-  val isNewDirectory = FSDirectory.open(indexPath3)
+  val isNewIndexPath = new File(indexPath1 + "_isNew").toPath()
+  val isNewDirectory = FSDirectory.open(isNewIndexPath)
   val isNewConfig = new IndexWriterConfig(new KeywordAnalyzer)
   isNewConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
   val isNewIndexWriter = new IndexWriter(isNewDirectory, isNewConfig)
