@@ -410,7 +410,7 @@ class TopIndex(simSearch: SimDocsSearch,
     require(id >= 0)
     require(searcher != null)
 
-    "TRUE".equals(searcher.doc(id).get("isNew"))
+    "1".equals(searcher.doc(id).get("isNew"))
   }
 
   /**
@@ -435,8 +435,11 @@ class TopIndex(simSearch: SimDocsSearch,
       doc.getFields().asScala.foldLeft[Map[String,List[String]]] (Map()) {
         case  (map, field) => {
           val name = field.name()
-          val lst = map.getOrElse(name,List[String]())
-          map + ((name, field.stringValue() :: lst))
+          if ("isNew".equals(name)) map
+          else {
+            val lst = map.getOrElse(name,List[String]())
+            map + ((name, field.stringValue() :: lst))
+          }
         }
       }
     } else fields.foldLeft[Map[String,List[String]]] (Map()) {
