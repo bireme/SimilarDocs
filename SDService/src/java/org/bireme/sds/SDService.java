@@ -124,6 +124,8 @@ public class SDService extends HttpServlet {
         final ServletContext context = request.getServletContext();
         final boolean maintenanceMode =
                               (Boolean)context.getAttribute("MAINTENANCE_MODE");
+        final scala.Option<Integer> none = scala.Option.apply(null);
+        
         try (PrintWriter out = response.getWriter()) {
             final String maintenance = request.getParameter("maintenance");
             if (maintenance != null) {
@@ -156,7 +158,7 @@ public class SDService extends HttpServlet {
                     for (String fld: oFields) {
                         fields.add(fld);
                     }
-                    out.println(simSearch.search(adhocSimilarDocs, false));
+                    out.println(simSearch.search(adhocSimilarDocs, 0));
                 }
                 return;          
             }
@@ -213,10 +215,11 @@ public class SDService extends HttpServlet {
                     for (String fld: oFields) {
                         fields.add(fld);
                     }
-                    final boolean onlyNewDocs = 
-                                  (request.getParameter("onlyNewDocs") != null);
+                    final String lastDaysPar = request.getParameter("lastDays");
+                    final int lastDays = (lastDaysPar == null) ? 0 : 
+                                           Integer.parseInt(lastDaysPar);
                     out.println(topIndex.getSimDocsXml(psId, profiles.toSet(), 
-                                              fields.toSet(), 10, onlyNewDocs));
+                                              fields.toSet(), 10, lastDays));
                 }
                 return;
             }

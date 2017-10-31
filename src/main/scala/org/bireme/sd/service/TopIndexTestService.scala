@@ -76,7 +76,7 @@ object TopIndexTestService extends App {
       case Some(profId) => topIndex.deleteProfile(psId,profId)
       case None => getSimDocs match {
         case Some(fields) => println(topIndex.getSimDocsXml(psId,
-                        fields.trim().split(" *\\, *").toSet, Set(), 10, false))
+                        fields.trim().split(" *\\, *").toSet, Set(), 10))
         case None => if (showProfiles) println(topIndex.getProfilesXml(psId))
                      else if (cleanSimDocs) topIndex.resetAllTimes()
                      else usage()

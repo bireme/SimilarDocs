@@ -29,9 +29,10 @@ import bruma.master._
 
 import java.io.File
 import java.util.regex.Pattern
+import java.util.{Calendar,GregorianCalendar,TimeZone}
 
 import org.apache.lucene.analysis.core.KeywordAnalyzer
-import org.apache.lucene.document.{Document,Field,StoredField,StringField,TextField}
+import org.apache.lucene.document.{DateTools,Document,Field,StoredField,StringField,TextField}
 import org.apache.lucene.index.{DirectoryReader,IndexWriter,IndexWriterConfig,Term}
 import org.apache.lucene.search.{IndexSearcher,TermQuery,TotalHitCountCollector}
 import org.apache.lucene.store.FSDirectory
@@ -53,7 +54,8 @@ class LuceneIndexMain(indexPath: String,
                       fldIdxNames: Set[String],
                       fldStrdNames: Set[String],
                       decsDir: String,
-                      encoding: String) extends Actor with ActorLogging {
+                      encoding: String,
+                      fullIndexing: Boolean) extends Actor with ActorLogging {
   val idxWorkers = 10 // Number of actors to run concurrently
 
   val analyzer = new NGramAnalyzer(NGSize.ngram_min_size,
@@ -70,15 +72,21 @@ class LuceneIndexMain(indexPath: String,
   val isNewIndexPath = new File(indexPath1 + "_isNew").toPath()
   val isNewDirectory = FSDirectory.open(isNewIndexPath)
   val isNewConfig = new IndexWriterConfig(new KeywordAnalyzer)
-  isNewConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
+  if (fullIndexing) isNewConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE)
+  else isNewConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
   val isNewIndexWriter = new IndexWriter(isNewDirectory, isNewConfig)
-
+  val now = new GregorianCalendar(TimeZone.getDefault())
+  val year = now.get(Calendar.YEAR)
+  val month = now.get(Calendar.MONTH)
+  val day = now.get(Calendar.DAY_OF_MONTH)
+  val todayCal = new GregorianCalendar(year, month, day, 0, 0) // begin of today
+  val today = DateTools.dateToString(todayCal.getTime(), DateTools.Resolution.SECOND)
   val decsMap = if (decsDir.isEmpty()) Map[Int,Set[String]]()
                 else decx2Map(decsDir)
   val routerIdx = {
     val routees = Vector.fill(idxWorkers) {
-      val r = context.actorOf(Props(classOf[LuceneIndexActor], indexWriter,
-                                    isNewIndexWriter, fldIdxNames + "isNew",
+      val r = context.actorOf(Props(classOf[LuceneIndexActor], today, indexWriter,
+                                    isNewIndexWriter, fldIdxNames + "entranceDate",
                                     fldStrdNames + "id", decsMap))
       context watch r
       ActorRefRoutee(r)
@@ -171,7 +179,8 @@ class LuceneIndexMain(indexPath: String,
   }
 }
 
-class LuceneIndexActor(indexWriter: IndexWriter,
+class LuceneIndexActor(today: String,
+                       indexWriter: IndexWriter,
                        isNewIndexWriter: IndexWriter,
                        fldIdxNames: Set[String],
                        fldStrdNames: Set[String],
@@ -192,19 +201,20 @@ class LuceneIndexActor(indexWriter: IndexWriter,
       log.debug(s"[${self.path.name}] received a requisition to index $fname")
       try {
         IahxXmlParser.getElements(fname, encoding, Set()).zipWithIndex.foreach {
-          case (map,idx) => {
+          case (map,idx) =>
             if (idx % 50000 == 0) log.info(s"[$fname] - $idx")
             val smap = map.toMap
-            Try(indexWriter.addDocument(map2doc(updateIsNewField(smap))))
-              match {
+            if (updIsNewDocument(smap)) {
+              val emap = smap + ("entranceDate" -> List(today))
+              Try(indexWriter.addDocument(map2doc(emap))) match {
                 case Success(_) => ()
                 case Failure(ex) => {
                   val did = smap.getOrElse("id", List(s"? docPos=$idx")).head
                   log.error(s"skipping document => file:[$fname]" +
-                            s" id:[$did] -${ex.toString()}")
+                              s" id:[$did] -${ex.toString()}")
                 }
               }
-          }
+            }
         }
       } catch {
         case ex: Throwable => log.error(s"skipping file: [$fname] -${ex.toString()}")
@@ -220,8 +230,7 @@ class LuceneIndexActor(indexWriter: IndexWriter,
     log.debug(s"LuceneIndexActor[${self.path.name}] is now finishing")
   }
 
-  private def updateIsNewField(doc: Map[String,List[String]]):
-                                                    Map[String,List[String]] = {
+  private def updIsNewDocument(doc: Map[String,List[String]]): Boolean = {
     val id = doc("id").head
     val collector = new TotalHitCountCollector()
 
@@ -230,8 +239,8 @@ class LuceneIndexActor(indexWriter: IndexWriter,
       val newDoc = new Document()
       newDoc.add(new StringField("id", id, Field.Store.YES))
       isNewIndexWriter.addDocument(newDoc)
-      doc + ("isNew" -> List("1"))
-    } else doc
+      true
+    } else false
   }
 
   /**
@@ -261,7 +270,7 @@ class LuceneIndexActor(indexWriter: IndexWriter,
             }
           }
         }
-        if (fldIdxNames.contains(tag) || "isNew".equals(tag)) {  // Add indexed fields
+        if (fldIdxNames.contains(tag) || "entranceDate".equals(tag)) {  // Add indexed fields
           lst.foreach {
             elem =>
               if (elem.size < 10000)  // Bug during indexing. Fix in future. Sorry!
@@ -299,7 +308,8 @@ object LuceneIndexAkka extends App {
       "\n\t[-indexedFields=<field1>,...,<fieldN>] - xml doc fields to be indexed and stored" +
       "\n\t[-storedFields=<field1>,...,<fieldN>] - xml doc fields to be stored but not indexed" +
       "\n\t[-decs=<dir>] - decs master file directory" +
-      "\n\t[-encoding=<str>] - xml file encoding")
+      "\n\t[-encoding=<str>] - xml file encoding" +
+      "\n\t[--fullIndexing] - if present, recreate the indexes from scratch")
     System.exit(1)
   }
 
@@ -325,11 +335,13 @@ object LuceneIndexAkka extends App {
 
   val decsDir = parameters.getOrElse("decs", "")
   val encoding = parameters.getOrElse("encoding", "ISO-8859-1")
+  val fullIndexing = parameters.contains("fullindexing")
 
   val system = ActorSystem("Main")
   try {
     val props = Props(classOf[LuceneIndexMain], indexPath, decsIndexPath, xmlDir,
-                      xmlFileFilter, fldIdxNames, fldStrdNames, decsDir, encoding)
+                      xmlFileFilter, fldIdxNames, fldStrdNames, decsDir, encoding,
+                      fullIndexing)
     system.actorOf(props, "app")
 
     //val app = system.actorOf(props, "app")

@@ -23,14 +23,14 @@ package org.bireme.sd.service
 
 import java.nio.file.Paths
 
-import java.util.Date
+import java.util.{Calendar,Date,GregorianCalendar,TimeZone}
 
-import org.apache.lucene.document.{Document, Field, LongPoint, StringField, StoredField}
-import org.apache.lucene.index.{DirectoryReader, IndexWriter, IndexWriterConfig, Term}
-import org.apache.lucene.search.{IndexSearcher, MatchAllDocsQuery, TermQuery}
+import org.apache.lucene.document.{DateTools,Document,Field,LongPoint,StringField,StoredField}
+import org.apache.lucene.index.{DirectoryReader,IndexWriter,IndexWriterConfig,Term}
+import org.apache.lucene.search.{IndexSearcher,MatchAllDocsQuery,TermQuery}
 import org.apache.lucene.store.FSDirectory
 
-import org.bireme.sd.{SimDocsSearch, Tools}
+import org.bireme.sd.{SimDocsSearch,Tools}
 
 import scala.collection.JavaConverters._
 
@@ -97,7 +97,7 @@ class TopIndex(simSearch: SimDocsSearch,
     val id = s"${tuser}_${tname}"
     val updateTime = new Date().getTime()
 
-    // Retrieves or creates the pesonal service document
+    // Retrieves or creates the personal service document
     val (doc, isNew) = getDocuments(idFldName, id) match {
       case Some(lst) =>
         val doc2 = lst.head
@@ -163,7 +163,7 @@ class TopIndex(simSearch: SimDocsSearch,
     // Add similar documents ids
     if (getSdIds) {
       doc.removeFields(sdIdFldName)
-      simSearch.searchIds(newContent, idxFldNames, maxDocs, minSim, false).foreach {
+      simSearch.searchIds(newContent, idxFldNames, maxDocs, minSim, None).foreach {
         case (id,_) => doc.add(new StoredField(sdIdFldName, id))
       }
     }
@@ -252,7 +252,7 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param profiles name of profiles used to find similar documents
     * @param outFlds fields of similar documents to be retrieved
     * @param maxDocs the maximun number of similar documents to be retrieved
-    * @param onlyNewDocs returns only docs that have the 'isNew' flag set
+    * @param lastDays filter documents whose 'entranceDate' is yonger or equal to x days
     * @return an XML document with each desired field and its respective
     *         occurrences, given that fields can have more than one occurrences
     */
@@ -260,7 +260,30 @@ class TopIndex(simSearch: SimDocsSearch,
                     profiles: Set[String],
                     outFields: Set[String],
                     maxDocs: Int,
-                    onlyNewDocs: Boolean): String = {
+                    lastDays: Int): String = {
+    val days = if (lastDays <= 0) None else Some(lastDays)
+
+    getSimDocsXml(psId, profiles, outFields, maxDocs, days)
+  }
+
+  /**
+    * Given a id of a personal service document, profiles names and
+    * similar documents fields where the profiles will be compared, returns
+    * a list of similar documents represented as a XML document
+    *
+    * @param psId personal services document id
+    * @param profiles name of profiles used to find similar documents
+    * @param outFlds fields of similar documents to be retrieved
+    * @param maxDocs the maximun number of similar documents to be retrieved
+    * @param lastDays filter documents whose 'entranceDate' is yonger or equal to x days
+    * @return an XML document with each desired field and its respective
+    *         occurrences, given that fields can have more than one occurrences
+    */
+  def getSimDocsXml(psId: String,
+                    profiles: Set[String],
+                    outFields: Set[String],
+                    maxDocs: Int,
+                    lastDays: Option[Int] = None): String = {
     require((psId != null) && (!psId.trim.isEmpty))
     require(profiles != null)
     require(outFields != null)
@@ -268,7 +291,7 @@ class TopIndex(simSearch: SimDocsSearch,
 
     val head = """<?xml version="1.0" encoding="UTF-8"?><documents>"""
 
-    getSimDocs(psId, profiles, outFields, maxDocs, onlyNewDocs).
+    getSimDocs(psId, profiles, outFields, maxDocs, lastDays).
                                                        foldLeft[String] (head) {
       case (str,map) => {
         s"${str}<document>" + map.foldLeft[String]("") {
@@ -297,7 +320,7 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param names name of profiles used to find similar documents
     * @param outFlds fields of similar documents to be retrieved
     * @param maxDocs the maximun number of similar documents to be retrieved
-    * @param onlyNewDocs returns only docs that have the 'isNew' flag set
+    * @param lastDays filter documents whose 'entranceDate' is yonger or equal to x days
     * @return a list of similar documents, where each similar document is a
     *         a collection of field names and its contents. Each fields can
     *         have more than one occurrence
@@ -306,7 +329,7 @@ class TopIndex(simSearch: SimDocsSearch,
                  names: Set[String],
                  outFlds: Set[String],
                  maxDocs: Int,
-                 onlyNewDocs: Boolean): List[Map[String,List[String]]] = {
+                 lastDays: Option[Int] = None): List[Map[String,List[String]]] = {
     require((user != null) && (!user.trim.isEmpty))
     require(names != null)
     require(outFlds != null)
@@ -336,7 +359,7 @@ class TopIndex(simSearch: SimDocsSearch,
       val sdDirectory = FSDirectory.open(Paths.get(simSearch.sdIndexPath))
       val sdReader = DirectoryReader.open(sdDirectory)
       val sdSearcher = new IndexSearcher(sdReader)
-      val list = limitDocs(docIds, maxDocs, onlyNewDocs, List()).
+      val list = limitDocs(docIds, maxDocs, lastDays, List()).
                           foldLeft[List[Map[String,List[String]]]](List()) {
         case (lst, id) => {
           val fields = getDocFields(id, sdSearcher, outFlds)
@@ -356,13 +379,13 @@ class TopIndex(simSearch: SimDocsSearch,
     *
     * @param docs list of ids for each profile
     * @param maxDocs the maximum number of ids to be returned
-    * @param onlyNewDocs returns only docs that have the 'isNew' flag set
+    * @param lastDays filter documents whose 'entranceDate' is yonger or equal to x days
     * @param ids auxiliary id list
     * @return a list of similiar document ids
     */
   private def limitDocs(docs: List[List[Int]],
                         maxDocs: Int,
-                        onlyNewDocs: Boolean,
+                        lastDays: Option[Int],
                         ids: List[Int]): List[Int] = {
     require(docs != null)
     require(maxDocs > 0)
@@ -372,45 +395,58 @@ class TopIndex(simSearch: SimDocsSearch,
     else {
       val num = maxDocs - ids.size
       if (num > 0) {
-        val newIds = if (onlyNewDocs) {
-          val reader = simSearch.getReader()
-          val searcher = new IndexSearcher(reader)
-          val idList = docs.foldLeft[List[Int]](List()) {
-            case (outLst,lstD) =>
-              if (lstD.isEmpty) outLst
-              else if (isNewDoc(lstD.head, searcher)) outLst :+ lstD.head
-                   else outLst
-          }
-          reader.close()
-          idList
-        } else {
-          docs.foldLeft[List[Int]](List()) {
-            case (outLst,lstD) => if (lstD.isEmpty) outLst
-                                  else outLst :+ lstD.head
-          }
+        val newIds = lastDays match {
+          case Some(days) =>
+            val reader = simSearch.getReader()
+            val searcher = new IndexSearcher(reader)
+            val idList = docs.foldLeft[List[Int]](List()) {
+              case (outLst,lstD) =>
+                if (lstD.isEmpty) outLst
+                else if (isNewDoc(lstD.head, searcher, days)) outLst :+ lstD.head
+                     else outLst
+            }
+            reader.close()
+            idList
+          case None =>
+            docs.foldLeft[List[Int]](List()) {
+              case (outLst,lstD) => if (lstD.isEmpty) outLst
+                                    else outLst :+ lstD.head
+            }
         }
         val newDocs = docs.foldLeft[List[List[Int]]](List()) {
           case (lst,lstD) => if ((lstD.isEmpty)||(lstD.tail.isEmpty)) lst
                             else lst :+ lstD.tail
         }
-        limitDocs(newDocs, maxDocs, onlyNewDocs, (ids ++ newIds.take(num)))
+        limitDocs(newDocs, maxDocs, lastDays, (ids ++ newIds.take(num)))
       } else ids.take(maxDocs)
     }
   }
 
   /**
-    * Check if a document is new or not according to its 'isNew' flag
+    * Check if a document is new or not according to its 'entranceDate' flag
     *
     * @param id document identifier (personal service document identifier)
     * @param searcher Lucene IndexSearcher object. See Lucene documentation
+    * @param days number of days before today
     * @return true if this document is new or false if not
     */
   private def isNewDoc(id: Int,
-                       searcher: IndexSearcher): Boolean = {
+                       searcher: IndexSearcher,
+                       days: Int): Boolean = {
     require(id >= 0)
     require(searcher != null)
+    require (days > 0)
 
-    "1".equals(searcher.doc(id).get("isNew"))
+    val now = new GregorianCalendar(TimeZone.getDefault())
+    val year = now.get(Calendar.YEAR)
+    val month = now.get(Calendar.MONTH)
+    val day = now.get(Calendar.DAY_OF_MONTH)
+    val todayCal = new GregorianCalendar(year, month, day, 0, 0) // begin of today
+    val daysAgoCal = todayCal.clone().asInstanceOf[GregorianCalendar]
+    daysAgoCal.add(Calendar.DAY_OF_MONTH, -days)                // begin of x days ago
+    val daysAgo = DateTools.dateToString(daysAgoCal.getTime(),
+                                         DateTools.Resolution.SECOND)
+    searcher.doc(id).get("entranceDate").compareTo(daysAgo) >= 0
   }
 
   /**
@@ -435,7 +471,7 @@ class TopIndex(simSearch: SimDocsSearch,
       doc.getFields().asScala.foldLeft[Map[String,List[String]]] (Map()) {
         case  (map, field) => {
           val name = field.name()
-          if ("isNew".equals(name)) map
+          if ("entranceDate".equals(name)) map
           else {
             val lst = map.getOrElse(name,List[String]())
             map + ((name, field.stringValue() :: lst))
@@ -460,7 +496,7 @@ class TopIndex(simSearch: SimDocsSearch,
     *
     * @param field document field name
     * @param content document field content
-    * @return probably a List of Lucene Document
+    * @return probably a list of Lucene documents
     */
   private def getDocuments(field: String,
                            content: String): Option[List[Document]] = {
@@ -564,7 +600,7 @@ class TopIndex(simSearch: SimDocsSearch,
     ndoc.add(new StoredField(contentFldName, content))
 
     // Include 'sd_id' (similar docs) fields
-    simSearch.searchIds(content, idxFldNames, maxDocs, minSim, false).
+    simSearch.searchIds(content, idxFldNames, maxDocs, minSim, None).
       foreach { case (sdId,_) => ndoc.add(new StoredField(sdIdFldName, sdId)) }
 
     // Update document
