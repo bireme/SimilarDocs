@@ -76,11 +76,13 @@ class LuceneIndexMain(indexPath: String,
   else isNewConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
   val isNewIndexWriter = new IndexWriter(isNewDirectory, isNewConfig)
   val now = new GregorianCalendar(TimeZone.getDefault())
-  val year = now.get(Calendar.YEAR)
+  /*val year = now.get(Calendar.YEAR)
   val month = now.get(Calendar.MONTH)
   val day = now.get(Calendar.DAY_OF_MONTH)
   val todayCal = new GregorianCalendar(year, month, day, 0, 0) // begin of today
-  val today = DateTools.dateToString(todayCal.getTime(), DateTools.Resolution.SECOND)
+  val today = DateTools.dateToString(todayCal.getTime(), DateTools.Resolution.SECOND)*/
+  val today = DateTools.dateToString(DateTools.round(now.getTime, DateTools.Resolution.DAY),
+                                                      DateTools.Resolution.DAY)
   val decsMap = if (decsDir.isEmpty()) Map[Int,Set[String]]()
                 else decx2Map(decsDir)
   val routerIdx = {
