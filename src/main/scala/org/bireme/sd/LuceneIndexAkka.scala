@@ -118,14 +118,17 @@ class LuceneIndexMain(indexPath: String,
   routerIdx.route(Broadcast(Finishing()), self)
 
   override def postStop(): Unit = {
-    log.info("Optimizing index")
+    log.info("Optimizing index 'sdIndex' - begin")
     indexWriter.forceMerge(1)
     indexWriter.close()
     directory.close()
+    log.info("Optimizing index 'sdIndex - end'")
+    log.info("Optimizing index - 'sdIndex_isNew' - begin")
     isNewIndexWriter.commit()
     isNewIndexWriter.forceMerge(1)
     isNewIndexWriter.close()
     isNewDirectory.close()
+    log.info("Optimizing index - 'sdIndex_isNew' - end")
     context.system.terminate()
   }
 
@@ -357,7 +360,13 @@ object LuceneIndexAkka extends App {
     //  case Failure(ex) => system.terminate(); throw ex
     //}
   } catch {
-    case NonFatal(e) ⇒ system.terminate(); throw e
+    case NonFatal(e) ⇒ {
+      println("---------------------------------------------------------------")
+      println(s"Application Error: ${e.toString}")
+      println("---------------------------------------------------------------")
+      e.printStackTrace()
+      system.terminate(); throw e
+    }
   }
 
   Await.result(system.whenTerminated, 6 hours)
