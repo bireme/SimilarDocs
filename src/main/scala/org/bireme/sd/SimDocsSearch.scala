@@ -144,11 +144,11 @@ class SimDocsSearch(val sdIndexPath: String,
         val day = now.get(Calendar.DAY_OF_MONTH)
         val todayCal = new GregorianCalendar(year, month, day, 0, 0) // begin of today
         val today = DateTools.dateToString(todayCal.getTime(),
-                                           DateTools.Resolution.SECOND)
+                                           DateTools.Resolution.DAY)
         val daysAgoCal = todayCal.clone().asInstanceOf[GregorianCalendar]
         daysAgoCal.add(Calendar.DAY_OF_MONTH, -days)                // begin of x days ago
         val daysAgo = DateTools.dateToString(daysAgoCal.getTime(),
-                                             DateTools.Resolution.SECOND)
+                                             DateTools.Resolution.DAY)
         val query2 = new TermRangeQuery("entranceDate", new BytesRef(daysAgo),
                                         new BytesRef(today), true, true);
         val builder = new BooleanQuery.Builder()

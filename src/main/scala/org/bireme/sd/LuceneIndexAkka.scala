@@ -29,7 +29,7 @@ import bruma.master._
 
 import java.io.File
 import java.util.regex.Pattern
-import java.util.{Calendar,GregorianCalendar,TimeZone}
+import java.util.{GregorianCalendar,TimeZone}
 
 import org.apache.lucene.analysis.core.KeywordAnalyzer
 import org.apache.lucene.document.{DateTools,Document,Field,StoredField,StringField,TextField}
