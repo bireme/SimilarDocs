@@ -67,7 +67,8 @@ class LuceneIndexMain(indexPath: String,
   val indexPath2 = new File(indexPath1).toPath()
   val directory = FSDirectory.open(indexPath2)
   val config = new IndexWriterConfig(analyzer)
-  config.setOpenMode(IndexWriterConfig.OpenMode.CREATE)
+  if (fullIndexing) config.setOpenMode(IndexWriterConfig.OpenMode.CREATE)
+  else config.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
   val indexWriter = new IndexWriter(directory, config)
   val isNewIndexPath = new File(indexPath1 + "_isNew").toPath()
   val isNewDirectory = FSDirectory.open(isNewIndexPath)
@@ -323,7 +324,8 @@ object LuceneIndexAkka extends App {
   val parameters = args.drop(3).foldLeft[Map[String,String]](Map()) {
     case (map,par) => {
       val split = par.split(" *= *", 2)
-      map + ((split(0).substring(1), split(1)))
+      if (split.length == 1) map + ((split(0).substring(2), ""))
+      else map + ((split(0).substring(1), split(1)))
     }
   }
 
@@ -340,7 +342,7 @@ object LuceneIndexAkka extends App {
 
   val decsDir = parameters.getOrElse("decs", "")
   val encoding = parameters.getOrElse("encoding", "ISO-8859-1")
-  val fullIndexing = parameters.contains("fullindexing")
+  val fullIndexing = parameters.contains("fullIndexing")
 
   val system = ActorSystem("Main")
   try {
