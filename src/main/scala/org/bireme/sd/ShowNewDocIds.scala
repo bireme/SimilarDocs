@@ -46,7 +46,7 @@ object ShowNewDocIds extends App {
 
   if (args.length < 2) usage();
 
-  val maxDocs = if (args.length == 2) Integer.MAX_VALUE else args(2).toInt
+  val maxDocs = if (args.length == 2) 1000 else args(2).toInt
   getNewDocsIds(args(0), args(1).toInt, maxDocs).foreach(id => println(s"id:$id"))
 
   /**
