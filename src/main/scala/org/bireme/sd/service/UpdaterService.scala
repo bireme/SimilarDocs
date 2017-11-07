@@ -21,6 +21,10 @@
 
 package org.bireme.sd.service
 
+//import scala.concurrent.{Await,Future}
+//import scala.concurrent.ExecutionContext.Implicits.global
+//import scala.concurrent.duration._
+
 /** Service that updates all outdated similar document ids (TopIndex)
 *
 * @param topDocs TopIndex Lucene object
@@ -28,37 +32,42 @@ package org.bireme.sd.service
 * date: 20170524
 */
 class UpdaterService(topDocs: TopIndex) {
-  var finished = false
-  var running = true
+  var running = false
+  var stopping = false
 
   /** Update the similar docs of all documents that are outdated
     */
-  def updateAll(): Unit = {
-    if (running) topDocs.updateSimilarDocs() match {
-      case Some(_) => updateAll()
-      case None => {
-        finished = true
-        running = false
-      }
-    } else finished = true
+  private def updateAll(): Unit = {
+    if (!stopping) topDocs.updateSimilarDocs() match {
+      case Some(_) => updateAll()  // has more documents to update
+      case None => ()
+    }
   }
 
   /** Update the similar docs of all documents that are outdated
     */
   def start(): Unit = {
-    finished = false
-    running = true
-    updateAll()
+    if (!running) {
+      while (stopping) Thread.sleep(500)
+      running = true
+      updateAll()
+      running = false
+
+      /*val updAll = Future { updateAll() }
+      val result = Await.ready(updAll, Duration.Inf).value.get
+
+      result match {
+        case _ => running = false
+      }*/
+    }
   }
 
   /** Stop the service
     */
   def stop(): Unit = {
-    running = false
-    while (!finished) Thread.sleep(1000)
+    stopping = true
+    while (running) Thread.sleep(500)
     topDocs.resetAllTimes()
+    stopping = false
   }
-
-  // Outdate all documents
-  //topDocs.resetAllTimes()
 }

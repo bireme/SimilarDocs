@@ -32,7 +32,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.bireme.sd.SimDocsSearch;
 import org.bireme.sd.service.Conf;
-import org.bireme.sd.service.UpdaterServicePar;
+import org.bireme.sd.service.UpdaterService;
 import org.bireme.sd.service.TopIndex;
 
 import scala.collection.mutable.HashSet;
@@ -45,7 +45,7 @@ import scala.collection.mutable.Set;
  */
 public class SDService extends HttpServlet {
     private TopIndex topIndex;
-    private UpdaterServicePar updaterService;
+    private UpdaterService updaterService;
     private SimDocsSearch simSearch;
     
     @Override
@@ -70,11 +70,11 @@ public class SDService extends HttpServlet {
 
         simSearch = new SimDocsSearch(sdIndexPath, decsIndexPath);
         topIndex = new TopIndex(simSearch, topIndexPath, Conf.idxFldNames());
-        updaterService = new UpdaterServicePar(topIndex);
+        updaterService = new UpdaterService(topIndex);
 
         context.setAttribute("MAINTENANCE_MODE", Boolean.FALSE);
         //System.out.println("I will call 'updaterService.start()'");
-        updaterService.start();
+        //updaterService.start(); // Demora muita para finalizar, deixa para atualização do índice
         //System.out.println("After call of 'updaterService.start()'");
     }
     
@@ -124,7 +124,6 @@ public class SDService extends HttpServlet {
         final ServletContext context = request.getServletContext();
         final boolean maintenanceMode =
                               (Boolean)context.getAttribute("MAINTENANCE_MODE");
-        final scala.Option<Integer> none = scala.Option.apply(null);
         
         try (PrintWriter out = response.getWriter()) {
             final String maintenance = request.getParameter("maintenance");
