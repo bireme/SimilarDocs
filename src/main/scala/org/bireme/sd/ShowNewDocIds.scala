@@ -28,7 +28,6 @@ import org.apache.lucene.document.DateTools
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.search.{IndexSearcher,TermRangeQuery}
 import org.apache.lucene.store.FSDirectory
-import org.apache.lucene.util.BytesRef
 
 import scala.collection.JavaConverters._
 
@@ -75,8 +74,8 @@ object ShowNewDocIds extends App {
     daysAgoCal.add(Calendar.DAY_OF_MONTH, -days)  // begin of x days ago
     val daysAgo = DateTools.dateToString(daysAgoCal.getTime(),
                                          DateTools.Resolution.DAY)
-    val query = new TermRangeQuery("entranceDate", new BytesRef(daysAgo),
-                                    new BytesRef(today), true, true);
+    val query = TermRangeQuery.newStringRange("entranceDate", daysAgo,
+                                              today, true, true);
     val ids = searcher.search(query, maxDocs).scoreDocs.foldLeft[Seq[String]](Seq()) {
       case (seq,sd) =>
         val id = reader.document(sd.doc, Set("id").asJava).get("id")
