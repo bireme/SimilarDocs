@@ -31,7 +31,9 @@ import java.io.File
 import java.util.regex.Pattern
 import java.util.{GregorianCalendar,TimeZone}
 
+import org.apache.lucene.analysis.Analyzer
 import org.apache.lucene.analysis.core.KeywordAnalyzer
+import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper
 import org.apache.lucene.document.{DateTools,Document,Field,StoredField,StringField,TextField}
 import org.apache.lucene.index.{DirectoryReader,IndexWriter,IndexWriterConfig,Term}
 import org.apache.lucene.search.{IndexSearcher,TermQuery,TotalHitCountCollector}
@@ -58,8 +60,11 @@ class LuceneIndexMain(indexPath: String,
                       fullIndexing: Boolean) extends Actor with ActorLogging {
   val idxWorkers = 10 // Number of actors to run concurrently
 
-  val analyzer = new NGramAnalyzer(NGSize.ngram_min_size,
-                                   NGSize.ngram_max_size)
+  val ngAnalyzer = new NGramAnalyzer(NGSize.ngram_min_size,
+                                     NGSize.ngram_max_size)
+  val analyzerPerField = Map[String,Analyzer](
+                                 "entranceDate" -> new KeywordAnalyzer()).asJava
+  val analyzer = new PerFieldAnalyzerWrapper(ngAnalyzer, analyzerPerField)
   val indexPathTrim = indexPath.trim
   val indexPath1 = if (indexPathTrim.endsWith("/"))
                      indexPathTrim.substring(0, indexPathTrim.size - 1)
@@ -77,11 +82,6 @@ class LuceneIndexMain(indexPath: String,
   else isNewConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
   val isNewIndexWriter = new IndexWriter(isNewDirectory, isNewConfig)
   val now = new GregorianCalendar(TimeZone.getDefault())
-  /*val year = now.get(Calendar.YEAR)
-  val month = now.get(Calendar.MONTH)
-  val day = now.get(Calendar.DAY_OF_MONTH)
-  val todayCal = new GregorianCalendar(year, month, day, 0, 0) // begin of today
-  val today = DateTools.dateToString(todayCal.getTime(), DateTools.Resolution.SECOND)*/
   val today = DateTools.dateToString(DateTools.round(now.getTime, DateTools.Resolution.DAY),
                                                       DateTools.Resolution.DAY)
   val decsMap = if (decsDir.isEmpty()) Map[Int,Set[String]]()
@@ -282,7 +282,7 @@ class LuceneIndexActor(today: String,
               if (elem.size < 10000)  // Bug during indexing. Fix in future. Sorry!
                 doc.add(new TextField(tag, elem, Field.Store.YES))
               else
-                doc.add(new TextField(tag, elem.substring(10000), Field.Store.YES))
+                doc.add(new TextField(tag, elem.substring(0,10000), Field.Store.YES))
           }
         } else if (fldStrdNames.contains(tag)) { // Add stored fields
           lst.foreach {

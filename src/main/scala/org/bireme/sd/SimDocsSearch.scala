@@ -36,7 +36,6 @@ import org.apache.lucene.index.{DirectoryReader,IndexableField}
 import org.apache.lucene.queryparser.classic.{MultiFieldQueryParser}
 import org.apache.lucene.search.{BooleanClause,BooleanQuery,IndexSearcher,ScoreDoc,TermRangeQuery}
 import org.apache.lucene.store.FSDirectory
-import org.apache.lucene.util.BytesRef
 
 /** Class that looks for similar documents to a given ones
   *
@@ -149,8 +148,8 @@ class SimDocsSearch(val sdIndexPath: String,
         daysAgoCal.add(Calendar.DAY_OF_MONTH, -days)                // begin of x days ago
         val daysAgo = DateTools.dateToString(daysAgoCal.getTime(),
                                              DateTools.Resolution.DAY)
-        val query2 = new TermRangeQuery("entranceDate", new BytesRef(daysAgo),
-                                        new BytesRef(today), true, true);
+        val query2 = TermRangeQuery.newStringRange("entranceDate", daysAgo,
+                                                             today, true, true)
         val builder = new BooleanQuery.Builder()
         builder.add(query1, BooleanClause.Occur.MUST)
         builder.add(query2, BooleanClause.Occur.MUST)

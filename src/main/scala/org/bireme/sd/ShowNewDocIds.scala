@@ -75,7 +75,7 @@ object ShowNewDocIds extends App {
     val daysAgo = DateTools.dateToString(daysAgoCal.getTime(),
                                          DateTools.Resolution.DAY)
     val query = TermRangeQuery.newStringRange("entranceDate", daysAgo,
-                                              today, true, true);
+                                              today, true, true)
     val ids = searcher.search(query, maxDocs).scoreDocs.foldLeft[Seq[String]](Seq()) {
       case (seq,sd) =>
         val id = reader.document(sd.doc, Set("id").asJava).get("id")
