@@ -157,7 +157,10 @@ public class SDService extends HttpServlet {
                     for (String fld: oFields) {
                         fields.add(fld);
                     }
-                    out.println(simSearch.search(adhocSimilarDocs, 0));
+                    final String lastDaysPar = request.getParameter("lastDays");
+                    final int lastDays = (lastDaysPar == null) ? 365 : 
+                                           Integer.parseInt(lastDaysPar);
+                    out.println(simSearch.search(adhocSimilarDocs, lastDays));
                 }
                 return;          
             }
@@ -241,7 +244,7 @@ public class SDService extends HttpServlet {
         out.println("psId=&lt;id&gt;&amp;deleteProfile=&lt;id&gt;");
         out.println("psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;&amp;outFields=&lt;field&gt;,...,&lt;field&gt;[&amp;lastDays=&lt;num&gt;]");
         out.println("psId=&lt;id&gt;&amp;showProfiles=true");
-        out.println("adhocSimDocs=&lt;sentence&gt;&amp;");
+        out.println("adhocSimDocs=&lt;sentence&gt;[&amp;lastDays=&lt;num&gt;]");
         out.println("</SYNTAX>");
     }
 
