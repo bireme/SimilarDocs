@@ -215,7 +215,7 @@ public class SDService extends HttpServlet {
                         fields.add(fld);
                     }
                     final String lastDaysPar = request.getParameter("lastDays");
-                    final int lastDays = (lastDaysPar == null) ? 0 : 
+                    final int lastDays = (lastDaysPar == null) ? 365 : 
                                            Integer.parseInt(lastDaysPar);
                     out.println(topIndex.getSimDocsXml(psId, profiles.toSet(), 
                                               fields.toSet(), 10, lastDays));
@@ -239,7 +239,7 @@ public class SDService extends HttpServlet {
         out.println("--- and one of the following options: ---");
         out.println("psId=&lt;id&gt;&amp;addProfile=&lt;id&gt;&amp;sentence=&lt;sentence&gt;");
         out.println("psId=&lt;id&gt;&amp;deleteProfile=&lt;id&gt;");
-        out.println("psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;&amp;outFields=&lt;field&gt;,...,&lt;field&gt;[&amp;onlyNewDocs=]");
+        out.println("psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;&amp;outFields=&lt;field&gt;,...,&lt;field&gt;[&amp;lastDays=&lt;num&gt;]");
         out.println("psId=&lt;id&gt;&amp;showProfiles=true");
         out.println("adhocSimDocs=&lt;sentence&gt;&amp;");
         out.println("</SYNTAX>");

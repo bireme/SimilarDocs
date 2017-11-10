@@ -46,7 +46,8 @@ object ShowNewDocIds extends App {
   if (args.length < 2) usage();
 
   val maxDocs = if (args.length == 2) 1000 else args(2).toInt
-  getNewDocsIds(args(0), args(1).toInt, maxDocs).foreach(id => println(s"id:$id"))
+  getNewDocsIds(args(0), args(1).toInt, maxDocs).
+    foreach(x => println(s"id:${x._1} entranceDate=${x._2}"))
 
   /**
     * Shows the ids of Lucene index documents that are younger or equals to 'days'
@@ -54,13 +55,13 @@ object ShowNewDocIds extends App {
     * @param indexName Lucene index path
     * @param days number of days from now used to filter the retrieved ids
     * @param maxDocs maximum number of document ids to be returned
-    * @return a list of document identificators
+    * @return a list of document (identifier,entranceDate)
     */
   def getNewDocsIds(indexName: String,
                     days: Int,
-                    maxDocs: Int): Seq[String] = {
+                    maxDocs: Int): Seq[(String,String)] = {
     require (indexName != null)
-    require (days >= 0)
+    require (days > 0)
     require (maxDocs > 0)
 
     val directory = FSDirectory.open(new File(indexName).toPath())
@@ -76,10 +77,13 @@ object ShowNewDocIds extends App {
                                          DateTools.Resolution.DAY)
     val query = TermRangeQuery.newStringRange("entranceDate", daysAgo,
                                               today, true, true)
-    val ids = searcher.search(query, maxDocs).scoreDocs.foldLeft[Seq[String]](Seq()) {
+    val ids = searcher.search(query, maxDocs).scoreDocs.
+                                         foldLeft[Seq[(String,String)]](Seq()) {
       case (seq,sd) =>
-        val id = reader.document(sd.doc, Set("id").asJava).get("id")
-        if (id == null) seq else seq :+ id
+        val doc = reader.document(sd.doc, Set("id","entranceDate").asJava)
+        val id = doc.get("id")
+        val entranceDate = doc.get("entranceDate")
+        if (id == null) seq else seq :+ (id,entranceDate)
     }
     reader.close()
     directory.close()

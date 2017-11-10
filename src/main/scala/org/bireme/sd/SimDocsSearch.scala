@@ -33,8 +33,8 @@ import org.apache.lucene.analysis.{Analyzer,TokenStream}
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import org.apache.lucene.document.DateTools
 import org.apache.lucene.index.{DirectoryReader,IndexableField}
-import org.apache.lucene.queryparser.classic.{MultiFieldQueryParser}
-import org.apache.lucene.search.{BooleanClause,BooleanQuery,IndexSearcher,ScoreDoc,TermRangeQuery}
+import org.apache.lucene.queryparser.classic.{MultiFieldQueryParser,QueryParser}
+import org.apache.lucene.search.{BooleanClause,BooleanQuery,IndexSearcher,Query,ScoreDoc,TermRangeQuery}
 import org.apache.lucene.store.FSDirectory
 
 /** Class that looks for similar documents to a given ones
@@ -128,13 +128,50 @@ class SimDocsSearch(val sdIndexPath: String,
     require (maxDocs > 0)
     require (minSim > 0)
 
-//println("entrando no searchIds / SimDocsSearch")
+    val andQuery = getQuery(text, fields, lastDays, false)
+    val dirReader = getReader()
+    val searcher = new IndexSearcher(dirReader)
+
+    // Retrieve documents with AND parameter
+    val andLst = sortByDate(searcher,
+                           searcher.search(andQuery, 3  * maxDocs).scoreDocs,
+                           maxDocs, minSim)
+    // If the number of AND documents is not enough, complete with OR documents
+    val lst = if (andLst.size < maxDocs) {
+      val orQuery = getQuery(text, fields, lastDays, true)
+      val orLst = sortByDate(searcher,
+                             searcher.search(orQuery, 3  * maxDocs).scoreDocs,
+                             maxDocs, minSim)
+      andLst ++ (orLst.take(maxDocs - andLst.size))
+    } else andLst
+
+    dirReader.close()
+    lst
+  }
+
+  /**
+    * Create the query object to be used in a search method call.
+    *
+    * @param text the text to be searched
+    * @param fields document fields into where the text will be searched
+    * @param lastDays filter documents whose 'entranceDate' is yonger or equal to x days
+    * @param useOROperator if true the OR operator will be used, if false the AND operator will be used
+    * @return the Lucene query object
+    */
+  private def getQuery(text: String,
+                       fields: Set[String],
+                       lastDays: Option[Int],
+                       useOROperator: Boolean): Query = {
+    require ((text != null) && (!text.isEmpty))
+    require ((fields != null) && (!fields.isEmpty))
+
     val mqParser = new MultiFieldQueryParser(fields.toArray,
       new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size))
-//println(s"text=$text fields=$fields")
     val textImproved = OneWordDecs.addDecsSynonyms(text, decsSearcher)
+    if (!useOROperator) mqParser.setDefaultOperator(QueryParser.Operator.AND)
     val query1 =  mqParser.parse(textImproved)
-    val query = lastDays match {
+
+    lastDays match {
       case Some(days) =>
         require (days > 0)
         val now = new GregorianCalendar(TimeZone.getDefault())
@@ -156,17 +193,6 @@ class SimDocsSearch(val sdIndexPath: String,
         builder.build
       case None => query1
     }
-//println("### antes do new IndexSearcher")
-    val dirReader = getReader()
-    val searcher = new IndexSearcher(dirReader)
-//println(s"### antes do 'searcher.search' maxDocs=$maxDocs minSim=$minSim query=$query")
-//println(s"### totalHits=${searcher.search(query, maxDocs).totalHits}")
-    val lst = sortByDate(searcher,
-                         searcher.search(query, 3  * maxDocs).scoreDocs,
-                         maxDocs, minSim)
-//println(s"### depois do 'searcher.search' Ids=$lst")
-    dirReader.close()
-    lst
   }
 
   /**
@@ -208,19 +234,24 @@ class SimDocsSearch(val sdIndexPath: String,
       }
     }
 
+    // Split docs between the ones who are younger than minDateSim e the others
     val (timeSeq, othersSeq) = scoreDocs.partition(_.score >= minDateSim)
 
     // Key ordering
     implicit val Ord = implicitly[Ordering[String]]
+
+    // Sort the younger docs by date
     val timeSortedMap = sortByDate(timeSeq, SortedMap.
                                          empty[String,(Int,Float)](Ord.reverse))
 
+    // Get the older docs whose similarity are bigger than minSim
     val dateSeq = othersSeq.filter(_.score >= minSim)
     val dateList = dateSeq.take(maxDocs - timeSortedMap.size).
                                            foldLeft[List[(Int,Float)]](List()) {
       case (lst, sdoc)=> lst :+ (sdoc.doc, sdoc.score)
     }
 
+    // Join both lists
     timeSortedMap.foldLeft[List[(Int,Float)]](List()) {
       case (lst, (_,v)) => lst :+ v
     } ++ dateList
