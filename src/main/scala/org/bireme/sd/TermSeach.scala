@@ -38,8 +38,6 @@ object TermSearch extends App {
   if (args.size != 3) usage()
 
   val dir = FSDirectory.open(new File(args(0)).toPath())
-  //val reader = DirectoryReader.open(dir)
-
   val config = new IndexWriterConfig(new KeywordAnalyzer)
   config.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
   val indexWriter = new IndexWriter(dir, config)

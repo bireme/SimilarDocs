@@ -52,6 +52,13 @@ class SimDocsSearch(val sdIndexPath: String,
   val decsReader = DirectoryReader.open(decsDirectory)
   val decsSearcher = new IndexSearcher(decsReader)
 
+  val now = new GregorianCalendar(TimeZone.getDefault())
+  val year = now.get(Calendar.YEAR)
+  val month = now.get(Calendar.MONTH)
+  val day = now.get(Calendar.DAY_OF_MONTH)
+  val todayCal = new GregorianCalendar(year, month, day, 0, 0) // begin of today
+  val today = DateTools.dateToString(todayCal.getTime(), DateTools.Resolution.DAY)
+
   def close(): Unit = {
     sdDirectory.close()
     decsReader.close()
@@ -167,20 +174,15 @@ class SimDocsSearch(val sdIndexPath: String,
 
     val mqParser = new MultiFieldQueryParser(fields.toArray,
       new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size))
-    val textImproved = OneWordDecs.addDecsSynonyms(text, decsSearcher)
+    val textImproved =
+      if (useOROperator) OneWordDecs.addDecsSynonyms(text, decsSearcher)
+      else text
     if (!useOROperator) mqParser.setDefaultOperator(QueryParser.Operator.AND)
     val query1 =  mqParser.parse(textImproved)
 
     lastDays match {
       case Some(days) =>
         require (days > 0)
-        val now = new GregorianCalendar(TimeZone.getDefault())
-        val year = now.get(Calendar.YEAR)
-        val month = now.get(Calendar.MONTH)
-        val day = now.get(Calendar.DAY_OF_MONTH)
-        val todayCal = new GregorianCalendar(year, month, day, 0, 0) // begin of today
-        val today = DateTools.dateToString(todayCal.getTime(),
-                                           DateTools.Resolution.DAY)
         val daysAgoCal = todayCal.clone().asInstanceOf[GregorianCalendar]
         daysAgoCal.add(Calendar.DAY_OF_MONTH, -days)                // begin of x days ago
         val daysAgo = DateTools.dateToString(daysAgoCal.getTime(),
@@ -225,16 +227,14 @@ class SimDocsSearch(val sdIndexPath: String,
       else {
         val sdoc = seq.head
         val time = searcher.doc(sdoc.doc, Set("entry_date").asJava).get("entry_date")
-        if (time == null) sortByDate(seq.tail, curMap)
-        else {
-          val ttime = time.trim.replaceAll("[^0-9]+", "")
-          sortByDate(seq.tail, curMap + ((s"${ttime}_${sdoc.doc}",
-                        (sdoc.doc, sdoc.score))))
-        }
+        val ttime = if (time == null) today // to be at the end of the map
+                    else time.trim.replaceAll("[^0-9]+", "")
+        sortByDate(seq.tail, curMap + ((s"${ttime}_${sdoc.doc}",
+          (sdoc.doc, sdoc.score))))
       }
     }
 
-    // Split docs between the ones who are younger than minDateSim e the others
+    // Split docs between the ones who are younger than minDateSim and the others
     val (timeSeq, othersSeq) = scoreDocs.partition(_.score >= minDateSim)
 
     // Key ordering

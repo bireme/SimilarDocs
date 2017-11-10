@@ -112,7 +112,8 @@ object SearchExplain extends App {
 
   private def getWordTotalHits(text: String): Int = {
     val collector = new TotalHitCountCollector()
-    val analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
+    val analyzer = new NGramAnalyzer(NGSize.ngram_min_size,
+                                     NGSize.ngram_max_size)
     val mqParser = new MultiFieldQueryParser(fields.toArray, analyzer)
     val query = mqParser.parse(text)
     searcher.search(query, collector)
