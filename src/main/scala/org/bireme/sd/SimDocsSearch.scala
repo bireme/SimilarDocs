@@ -356,7 +356,7 @@ object SimDocsSearch extends App {
     "\n\t[-fields=<field>,<field>,...,<field>] - document fields used to look for similarities" +
     "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
     "\n\t[-minSim=<num>] - minimum similarity level (0 to 1.0) accepted " +
-    "\n\t[-lastDays=<num>] - returns only docs that are younger (entranceDate flag) than 'lastDays' days")
+    "\n\t[-lastDays=<num>] - return only docs that are younger (entranceDate flag) than 'lastDays' days")
     System.exit(1)
   }
 

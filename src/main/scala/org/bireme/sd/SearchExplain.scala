@@ -28,12 +28,14 @@ import org.bireme.sd.service.Conf
 import org.apache.lucene.analysis.core.KeywordAnalyzer
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import org.apache.lucene.queryparser.classic.{MultiFieldQueryParser,QueryParser}
-import org.apache.lucene.search.{IndexSearcher,TotalHitCountCollector}
+import org.apache.lucene.search.{IndexSearcher,Query,TotalHitCountCollector}
 import org.apache.lucene.store.FSDirectory
 import org.apache.lucene.index.DirectoryReader
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.TreeMap
+
+// dengue vacinação na cidade de São Paulo
 
 object SearchExplain extends App {
   private def usage(): Unit = {
@@ -81,11 +83,22 @@ object SearchExplain extends App {
     }
   }
 
-  val ORhits = getSentenceTotalHits(sentence, true)
-  val ANDhits = getSentenceTotalHits(sentence, false)
+  println("\nSentence Query:")
+  println(s"[OR]: ${getQuery(sentence, true)}")
+  println(s"\n[AND]: ${getQuery(sentence, true)}")
+
+  val OR = getSentenceTotalHits(sentence, true)
+  val AND = getSentenceTotalHits(sentence, false)
+
   println("\nSentence Hits:")
-  println(s"[OR]: $ORhits")
-  println(s"[AND]: $ANDhits")
+  println(s"[OR]: ${OR._1}")
+  OR._2.foreach {
+    case (doc, id, score) => println(s"\tdoc=$doc id=$id score=$score")
+  }
+  println(s"\n[AND]: ${AND._1}")
+  AND._2.foreach {
+    case (doc, id, score) => println(s"\tdoc=$doc id=$id score=$score")
+  }
 
   reader.close()
 
@@ -121,14 +134,29 @@ object SearchExplain extends App {
   }
 
   private def getSentenceTotalHits(text: String,
-                                   useOR: Boolean): Int = {
-    val collector = new TotalHitCountCollector()
+                                   useOR: Boolean):
+                                            (Long, Seq[(Int, String, Float)])= {
+    val query =  getQuery(text, useOR)
+    val topDocs = searcher.search(query, Conf.maxDocs)
+    val totalHits = topDocs.totalHits
+    val scoreDocs = topDocs.scoreDocs
+    val docs = scoreDocs.foldLeft[Seq[(Int,String,Float)]](Seq()) {
+      case (seq, sc) =>
+        val doc = sc.doc
+        val id = searcher.doc(doc).get("id")
+        val score = sc.score
+
+        seq :+ (doc, id, score)
+    }
+    (totalHits, docs)
+  }
+
+  private def getQuery(text: String,
+                       useOR: Boolean): Query = {
     val analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
     val mqParser = new MultiFieldQueryParser(fields.toArray, analyzer)
     if (!useOR) mqParser.setDefaultOperator(QueryParser.Operator.AND)
-    val query =  mqParser.parse(text)
 
-    searcher.search(query, collector)
-    collector.getTotalHits
+    mqParser.parse(text)
   }
 }
