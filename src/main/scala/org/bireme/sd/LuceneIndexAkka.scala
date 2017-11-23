@@ -193,6 +193,7 @@ class LuceneIndexActor(today: String,
                        decsMap: Map[Int,Set[String]]) extends Actor with ActorLogging {
   val isNewIndexReader = DirectoryReader.open(isNewIndexWriter)
   val isNewIndexSearcher = new IndexSearcher(isNewIndexReader)
+  val checkXml = new CheckXml()
 
   val regexp = """\^d\d+""".r
   val fldMap = fldIdxNames.foldLeft[Map[String,Float]](Map[String,Float]()) {
@@ -206,20 +207,26 @@ class LuceneIndexActor(today: String,
     case (fname:String, encoding:String) => {
       log.debug(s"[${self.path.name}] received a requisition to index $fname")
       try {
-        IahxXmlParser.getElements(fname, encoding, Set()).zipWithIndex.foreach {
-          case (map,idx) =>
-            if (idx % 50000 == 0) log.info(s"[$fname] - $idx")
-            val smap = map.toMap
-            if (updIsNewDocument(smap)) {
-              val emap = smap + ("entranceDate" -> List(today))
-              Try(indexWriter.addDocument(map2doc(emap))) match {
-                case Success(_) => ()
-                case Failure(ex) => {
-                  val did = smap.getOrElse("id", List(s"? docPos=$idx")).head
-                  log.error(s"skipping document => file:[$fname]" +
-                              s" id:[$did] -${ex.toString()}")
+        checkXml.check(fname) match {
+          case Some(errMess) => log.error(s"skipping document => file:[$fname]" +
+            s" - ${errMess}")
+          case None =>
+            IahxXmlParser.getElements(fname, encoding, Set()).zipWithIndex.
+                                                                       foreach {
+              case (map,idx) =>
+                if (idx % 50000 == 0) log.info(s"[$fname] - $idx")
+                val smap = map.toMap
+                if (updIsNewDocument(smap)) {
+                  val emap = smap + ("entranceDate" -> List(today))
+                  Try(indexWriter.addDocument(map2doc(emap))) match {
+                    case Success(_) => ()
+                    case Failure(ex) => {
+                      val did = smap.getOrElse("id", List(s"? docPos=$idx")).head
+                      log.error(s"skipping document => file:[$fname]" +
+                                s" id:[$did] -${ex.toString()}")
+                    }
+                  }
                 }
-              }
             }
         }
       } catch {
