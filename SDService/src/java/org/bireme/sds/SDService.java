@@ -160,6 +160,10 @@ public class SDService extends HttpServlet {
                     final String lastDaysPar = request.getParameter("lastDays");
                     final int lastDays = (lastDaysPar == null) ? 365 : 
                                            Integer.parseInt(lastDaysPar);
+                    if (lastDays <= 0) {
+                        out.println("<ERROR>'lastDays' parameter should be > 0</ERROR>");
+                        return;
+                    }
                     out.println(simSearch.search(adhocSimilarDocs, lastDays));
                 }
                 return;          

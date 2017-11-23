@@ -290,18 +290,19 @@ class TopIndex(simSearch: SimDocsSearch,
     require(maxDocs > 0)
 
     val head = """<?xml version="1.0" encoding="UTF-8"?><documents>"""
-
     getSimDocs(psId, profiles, outFields, maxDocs, lastDays).
                                                        foldLeft[String] (head) {
       case (str,map) => {
         s"${str}<document>" + map.foldLeft[String]("") {
           case (str2, (tag,lst)) => {
             val tag2 = tag.trim().replaceAll(" +", "_")
-
-            lst.size match {
+            val lst2 = if (tag2 equals "decs") {
+              lst.map(_.replace("& ", "&amp; "))
+            } else lst
+            lst2.size match {
               case 0 => str2
-              case 1 => str2 + s"<$tag2>${lst.head}</$tag2>"
-              case _ => str2 + lst.foldLeft[String]("") {
+              case 1 => str2 + s"<$tag2>${lst2.head}</$tag2>"
+              case _ => str2 + lst2.foldLeft[String]("") {
                 case (str3,elem) => s"$str3<$tag2>${elem}</$tag2>"
               }
             }
