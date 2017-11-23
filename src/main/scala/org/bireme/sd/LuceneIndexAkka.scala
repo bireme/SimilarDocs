@@ -112,7 +112,7 @@ class LuceneIndexMain(indexPath: String,
         val fname = file.getName()
         matcher.reset(fname)
         if (matcher.matches) {
-          checkXml.check(fname) match {
+          checkXml.check(file.getPath) match {
             case Some(errMess) => log.error(s"skipping document => " +
               s"file:[$fname] - ${errMess}")
             case None => indexFile(file.getPath(), encoding)
