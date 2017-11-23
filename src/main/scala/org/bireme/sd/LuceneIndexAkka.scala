@@ -97,6 +97,7 @@ class LuceneIndexMain(indexPath: String,
     Router(RoundRobinRoutingLogic(), routees)
     //Router(SmallestMailboxRoutingLogic(), routees)
   }
+  val checkXml = new CheckXml()
   val matcher = Pattern.compile(xmlFileFilter).matcher("")
   var activeIdx  = idxWorkers
 
@@ -108,8 +109,15 @@ class LuceneIndexMain(indexPath: String,
   (new File(xmlDir)).listFiles().sorted.foreach {
     file =>
       if (file.isFile()) {
-        matcher.reset(file.getName())
-        if (matcher.matches) indexFile(file.getPath(), encoding)
+        val fname = file.getName()
+        matcher.reset(fname)
+        if (matcher.matches) {
+          checkXml.check(fname) match {
+            case Some(errMess) => log.error(s"skipping document => " +
+              s"file:[$fname] - ${errMess}")
+            case None => indexFile(file.getPath(), encoding)
+          }
+        }
       }
   }
 
@@ -193,8 +201,6 @@ class LuceneIndexActor(today: String,
                        decsMap: Map[Int,Set[String]]) extends Actor with ActorLogging {
   val isNewIndexReader = DirectoryReader.open(isNewIndexWriter)
   val isNewIndexSearcher = new IndexSearcher(isNewIndexReader)
-  val checkXml = new CheckXml()
-
   val regexp = """\^d\d+""".r
   val fldMap = fldIdxNames.foldLeft[Map[String,Float]](Map[String,Float]()) {
     case (map,fname) =>
@@ -207,26 +213,21 @@ class LuceneIndexActor(today: String,
     case (fname:String, encoding:String) => {
       log.debug(s"[${self.path.name}] received a requisition to index $fname")
       try {
-        checkXml.check(fname) match {
-          case Some(errMess) => log.error(s"skipping document => file:[$fname]" +
-            s" - ${errMess}")
-          case None =>
-            IahxXmlParser.getElements(fname, encoding, Set()).zipWithIndex.
+        IahxXmlParser.getElements(fname, encoding, Set()).zipWithIndex.
                                                                        foreach {
-              case (map,idx) =>
-                if (idx % 50000 == 0) log.info(s"[$fname] - $idx")
-                val smap = map.toMap
-                if (updIsNewDocument(smap)) {
-                  val emap = smap + ("entranceDate" -> List(today))
-                  Try(indexWriter.addDocument(map2doc(emap))) match {
-                    case Success(_) => ()
-                    case Failure(ex) => {
-                      val did = smap.getOrElse("id", List(s"? docPos=$idx")).head
-                      log.error(s"skipping document => file:[$fname]" +
-                                s" id:[$did] -${ex.toString()}")
-                    }
-                  }
+          case (map,idx) =>
+            if (idx % 50000 == 0) log.info(s"[$fname] - $idx")
+            val smap = map.toMap
+            if (updIsNewDocument(smap)) {
+              val emap = smap + ("entranceDate" -> List(today))
+              Try(indexWriter.addDocument(map2doc(emap))) match {
+                case Success(_) => ()
+                case Failure(ex) => {
+                  val did = smap.getOrElse("id", List(s"? docPos=$idx")).head
+                  log.error(s"skipping document => file:[$fname]" +
+                            s" id:[$did] -${ex.toString()}")
                 }
+              }
             }
         }
       } catch {
