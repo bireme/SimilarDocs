@@ -21,8 +21,10 @@
 
 package org.bireme.sd
 
-import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.parsers.SAXParserFactory
 import org.xml.sax.{ErrorHandler,InputSource,SAXParseException}
+
+import scala.util.{Failure,Success,Try}
 
 class SimpleErrorHandler extends ErrorHandler {
   var errMsg = ""
@@ -46,16 +48,23 @@ class CheckXml {
   def check(xml: String): Option[String] = {
     require (xml != null)
 
-    val factory = DocumentBuilderFactory.newInstance()
-    factory.setValidating(false)
-    factory.setNamespaceAware(true)
+    Try {
+      val factory = SAXParserFactory.newInstance()
+      factory.setValidating(false)
+      factory.setNamespaceAware(true)
 
-    val handler = new SimpleErrorHandler()
-    val builder = factory.newDocumentBuilder()
-    builder.setErrorHandler(handler)
-    builder.parse(new InputSource(xml))
+      val parser = factory.newSAXParser()
+      val reader = parser.getXMLReader()
+      val handler = new SimpleErrorHandler()
 
-    handler.getErrMsg
+      reader.setErrorHandler(handler)
+      reader.parse(new InputSource(xml))
+
+      handler.getErrMsg
+    } match {
+      case Success(errMess) => errMess
+      case Failure(ex) => Some(ex.getMessage)
+    }
   }
 }
 
