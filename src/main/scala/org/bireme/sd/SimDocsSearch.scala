@@ -306,7 +306,11 @@ class SimDocsSearch(val sdIndexPath: String,
         val fields = doc._2.toList   // List[(String,List[String])]
         val jflds = fields.foldLeft[String]("") {
           case (str2, fld) => fld._2.foldLeft[String](str2) {       // fld = (String,List[String])
-            case (str3, content) => str3 + "<" + fld._1 + ">" + content + "</" + fld._1 + ">"
+            case (str3, content) =>
+              val content2 =
+                if (fld._1 equals "decs") content.replace("& ", "&amp; ")
+                else content
+              str3 + "<" + fld._1 + ">" + content2 + "</" + fld._1 + ">"
           }
         }
         str + "<document score=\"" + doc._1 + "\">" + jflds + "</document>"
