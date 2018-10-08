@@ -21,21 +21,21 @@
 
 package org.bireme.sd
 
-import org.apache.lucene.analysis.{TokenFilter,TokenStream}
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
+import org.apache.lucene.analysis.{TokenFilter, TokenStream}
 
-import scala.collection.mutable.Queue
+import scala.collection.mutable
 
-/** Lucene filter that split a token stream at write spaces.
+/** Lucene filter that split a token stream at white spaces.
   *
-  * @author: Heitor Barbieri
+  * author: Heitor Barbieri
   * date: 20170102
   *
   * @param input the input token stream
 */
 class WhitespaceFilter(input: TokenStream) extends TokenFilter(input) {
   private val termAtt = addAttribute(classOf[CharTermAttribute])
-  private val queue = new Queue[String]()
+  private val queue = new mutable.Queue[String]()
 
   /**
     * Cleans all internal buffers
@@ -48,10 +48,11 @@ class WhitespaceFilter(input: TokenStream) extends TokenFilter(input) {
   /**
     * Gets the next avalilable token
     *
-    * @retun true if there is a next token, false otherwise
+    * @return true if there is a next token, false otherwise
     */
   override def incrementToken(): Boolean = {
 //println(s"queue=$queue")
+    clearAttributes()
     if (queue.isEmpty)
       if (fillQueue()) setHeadToken()
       else false
@@ -83,7 +84,7 @@ class WhitespaceFilter(input: TokenStream) extends TokenFilter(input) {
         if (input.incrementToken()) {
           splitAndFill()
           fillQueue(size - 1)
-        } else !queue.isEmpty
+        } else queue.nonEmpty
       }
     }
 
@@ -97,7 +98,7 @@ class WhitespaceFilter(input: TokenStream) extends TokenFilter(input) {
     * @return true always
     */
   private def splitAndFill(): Boolean = {
-    queue ++= termAtt.toString().trim().split(" +")
+    queue ++= termAtt.toString.trim().split(" +")
     true
   }
 }

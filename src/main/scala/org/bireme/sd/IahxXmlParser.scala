@@ -22,22 +22,24 @@
 package org.bireme.sd
 
 import java.io.IOException
-import scala.collection.mutable.Map
+
+import scala.collection.mutable
 import scala.io.{BufferedSource, Source}
-import scala.util.{Try, Success, Failure}
+import scala.util.matching.Regex
+import scala.util.{Failure, Success, Try}
 
 /** Parses an Iahx XML file to convert it into a Lucene document
   *
-  * @author: Heitor Barbieri
+  * author: Heitor Barbieri
   * date: 20170110
   */
 object IahxXmlParser {
-  val field_regexp = """ *<field name="(.+?)">(.+?)</field> *""".r
+  val field_regexp: Regex = """ *<field name="(.+?)">(.+?)</field> *""".r
 
   def getElements(xmlFile: String,
                   encoding: String,
-                  fldNames: Set[String]): Stream[Map[String,List[String]]] = {
-    val map = Map.empty[String,List[String]]
+                  fldNames: Set[String]): Stream[mutable.Map[String,List[String]]] = {
+    val map = mutable.Map.empty[String,List[String]]
 
     val source = Source.fromFile(xmlFile, encoding)
     val lines = source.getLines()
@@ -59,10 +61,10 @@ object IahxXmlParser {
   }
 
   private def docsStream(fldNames: Set[String],
-                         auxMap: Map[String,List[String]],
+                         auxMap: mutable.Map[String,List[String]],
                          source: BufferedSource,
                          lines: Iterator[String]):
-                                            Stream[Map[String,List[String]]] = {
+                                            Stream[mutable.Map[String,List[String]]] = {
     getDoc(fldNames, auxMap, lines) match {
       case Some(doc) => doc #:: docsStream(fldNames, auxMap, source, lines)
       case None =>
@@ -72,9 +74,9 @@ object IahxXmlParser {
   }
 
   private def getDoc(fldNames: Set[String],
-                     auxMap: Map[String,List[String]],
+                     auxMap: mutable.Map[String,List[String]],
                      lines: Iterator[String]):
-                                            Option[Map[String,List[String]]] = {
+                                            Option[mutable.Map[String,List[String]]] = {
     auxMap.clear()
 
     if (gotoOpenDocTag(lines)) {
@@ -103,8 +105,8 @@ object IahxXmlParser {
   }
 
   private def getFields(fldNames: Set[String],
-                        auxMap: Map[String,List[String]],
-                        lines: Iterator[String]): Map[String,List[String]] = {
+                        auxMap: mutable.Map[String,List[String]],
+                        lines: Iterator[String]): mutable.Map[String,List[String]] = {
     getField(fldNames, lines) match {
       case Some((name,content)) =>
         val map = if (name == null) auxMap else {
@@ -122,7 +124,7 @@ object IahxXmlParser {
     getFieldString(lines) match {
       case Some((name, content)) =>
         if (fldNames.isEmpty) Some((name, content))
-        else fldNames.find(name.startsWith(_)) match {
+        else fldNames.find(name.startsWith) match {
           case Some(fname) => Some((fname, content)) // matches field name
           case None => Some((null, null))
         }

@@ -27,7 +27,7 @@ import org.apache.http.util.EntityUtils
 
 /** Application to set or reset the SDService maintenance mode flag
 *
-* @author: Heitor Barbieri
+* author: Heitor Barbieri
 * date: 20170323
 */
 object MaintenanceMode extends App {
@@ -50,7 +50,7 @@ object MaintenanceMode extends App {
   val url1 = args(0).trim
   val url2 = if (url1.endsWith("/")) url1.substring(0,url1.lastIndexOf('/'))
              else url1
-  val url = s"${url2}?maintenance=$mode"
+  val url = s"$url2?maintenance=$mode"
   val get = new HttpGet(url)
   get.setHeader("Content-type", "text/plain;charset=utf-8")
 
@@ -58,7 +58,7 @@ object MaintenanceMode extends App {
   val response = httpClient.execute(get)
   val statusCode = response.getStatusLine.getStatusCode
   if (statusCode == 200)
-    println(EntityUtils.toString(response.getEntity()))
+    println(EntityUtils.toString(response.getEntity))
   else throw new Exception(s"url=$url statusCode=$statusCode")
 
   httpClient.close()

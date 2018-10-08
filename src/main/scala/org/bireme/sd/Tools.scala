@@ -22,19 +22,18 @@
 package org.bireme.sd
 
 import java.io.File
-
 import java.text.Normalizer
 import java.text.Normalizer.Form
+import java.util
 
-import org.apache.lucene.index.DirectoryReader
-import org.apache.lucene.index.TermsEnum
+import org.apache.lucene.index.{DirectoryReader, LeafReaderContext, TermsEnum}
 import org.apache.lucene.store.FSDirectory
 
 import scala.collection.immutable.TreeSet
 
 /** Collection of helper functions
   *
-  * @author: Heitor Barbieri
+  * author: Heitor Barbieri
   * date: 20170102
   *
 */
@@ -82,11 +81,11 @@ object Tools {
     */
   def showTerms(indexName: String,
                 fieldName: String): Unit = {
-    val directory = FSDirectory.open(new File(indexName).toPath())
-    val ireader = DirectoryReader.open(directory);
-    val leaves = ireader.leaves()
+    val directory: FSDirectory = FSDirectory.open(new File(indexName).toPath)
+    val ireader: DirectoryReader = DirectoryReader.open(directory)
+    val leaves: util.List[LeafReaderContext] = ireader.leaves()
 
-    if (!leaves.isEmpty()) {
+    if (!leaves.isEmpty) {
       val terms = leaves.get(0).reader().terms(fieldName)
       if (terms != null) {
         getNextTerm(terms.iterator()).foreach(x => println(s"[$x]"))
@@ -118,7 +117,7 @@ object ToolsApp extends App {
     System.exit(1)
   }
 
-  if (args.length != 2) usage();
+  if (args.length != 2) usage()
 
   Tools.showTerms(args(0), args(1))
 }

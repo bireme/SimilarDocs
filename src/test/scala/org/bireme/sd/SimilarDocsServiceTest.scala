@@ -175,7 +175,7 @@ class SimilarDocsServiceTest extends FlatSpec {
   profiles.foreach {
     p =>
       val profName = p._1
-      val prof = "<name>$profName</name>\\s+<content>[^<]+</content>".r
+      val prof = s"<name>$profName</name>\\s+<content>[^<]+</content>".r
       val url = s"$service/SDService?psId=$id&deleteProfile=$profName"
 
       s"The user '$id'" should s"delete his profile [$profName]" in {

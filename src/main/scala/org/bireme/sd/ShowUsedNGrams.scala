@@ -60,7 +60,7 @@ object ShowUsedNGrams extends App {
            index: String,
            minSize: Int,
            maxSize: Int): Unit = {
-    val directory = FSDirectory.open(new File(index).toPath())
+    val directory = FSDirectory.open(new File(index).toPath)
     val reader = DirectoryReader.open(directory)
     val searcher = new IndexSearcher(reader)
     val analyzer = new NGramAnalyzer(minSize, maxSize)
@@ -149,7 +149,7 @@ object ShowUsedNGrams extends App {
                         cattr: CharTermAttribute,
                         auxMap: Map[String,Int]): Map[String,Int] = {
     if (tokenStream.incrementToken()) {
-      val tok = cattr.toString()
+      val tok = cattr.toString
       val occ = auxMap.getOrElse(tok, 0)
       getTokens(tokenStream, cattr, auxMap + ((tok,occ+1)))
     } else auxMap

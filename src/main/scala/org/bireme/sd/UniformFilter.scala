@@ -28,9 +28,9 @@ import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 
 /** Lucene filter that converts all letters into lower case,
   * converts graphical accents letters into normal ones a-z and
-  * replaces all caracters that are not a-z 0-9 '_' and '-' into spaces
+  * replaces all characters that are not a-z 0-9 '_' and '-' into spaces
   *
-  * @author: Heitor Barbieri
+  * author: Heitor Barbieri
   * date: 20170102
   *
   * @param input the input token stream
@@ -53,7 +53,8 @@ class UniformFilter(input: TokenStream) extends TokenFilter(input) {
     */
   override def incrementToken(): Boolean = {
     if (input.incrementToken()) {
-      val str = Tools.uniformString(termAtt.toString())
+      val str = Tools.uniformString(termAtt.toString)
+      clearAttributes()
       termAtt.setEmpty().append(str)
       true
     } else false

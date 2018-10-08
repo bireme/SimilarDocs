@@ -43,10 +43,10 @@ object SearchExplain extends App {
       "[<field>,<field>,...,<field>]")
     System.exit(1)
   }
-  if (args.size < 2) usage()
-  val fields = if (args.size > 2) args(2).trim.split(" *\\, *").toSet
+  if (args.length < 2) usage()
+  val fields = if (args.length > 2) args(2).trim.split(" *\\, *").toSet
                else Conf.idxFldNames
-  val dir = FSDirectory.open(new File(args(0)).toPath())
+  val dir = FSDirectory.open(new File(args(0)).toPath)
   val reader = DirectoryReader.open(dir)
   val searcher = new IndexSearcher(reader)
   val sentence = Tools.uniformString(args(1))
@@ -84,11 +84,11 @@ object SearchExplain extends App {
   }
 
   println("\nSentence Query:")
-  println(s"[OR]: ${getQuery(sentence, true)}")
-  println(s"\n[AND]: ${getQuery(sentence, true)}")
+  println(s"[OR]: ${getQuery(sentence, useOR = true)}")
+  println(s"\n[AND]: ${getQuery(sentence, useOR = true)}")
 
-  val OR = getSentenceTotalHits(sentence, true)
-  val AND = getSentenceTotalHits(sentence, false)
+  val OR = getSentenceTotalHits(sentence, useOR = true)
+  val AND = getSentenceTotalHits(sentence, useOR = false)
 
   println("\nSentence Hits:")
   println(s"[OR]: ${OR._1}")
@@ -109,8 +109,8 @@ object SearchExplain extends App {
     val lst = new java.util.ArrayList[String]()
 
     tokenStream.reset()
-    while (tokenStream.incrementToken()) lst.add(charTermAttribute.toString())
-    lst.asScala.toSeq
+    while (tokenStream.incrementToken()) lst.add(charTermAttribute.toString)
+    lst.asScala
   }
 
   private def getTotalHits(text: String): Int = {
@@ -146,7 +146,7 @@ object SearchExplain extends App {
         val id = searcher.doc(doc).get("id")
         val score = sc.score
 
-        seq :+ (doc, id, score)
+        seq :+ ((doc, id, score))
     }
     (totalHits, docs)
   }

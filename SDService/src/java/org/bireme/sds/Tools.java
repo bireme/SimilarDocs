@@ -5,7 +5,7 @@ import java.io.File;
 
 /**
  *
- * @author Heitor Barbieri
+ * author Heitor Barbieri
  * date: 20170113
  */
 public class Tools {

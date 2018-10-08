@@ -30,15 +30,15 @@ class SimpleErrorHandler extends ErrorHandler {
   var errMsg = ""
 
   def warning(e: SAXParseException): Unit = {
-    errMsg = e.getMessage()
+    errMsg = e.getMessage
   }
 
   def error(e: SAXParseException): Unit = {
-    errMsg = e.getMessage()
+    errMsg = e.getMessage
   }
 
   def fatalError(e: SAXParseException): Unit = {
-    errMsg = e.getMessage()
+    errMsg = e.getMessage
   }
 
   def getErrMsg: Option[String] = if (errMsg.isEmpty) None else Some(errMsg)
@@ -54,7 +54,7 @@ class CheckXml {
       factory.setNamespaceAware(true)
 
       val parser = factory.newSAXParser()
-      val reader = parser.getXMLReader()
+      val reader = parser.getXMLReader
       val handler = new SimpleErrorHandler()
 
       reader.setErrorHandler(handler)
@@ -74,7 +74,7 @@ object CheckXml extends App {
     System.exit(1)
   }
 
-  if (args.size != 1) usage
+  if (args.length != 1) usage()
 
   (new CheckXml).check(args(0)) match {
     case Some(msg) => println(s"[${args(0)}] ERROR: $msg")

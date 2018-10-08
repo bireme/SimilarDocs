@@ -54,10 +54,9 @@ object LuceneIndex extends App {
   if (args.length < 3) usage()
 
   val parameters = args.drop(3).foldLeft[Map[String,String]](Map()) {
-    case (map,par) => {
+    case (map,par) =>
       val split = par.split(" *= *", 2)
       map + ((split(0).substring(1), split(1)))
-    }
   }
 
   val indexPath = args(0)
@@ -65,8 +64,8 @@ object LuceneIndex extends App {
   val xmlDir = args(2)
   val xmlFileFilter = parameters.getOrElse("xmlFileFilter", ".+\\.xml")
   val sIdxFields = parameters.getOrElse("indexedFields", "")
-  val fldIdxNames = (if (sIdxFields.isEmpty) Set[String]()
-                    else sIdxFields.split(" *, *").toSet)
+  val fldIdxNames = if (sIdxFields.isEmpty) Set[String]()
+                    else sIdxFields.split(" *, *").toSet
   val sStrdFields = parameters.getOrElse("storedFields", "")
   val fldStoredNames = (if (sStrdFields.isEmpty) Set[String]()
                         else sStrdFields.split(" *, *").toSet) + "id"
@@ -80,12 +79,12 @@ object LuceneIndex extends App {
     */
   private def index(): Unit = {
     val matcher = Pattern.compile(xmlFileFilter).matcher("")
-    val decsMap = if (decsDir.isEmpty()) Map[Int,Set[String]]()
+    val decsMap = if (decsDir.isEmpty) Map[Int,Set[String]]()
                   else decx2Map()
 
     val analyzer = new NGramAnalyzer(NGSize.ngram_min_size,
                                      NGSize.ngram_max_size)
-    val directory = FSDirectory.open(new File(indexPath).toPath())
+    val directory = FSDirectory.open(new File(indexPath).toPath)
 
     val config = new IndexWriterConfig(analyzer)
     config.setOpenMode(IndexWriterConfig.OpenMode.CREATE)
@@ -96,12 +95,12 @@ object LuceneIndex extends App {
     OneWordDecs.createIndex(decsDir, decsIndexPath)
     
     // Creating similar docs index
-    (new File(xmlDir)).listFiles().sorted.foreach {
+    new File(xmlDir).listFiles().sorted.foreach {
       file =>
-        if (file.isFile()) {
-          matcher.reset(file.getName())
+        if (file.isFile) {
+          matcher.reset(file.getName)
           if (matcher.matches)
-            indexFile(writer, file.getPath(), decsMap)
+            indexFile(writer, file.getPath, decsMap)
         }
     }
 
@@ -120,27 +119,27 @@ object LuceneIndex extends App {
   private def decx2Map(): Map[Int,Set[String]] = {
     val mst = MasterFactory.getInstance(decsDir).open()
     val map = mst.iterator().asScala.foldLeft[Map[Int,Set[String]]](Map()) {
-      case (map,rec) =>
-        if (rec.isActive()) {
-          val mfn = rec.getMfn()
+      case (map2,rec) =>
+        if (rec.isActive) {
+          val mfn = rec.getMfn
 
           // English
           val lst_1 = rec.getFieldList(1).asScala
           val set_1 = lst_1.foldLeft[Set[String]](Set[String]()) {
-            case(set, fld) => set + fld.getContent()
+            case(set, fld) => set + fld.getContent
           }
           // Spanish
           val lst_2 = rec.getFieldList(2).asScala
           val set_2 = lst_2.foldLeft[Set[String]](set_1) {
-            case(set, fld) => set + fld.getContent()
+            case(set, fld) => set + fld.getContent
           }
           // Portuguese
           val lst_3 = rec.getFieldList(3).asScala
           val set_3 = lst_3.foldLeft[Set[String]](set_2) {
-            case(set, fld) => set + fld.getContent()
+            case(set, fld) => set + fld.getContent
           }
-          map + ((mfn, set_3))
-        } else map
+          map2 + ((mfn, set_3))
+        } else map2
     }
     mst.close()
 
@@ -182,7 +181,7 @@ object LuceneIndex extends App {
     map.foreach {
       case (tag,lst) =>
         // Add decs descriptors
-        if (!decsMap.isEmpty && (tag == "mj")) {
+        if (decsMap.nonEmpty && (tag == "mj")) {
           lst.foreach {
             fld => regexp.findFirstIn(fld).foreach {
               subd =>

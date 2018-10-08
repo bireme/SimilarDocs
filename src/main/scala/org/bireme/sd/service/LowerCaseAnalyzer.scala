@@ -39,6 +39,6 @@ class LowerCaseAnalyzer(uniformTokens: Boolean = true) extends Analyzer {
     val source = new KeywordTokenizer()
     val filter = if (uniformTokens) new UniformFilter(source)
                  else new LowerCaseFilter(source)
-    return new TokenStreamComponents(source, filter)
+    new TokenStreamComponents(source, filter)
   }
 }

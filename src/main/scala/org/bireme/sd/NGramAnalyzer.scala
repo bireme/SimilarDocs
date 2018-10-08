@@ -31,7 +31,7 @@ import org.apache.lucene.analysis.Analyzer.TokenStreamComponents
   * no standard chars (a-z 0-9), removes stopwords and then creates the
   * tokens with a constant size.
   *
-  * @author: Heitor Barbieri
+  * author: Heitor Barbieri
   * date: 20170102
   *
   * @param minSize the minimum size of the generated tokens
@@ -42,11 +42,11 @@ class NGramAnalyzer(minSize: Int,
   override def createComponents(fieldName: String): TokenStreamComponents = {
      val source = new WhitespaceTokenizer()
      val filter1 = new UniformFilter(source) //new ASCIIFoldingFilter(source)
-     val filter2 = new StopFilter(filter1, Stopwords.getStopwords())
+     val filter2 = new StopFilter(filter1, Stopwords.getStopwords)
      val filter3 = new WhitespaceFilter(filter2)
      val filter4 = new NGramFilter(filter3, minSize, maxSize)
 
-     return new TokenStreamComponents(source, filter4)
+     new TokenStreamComponents(source, filter4)
    }
 
    /* override def createComponents(fieldName: String): TokenStreamComponents = {

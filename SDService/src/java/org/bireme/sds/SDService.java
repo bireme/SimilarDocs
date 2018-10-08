@@ -164,7 +164,7 @@ public class SDService extends HttpServlet {
                         out.println("<ERROR>'lastDays' parameter should be > 0</ERROR>");
                         return;
                     }
-                    out.println(simSearch.search(adhocSimilarDocs, lastDays));
+                    out.println(simSearch.search(adhocSimilarDocs, fields.toSet(), lastDays));
                 }
                 return;          
             }
@@ -246,9 +246,9 @@ public class SDService extends HttpServlet {
         out.println("--- and one of the following options: ---");
         out.println("psId=&lt;id&gt;&amp;addProfile=&lt;id&gt;&amp;sentence=&lt;sentence&gt;");
         out.println("psId=&lt;id&gt;&amp;deleteProfile=&lt;id&gt;");
-        out.println("psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;&amp;outFields=&lt;field&gt;,...,&lt;field&gt;[&amp;lastDays=&lt;num&gt;]");
+        out.println("psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;&amp;[outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;lastDays=&lt;num&gt;]");
         out.println("psId=&lt;id&gt;&amp;showProfiles=true");
-        out.println("adhocSimDocs=&lt;sentence&gt;[&amp;lastDays=&lt;num&gt;]");
+        out.println("adhocSimDocs=&lt;sentence&gt;[outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;lastDays=&lt;num&gt;]");
         out.println("</SYNTAX>");
     }
 

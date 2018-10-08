@@ -27,14 +27,14 @@ import org.apache.lucene.analysis.CharArraySet
 /**
   * List of stopwords taken from page: http://www.ranks.nl/stopwords
   *
-  * @author: Heitor Barbieri
+  * author: Heitor Barbieri
   * date: 20170102
   **/
 object Stopwords {
-  def getStopwords(): CharArraySet =
+  def getStopwords: CharArraySet =
                            new CharArraySet(asJavaCollection[String](All), true)
 
-  val English = Set[String](
+  val English: Set[String] = Set[String](
 "a", "able", "about", "above", "abst", "accordance", "according", "accordingly",
 "across", "act", "actually", "added", "adj", "affected", "affecting", "affects",
 "after", "afterwards", "again", "against", "ah", "all", "almost", "alone", "along",
@@ -109,9 +109,9 @@ object Stopwords {
 "why", "widely", "willing", "wish", "with", "within", "without", "wont", "words",
 "world", "would", "wouldnt", "www", "x", "y", "yes", "yet", "you", "youd", "your",
 "youre", "yours", "yourself", "yourselves", "z", "zero"
-  ).map(Tools.uniformString(_))
+  ).map(Tools.uniformString)
 
-  val Spanish = Set[String](
+  val Spanish: Set[String] = Set[String](
     "algún", "alguna", "algunas", "alguno", "algunos", "ambos", "ampleamos", "ante",
     "antes", "aquel", "aquellas", "aquellos", "aqui", "arriba", "atras", "bajo",
     "bastante", "bien", "cada", "cierta", "ciertas", "cierto", "ciertos", "como",
@@ -134,9 +134,9 @@ object Stopwords {
     "un", "una", "unas", "uno", "unos", "usa", "usais", "usamos", "usan", "usar",
     "usas", "uso", "va", "vais", "valor", "vamos", "van", "vaya", "verdad",
     "verdadera", "verdadero", "vosotras", "vosotros", "voy", "yo"
-  ).map(Tools.uniformString(_))
+  ).map(Tools.uniformString)
 
-  val Portuguese = Set[String](
+  val Portuguese: Set[String] = Set[String](
     "acerca", "agora", "algumas", "alguns", "ali", "ambos", "antes", "apontar",
     "aquela", "aquelas", "aquele", "aqueles", "aqui", "atrás", "bem", "bom",
     "cada", "caminho", "cima", "com", "como", "comprido", "conhecido",
@@ -155,7 +155,7 @@ object Stopwords {
     "tente", "tentei", "teu", "teve", "tipo", "tive", "todos", "trabalhar",
     "trabalho", "tu", "último", "um", "uma", "umas", "uns", "usa", "usar",
     "valor", "veja", "ver", "verdade", "verdadeiro", "você"
-  ).map(Tools.uniformString(_))
+  ).map(Tools.uniformString)
 
-  val All = English ++ Spanish ++ Portuguese
+  val All: Set[String] = English ++ Spanish ++ Portuguese
 }

@@ -21,25 +21,25 @@
 
 package org.bireme.sd
 
-import org.apache.lucene.analysis.{TokenFilter,TokenStream}
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
+import org.apache.lucene.analysis.{TokenFilter, TokenStream}
 
-import scala.collection.mutable.Queue
+import scala.collection.mutable
 
 /** Lucene filter that broken token stream into ngrams.
   *
-  * @author: Heitor Barbieri
+  * author: Heitor Barbieri
   * date: 20170102
   *
   * @param input the input token stream
-  * @minSize the minimum ngram size
-  * @maxSize the maximum ngram size
+  * @param minSize the minimum ngram size
+  * @param maxSize the maximum ngram size
 */
 class NGramFilter(input: TokenStream,
                   minSize: Int,
                   maxSize: Int) extends TokenFilter(input) {
-  private val termAtt = addAttribute(classOf[CharTermAttribute])
-  private val queue = new Queue[String]()
+  private val termAtt: CharTermAttribute = addAttribute(classOf[CharTermAttribute])
+  private val queue: mutable.Queue[String] = new mutable.Queue[String]()
 
   /**
     * Cleans all internal buffers
@@ -52,7 +52,7 @@ class NGramFilter(input: TokenStream,
   /**
     * Gets the next avalilable token
     *
-    * @retun true if there is a next token, false otherwise
+    * @return true if there is a next token, false otherwise
     */
   override def incrementToken(): Boolean = {
     if (queue.isEmpty)
@@ -67,6 +67,7 @@ class NGramFilter(input: TokenStream,
     * @return true always
     */
   private def setHeadToken(): Boolean = {
+    clearAttributes()
     termAtt.setEmpty()
     termAtt.append(queue.dequeue())
     /*val str = queue.dequeue()
@@ -83,13 +84,10 @@ class NGramFilter(input: TokenStream,
     */
   private def fillQueue(): Boolean = {
     def fillQueue(qsize: Int): Boolean = {
-      if (qsize == 0) true
-      else {
-        if (input.incrementToken()) {
-          splitAndFill()
-          fillQueue(qsize - 1)
-        } else !queue.isEmpty
-      }
+      if ((qsize > 0) && (input.incrementToken())) {
+        splitAndFill()
+        fillQueue(qsize - 1)
+      } else queue.nonEmpty
     }
 
     fillQueue(1000)

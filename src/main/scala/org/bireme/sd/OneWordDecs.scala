@@ -22,13 +22,12 @@
 package org.bireme.sd
 
 import bruma.master._
-
 import java.io.File
 
 import org.apache.lucene.analysis.core.KeywordAnalyzer
-import org.apache.lucene.document.{Document,Field,StoredField,TextField}
-import org.apache.lucene.index.{DirectoryReader, IndexWriter,IndexWriterConfig, Term}
-import org.apache.lucene.search.{IndexSearcher,TermQuery}
+import org.apache.lucene.document.{Document, Field, StoredField, TextField}
+import org.apache.lucene.index.{DirectoryReader, IndexWriter, IndexWriterConfig, Term}
+import org.apache.lucene.search.{IndexSearcher, TermQuery, TopDocs}
 import org.apache.lucene.store.FSDirectory
 
 import scala.collection.JavaConverters._
@@ -40,7 +39,7 @@ object OneWordDecs {
     require(indexPath != null)
 
     val analyzer = new KeywordAnalyzer()
-    val directory = FSDirectory.open(new File(indexPath).toPath())
+    val directory = FSDirectory.open(new File(indexPath).toPath)
     val config = new IndexWriterConfig(analyzer)
     config.setOpenMode(IndexWriterConfig.OpenMode.CREATE)
     val indexWriter = new IndexWriter(directory, config)
@@ -55,7 +54,7 @@ object OneWordDecs {
   }
 
   private def createDoc(rec: Record): Seq[Document] = {
-    if (rec.isActive()) {
+    if (rec.isActive) {
       // Create a set with synonyms with only one word
       val sims = getFldSyns(rec, 50) ++ getFldSyns(rec, 23)
 
@@ -68,7 +67,7 @@ object OneWordDecs {
             val doc = new Document()
             doc.add(new TextField("descriptor",
               Tools.uniformString(fld.getContent.trim()), Field.Store.YES))
-            doc.add(new StoredField("id", rec.getMfn()))
+            doc.add(new StoredField("id", rec.getMfn))
             sims.foreach(syn => doc.add(new StoredField("synonym",
                                               Tools.uniformString(syn.trim()))))
             seq :+ doc
@@ -85,10 +84,10 @@ object OneWordDecs {
     val subIds = Set('i', 'e', 'p')
 
     rec.getFieldList(tag).asScala.foldLeft[Set[String]](Set()) {
-      case (set,fld) => fld.getSubfields().asScala.
-        filter(sub => subIds.contains(sub.getId())).foldLeft[Set[String]](set) {
+      case (set,fld) => fld.getSubfields.asScala.
+        filter(sub => subIds.contains(sub.getId)).foldLeft[Set[String]](set) {
           case (s,sub) =>
-            val split = sub.getContent().trim().split(" +", 2)
+            val split = sub.getContent.trim().split(" +", 2)
             if (split.size == 1) s + split.head else s
         }
     }
@@ -116,10 +115,10 @@ object OneWordDecs {
     if (inWords.isEmpty) Set()
     else if (endPos >= inWords.size) inWords.toSet
     else {
-      val descr = inWords.slice(beginPos, endPos + 1)
-      val descrStr = descr.mkString(" ")
-      val query = new TermQuery(new Term("descriptor", descrStr))
-      val topDocs = decsSearcher.search(query, 1)
+      val descr: Seq[String] = inWords.slice(beginPos, endPos + 1)
+      val descrStr: String = descr.mkString(" ")
+      val query: TermQuery = new TermQuery(new Term("descriptor", descrStr))
+      val topDocs: TopDocs = decsSearcher.search(query, 1)
 
       if (topDocs.totalHits > 0) {
         val doc = decsSearcher.doc(topDocs.scoreDocs(0).doc)
@@ -149,7 +148,7 @@ object OneWordDecsCreate extends App {
     System.exit(1)
   }
 
-  if (args.size != 2) usage()
+  if (args.length != 2) usage()
 
   OneWordDecs.createIndex(args(0), args(1))
 }
@@ -160,9 +159,9 @@ object OneWordDecsTest extends App {
     System.exit(1)
   }
 
-  if (args.size != 2) usage()
+  if (args.length != 2) usage()
 
-  val decsDirectory = FSDirectory.open(new File(args(0)).toPath())
+  val decsDirectory = FSDirectory.open(new File(args(0)).toPath)
   val decsReader = DirectoryReader.open(decsDirectory)
   val decsSearcher = new IndexSearcher(decsReader)
   val outSentence = OneWordDecs.addDecsSynonyms(args(1), decsSearcher)

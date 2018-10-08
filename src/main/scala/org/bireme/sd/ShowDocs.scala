@@ -28,7 +28,7 @@ import scala.collection.JavaConverters._
 
 /** Show a Lucene index document
   *
-  * @author: Heitor Barbieri
+  * author: Heitor Barbieri
   * date: 20170320
   *
 */
@@ -38,7 +38,7 @@ object ShowDocs extends App {
     System.exit(1)
   }
 
-  if (args.length < 1) usage();
+  if (args.length < 1) usage()
 
   val docNum = if (args.length == 1) "" else args(1)
   showDocument(args(0), docNum)
@@ -51,8 +51,8 @@ object ShowDocs extends App {
     */
   def showDocument(indexName: String,
                    docNum: String): Unit = {
-    val directory = FSDirectory.open(new File(indexName).toPath())
-    val ireader = DirectoryReader.open(directory);
+    val directory = FSDirectory.open(new File(indexName).toPath)
+    val ireader = DirectoryReader.open(directory)
 
     if (docNum.isEmpty) (0 until ireader.numDocs()).foreach(showDoc(ireader, _))
     else showDoc(ireader, docNum.toInt)
@@ -64,7 +64,7 @@ object ShowDocs extends App {
   /**
     * Shows a Lucene index document
     *
-    * @param indexName Lucene index path
+    * @param ireader Lucene index reader
     * @param docNum Lucene document number
     */
   private def showDoc(ireader: IndexReader,

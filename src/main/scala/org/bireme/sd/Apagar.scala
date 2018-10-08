@@ -15,7 +15,7 @@ object Apagar extends App {
   val analyzer0 = new NGramAnalyzer(NGSize.ngram_min_size,
                                    NGSize.ngram_max_size)
   //val analyzer = new WhitespaceAnalyzer()
-  val indexPath2 = new File(indexPath.trim).toPath()
+  val indexPath2 = new File(indexPath.trim).toPath
   val directory = FSDirectory.open(indexPath2)
   val config = new IndexWriterConfig(analyzer0)
   config.setOpenMode(IndexWriterConfig.OpenMode.CREATE)
@@ -23,7 +23,7 @@ object Apagar extends App {
 
   val src = Source.fromFile(filePath, "iso-8859-1")
   val str0 = src.getLines.mkString(" ")
-  println(s"len=${str0.size}")
+  println(s"len=${ str0.length}")
   val str = str0.substring(0, 12000)
   val str1 = "Ãbcdef gHijkLmnÓp qrstüvwxyz01234567890"
   val doc = new Document()

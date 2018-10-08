@@ -85,7 +85,7 @@ class MongoDbExport(host: String,
 
     docs.foreach {
       doc =>
-        val json = Json.parse(doc.toString())
+        val json = Json.parse(doc.toString)
         val jsonStr = if (prettyPrint) Json.prettyPrint(json)
                       else Json.stringify(json)
         if (first) first = false
@@ -102,16 +102,16 @@ class MongoDbExport(host: String,
     * @return the date of the initial instant of yesterday and the date of the
     *         initial instant of today
     */
-  private def getYesterdayDate(): (Date, Date) = {
-    val now = new GregorianCalendar(TimeZone.getDefault())
+  private def getYesterdayDate: (Date, Date) = {
+    val now = new GregorianCalendar(TimeZone.getDefault)
     val year = now.get(Calendar.YEAR)
     val month = now.get(Calendar.MONTH)
     val day = now.get(Calendar.DAY_OF_MONTH)
     val todayCal = new GregorianCalendar(year, month, day, 0, 0) // begin of today
-    val today = todayCal.getTime()                               // begin of today date
+    val today = todayCal.getTime                                 // begin of today date
     val yesterdayCal = todayCal.clone().asInstanceOf[GregorianCalendar]
     yesterdayCal.add(Calendar.DAY_OF_MONTH, -1)                  // begin of yesterday
-    val yesterday = yesterdayCal.getTime()                       // begin of yesterday date
+    val yesterday = yesterdayCal.getTime                         // begin of yesterday date
 
     (yesterday, today)
   }
@@ -132,14 +132,13 @@ object MongoDbExport extends App {
     System.exit(1)
   }
 
-  if (args.length < 3) usage();
+  if (args.length < 3) usage()
 
   val parameters = args.foldLeft[Map[String,String]](Map()) {
-    case (map,par) => {
+    case (map,par) =>
       val split = par.split(" *= *", 2)
       if (split.size == 1) map + ((split(0).substring(2), ""))
       else map + ((split(0).substring(1), split(1)))
-    }
   }
   val host = parameters("host")
   val dbase = parameters("dbase")
@@ -149,11 +148,11 @@ object MongoDbExport extends App {
   val exportAll = parameters.contains("exportAll")
   val prettyPrint = parameters.contains("prettyPrint")
   val mongoExp = new MongoDbExport(host, port)
-  val (yesterday, today) = mongoExp.getYesterdayDate()
+  val (yesterday, today) = mongoExp.getYesterdayDate
   val format = new SimpleDateFormat("yyyyMMdd")
   val outFileName = if (exportAll) s"begin_${format.format(today)}.json"
     else s"${format.format(yesterday)}.json"
-  val outFile = new File(outFileDir, outFileName).getPath()
+  val outFile = new File(outFileDir, outFileName).getPath
 
   if (exportAll)
     mongoExp.exportDocuments(dbase, coll, null, null, outFile, prettyPrint)

@@ -26,7 +26,7 @@ import org.bireme.sd.SimDocsSearch
 /**
   * Application to test the same services offered by the associated web services
   *
-  * @author: Heitor Barbieri
+  * author: Heitor Barbieri
   * date: 20170110
   */
 object TopIndexTestService extends App {
@@ -49,11 +49,10 @@ object TopIndexTestService extends App {
   if (args.length != 5) usage()
 
   val parameters = args.foldLeft[Map[String,String]](Map()) {
-    case (map,par) => {
+    case (map,par) =>
       val split = par.split(" *= *", 2)
       if (split.length == 2) map + ((split(0).substring(1), split(1)))
       else map + ((split(0).substring(2), ""))
-    }
   }
   val sdIndexPath = parameters("sdIndexPath")
   val topIndexPath = parameters("topIndexPath")
@@ -67,11 +66,10 @@ object TopIndexTestService extends App {
   val simDocs = new SimDocsSearch(sdIndexPath, decsIndexPath)
   val topIndex = new TopIndex(simDocs, topIndexPath, Conf.idxFldNames)
   addProfile match {
-    case Some(profile) => {
+    case Some(profile) =>
       val split = profile.trim().split(" *\\= *", 2)
       if (split.length != 2) usage()
       topIndex.addProfile(psId, split(0), split(1))
-    }
     case None => delProfile match {
       case Some(profId) => topIndex.deleteProfile(psId,profId)
       case None => getSimDocs match {

@@ -24,28 +24,28 @@ package org.bireme.sd
 import akka.actor.{Actor, ActorLogging, ActorSystem}
 import akka.actor.{PoisonPill, Props, Terminated}
 import akka.routing.{ActorRefRoutee, Broadcast, RoundRobinRoutingLogic, Router}
-
 import bruma.master._
-
 import java.io.File
-import java.util.regex.Pattern
-import java.util.{GregorianCalendar,TimeZone}
+import java.nio.file.Path
+import java.util
+import java.util.regex.{Matcher, Pattern}
+import java.util.{GregorianCalendar, TimeZone}
 
 import org.apache.lucene.analysis.Analyzer
 import org.apache.lucene.analysis.core.KeywordAnalyzer
 import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper
-import org.apache.lucene.document.{DateTools,Document,Field,StoredField,StringField,TextField}
-import org.apache.lucene.index.{DirectoryReader,IndexWriter,IndexWriterConfig,Term}
-import org.apache.lucene.search.{IndexSearcher,TermQuery,TotalHitCountCollector}
+import org.apache.lucene.document.{DateTools, Document, Field, StoredField, StringField, TextField}
+import org.apache.lucene.index.{DirectoryReader, IndexWriter, IndexWriterConfig, Term}
+import org.apache.lucene.search.{IndexSearcher, TermQuery, TotalHitCountCollector}
 import org.apache.lucene.store.FSDirectory
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.{Try, Success, Failure}
+import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
-//import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.matching.Regex
 
 case class Finishing()
 
@@ -60,33 +60,33 @@ class LuceneIndexMain(indexPath: String,
                       fullIndexing: Boolean) extends Actor with ActorLogging {
   val idxWorkers = 10 // Number of actors to run concurrently
 
-  val ngAnalyzer = new NGramAnalyzer(NGSize.ngram_min_size,
+  val ngAnalyzer: NGramAnalyzer = new NGramAnalyzer(NGSize.ngram_min_size,
                                      NGSize.ngram_max_size)
-  val analyzerPerField = Map[String,Analyzer](
+  val analyzerPerField: util.Map[String, Analyzer] = Map[String,Analyzer](
                                  "entranceDate" -> new KeywordAnalyzer()).asJava
-  val analyzer = new PerFieldAnalyzerWrapper(ngAnalyzer, analyzerPerField)
-  val indexPathTrim = indexPath.trim
-  val indexPath1 = if (indexPathTrim.endsWith("/"))
-                     indexPathTrim.substring(0, indexPathTrim.size - 1)
-                   else indexPathTrim
-  val indexPath2 = new File(indexPath1).toPath()
-  val directory = FSDirectory.open(indexPath2)
-  val config = new IndexWriterConfig(analyzer)
+  val analyzer: PerFieldAnalyzerWrapper = new PerFieldAnalyzerWrapper(ngAnalyzer, analyzerPerField)
+  val indexPathTrim: String = indexPath.trim
+  val indexPath1: String = if (indexPathTrim.endsWith("/"))
+                               indexPathTrim.substring(0, indexPathTrim.length - 1)
+                           else indexPathTrim
+  val indexPath2: Path = new File(indexPath1).toPath
+  val directory: FSDirectory = FSDirectory.open(indexPath2)
+  val config: IndexWriterConfig = new IndexWriterConfig(analyzer)
   if (fullIndexing) config.setOpenMode(IndexWriterConfig.OpenMode.CREATE)
   else config.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
-  val indexWriter = new IndexWriter(directory, config)
-  val isNewIndexPath = new File(indexPath1 + "_isNew").toPath()
-  val isNewDirectory = FSDirectory.open(isNewIndexPath)
-  val isNewConfig = new IndexWriterConfig(new KeywordAnalyzer)
+  val indexWriter: IndexWriter = new IndexWriter(directory, config)
+  val isNewIndexPath: Path = new File(indexPath1 + "_isNew").toPath
+  val isNewDirectory: FSDirectory = FSDirectory.open(isNewIndexPath)
+  val isNewConfig: IndexWriterConfig = new IndexWriterConfig(new KeywordAnalyzer)
   if (fullIndexing) isNewConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE)
   else isNewConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
-  val isNewIndexWriter = new IndexWriter(isNewDirectory, isNewConfig)
-  val now = new GregorianCalendar(TimeZone.getDefault())
-  val today = DateTools.dateToString(DateTools.round(now.getTime, DateTools.Resolution.DAY),
+  val isNewIndexWriter: IndexWriter = new IndexWriter(isNewDirectory, isNewConfig)
+  val now: GregorianCalendar = new GregorianCalendar(TimeZone.getDefault)
+  val today: String = DateTools.dateToString(DateTools.round(now.getTime, DateTools.Resolution.DAY),
                                                       DateTools.Resolution.DAY)
-  val decsMap = if (decsDir.isEmpty()) Map[Int,Set[String]]()
-                else decx2Map(decsDir)
-  val routerIdx = {
+  val decsMap: Map[Int, Set[String]] = if (decsDir.isEmpty) Map[Int,Set[String]]()
+                                       else decx2Map(decsDir)
+  val routerIdx: Router = {
     val routees = Vector.fill(idxWorkers) {
       val r = context.actorOf(Props(classOf[LuceneIndexActor], today, indexWriter,
                                     isNewIndexWriter, fldIdxNames + "entranceDate",
@@ -97,26 +97,21 @@ class LuceneIndexMain(indexPath: String,
     Router(RoundRobinRoutingLogic(), routees)
     //Router(SmallestMailboxRoutingLogic(), routees)
   }
-  val checkXml = new CheckXml()
-  val matcher = Pattern.compile(xmlFileFilter).matcher("")
-  var activeIdx  = idxWorkers
+  val matcher: Matcher = Pattern.compile(xmlFileFilter).matcher("")
+  var activeIdx: Int = idxWorkers
 
   // Create decs index
   log.info("Creating decs index")
   OneWordDecs.createIndex(decsDir, decsIndexPath)
 
   // Create similar docs index
-  (new File(xmlDir)).listFiles().sorted.foreach {
+  new File(xmlDir).listFiles().sorted.foreach {
     file =>
-      if (file.isFile()) {
-        val fname = file.getName()
+      if (file.isFile) {
+        val fname = file.getName
         matcher.reset(fname)
         if (matcher.matches) {
-          checkXml.check(file.getPath) match {
-            case Some(errMess) => log.error(s"skipping document => " +
-              s"file:[$fname] - ${errMess}")
-            case None => indexFile(file.getPath(), encoding)
-          }
+          indexFile(file.getPath, encoding)
         }
       }
   }
@@ -141,7 +136,7 @@ class LuceneIndexMain(indexPath: String,
     context.system.terminate()
   }
 
-  def receive = {
+  def receive: PartialFunction[Any, Unit] = {
     case Terminated(actor) =>
       log.debug(s"actor[${actor.path.name}] has terminated")
       activeIdx -= 1
@@ -165,27 +160,27 @@ class LuceneIndexMain(indexPath: String,
   private def decx2Map(decsDir: String): Map[Int,Set[String]] = {
     val mst = MasterFactory.getInstance(decsDir).open()
     val map = mst.iterator().asScala.foldLeft[Map[Int,Set[String]]](Map()) {
-      case (map,rec) =>
-        if (rec.isActive()) {
-          val mfn = rec.getMfn()
+      case (map2,rec) =>
+        if (rec.isActive) {
+          val mfn = rec.getMfn
 
           // English
           val lst_1 = rec.getFieldList(1).asScala
           val set_1 = lst_1.foldLeft[Set[String]](Set[String]()) {
-            case(set, fld) => set + fld.getContent()
+            case(set, fld) => set + fld.getContent
           }
           // Spanish
           val lst_2 = rec.getFieldList(2).asScala
           val set_2 = lst_2.foldLeft[Set[String]](set_1) {
-            case(set, fld) => set + fld.getContent()
+            case(set, fld) => set + fld.getContent
           }
           // Portuguese
           val lst_3 = rec.getFieldList(3).asScala
           val set_3 = lst_3.foldLeft[Set[String]](set_2) {
-            case(set, fld) => set + fld.getContent()
+            case(set, fld) => set + fld.getContent
           }
-          map + ((mfn, set_3))
-        } else map
+          map2 + ((mfn, set_3))
+        } else map2
     }
     mst.close()
 
@@ -199,42 +194,46 @@ class LuceneIndexActor(today: String,
                        fldIdxNames: Set[String],
                        fldStrdNames: Set[String],
                        decsMap: Map[Int,Set[String]]) extends Actor with ActorLogging {
-  val isNewIndexReader = DirectoryReader.open(isNewIndexWriter)
-  val isNewIndexSearcher = new IndexSearcher(isNewIndexReader)
-  val regexp = """\^d\d+""".r
-  val fldMap = fldIdxNames.foldLeft[Map[String,Float]](Map[String,Float]()) {
+  val isNewIndexReader: DirectoryReader = DirectoryReader.open(isNewIndexWriter)
+  val isNewIndexSearcher: IndexSearcher = new IndexSearcher(isNewIndexReader)
+  val regexp: Regex = """\^d\d+""".r
+  val checkXml: CheckXml = new CheckXml()
+  val fldMap: Map[String, Float] = fldIdxNames.foldLeft[Map[String,Float]](Map[String,Float]()) {
     case (map,fname) =>
       val split = fname.split(" *: *", 2)
       if (split.length == 1) map + ((split(0), 1f))
       else map + ((split(0), split(1).toFloat))
   }
 
-  def receive = {
-    case (fname:String, encoding:String) => {
+  def receive: PartialFunction[Any, Unit] = {
+    case (fname:String, encoding:String) =>
       log.debug(s"[${self.path.name}] received a requisition to index $fname")
       try {
-        IahxXmlParser.getElements(fname, encoding, Set()).zipWithIndex.
+        checkXml.check(fname) match {
+          case Some(errMess) => log.error("skipping document => " +
+            s"file:[$fname] - $errMess")
+          case None =>
+            IahxXmlParser.getElements(fname, encoding, Set()).zipWithIndex.
                                                                        foreach {
-          case (map,idx) =>
-            if (idx % 50000 == 0) log.info(s"[$fname] - $idx")
-            val smap = map.toMap
-            if (updIsNewDocument(smap)) {
-              val emap = smap + ("entranceDate" -> List(today))
-              Try(indexWriter.addDocument(map2doc(emap))) match {
-                case Success(_) => ()
-                case Failure(ex) => {
-                  val did = smap.getOrElse("id", List(s"? docPos=$idx")).head
-                  log.error(s"skipping document => file:[$fname]" +
-                            s" id:[$did] -${ex.toString()}")
+              case (map,idx) =>
+                if (idx % 50000 == 0) log.info(s"[$fname] - $idx")
+                val smap = map.toMap
+                if (updIsNewDocument(smap)) {
+                  val emap = smap + ("entranceDate" -> List(today))
+                  Try(indexWriter.addDocument(map2doc(emap))) match {
+                    case Success(_) => ()
+                    case Failure(ex) =>
+                      val did = smap.getOrElse("id", List(s"? docPos=$idx")).head
+                      log.error(s"skipping document => file:[$fname]" +
+                                s" id:[$did] -${ex.toString}")
+                  }
                 }
-              }
             }
         }
       } catch {
-        case ex: Throwable => log.error(s"skipping file: [$fname] -${ex.toString()}")
+        case ex: Throwable => log.error(s"skipping file: [$fname] -${ex.toString}")
       }
       log.debug(s"[${self.path.name}] finished my task")
-    }
     case _:Finishing => self ! PoisonPill
     case el => log.debug(s"LuceneIndexActor - recebi uma mensagem inesperada [$el]")
   }
@@ -249,7 +248,7 @@ class LuceneIndexActor(today: String,
     val collector = new TotalHitCountCollector()
 
     isNewIndexSearcher.search(new TermQuery(new Term("id",id)), collector)
-    if (collector.getTotalHits() == 0) {
+    if (collector.getTotalHits == 0) {
       val newDoc = new Document()
       newDoc.add(new StringField("id", id, Field.Store.YES))
       isNewIndexWriter.addDocument(newDoc)
@@ -261,16 +260,17 @@ class LuceneIndexActor(today: String,
     * Converts a document from a map of fields into a lucene document
     *
     * @param map a document of (field name -> all occurrences of the field)
-    * @param doc a work Document object
     * @return a lucene document
     */
   private def map2doc(map: Map[String,List[String]]): Document = {
     val doc = new Document()
 
     map.foreach {
-      case (tag,lst) =>
+      case (xtag,lst) =>
+        val tag: String = xtag.toLowerCase
+
         // Add decs descriptors
-        if (!decsMap.isEmpty && (tag == "mj")) {
+        if (decsMap.nonEmpty && (tag == "mj")) {
           lst.foreach {
             fld => regexp.findFirstIn(fld).foreach {
               subd =>
@@ -287,7 +287,7 @@ class LuceneIndexActor(today: String,
         if (fldIdxNames.contains(tag) || "entranceDate".equals(tag)) {  // Add indexed fields
           lst.foreach {
             elem =>
-              if (elem.size < 10000)  // Bug during indexing. Fix in future. Sorry!
+              if (elem.length < 10000)  // Bug during indexing. Fix in future. Sorry!
                 doc.add(new TextField(tag, elem, Field.Store.YES))
               else
                 doc.add(new TextField(tag, elem.substring(0,10000), Field.Store.YES))
@@ -330,11 +330,10 @@ object LuceneIndexAkka extends App {
   if (args.length < 3) usage()
 
   val parameters = args.drop(3).foldLeft[Map[String,String]](Map()) {
-    case (map,par) => {
+    case (map,par) =>
       val split = par.split(" *= *", 2)
       if (split.length == 1) map + ((split(0).substring(2), ""))
       else map + ((split(0).substring(1), split(1)))
-    }
   }
 
   val indexPath = args(0)
@@ -342,11 +341,11 @@ object LuceneIndexAkka extends App {
   val xmlDir = args(2)
   val xmlFileFilter = parameters.getOrElse("xmlFileFilter", ".+\\.xml")
   val sIdxFields = parameters.getOrElse("indexedFields", "")
-  val fldIdxNames = (if (sIdxFields.isEmpty) Set[String]()
-                     else sIdxFields.split(" *, *").toSet)
+  val fldIdxNames = if (sIdxFields.isEmpty) Set[String]()
+                     else sIdxFields.split(" *, *").toSet
   val sStrdFields = parameters.getOrElse("storedFields", "")
-  val fldStrdNames = (if (sStrdFields.isEmpty) Set[String]()
-                      else sStrdFields.split(" *, *").toSet)
+  val fldStrdNames = if (sStrdFields.isEmpty) Set[String]()
+                      else sStrdFields.split(" *, *").toSet
 
   val decsDir = parameters.getOrElse("decs", "")
   val encoding = parameters.getOrElse("encoding", "ISO-8859-1")
@@ -370,13 +369,12 @@ object LuceneIndexAkka extends App {
     //  case Failure(ex) => system.terminate(); throw ex
     //}
   } catch {
-    case NonFatal(e) ⇒ {
+    case NonFatal(e) =>
       println("---------------------------------------------------------------")
       println(s"Application Error: ${e.toString}")
       println("---------------------------------------------------------------")
       e.printStackTrace()
       system.terminate(); throw e
-    }
   }
 
   Await.result(system.whenTerminated, 6 hours)

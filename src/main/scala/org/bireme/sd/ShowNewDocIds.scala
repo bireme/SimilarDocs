@@ -33,7 +33,7 @@ import scala.collection.JavaConverters._
 
 /** Show a Lucene index document
   *
-  * @author: Heitor Barbieri
+  * author: Heitor Barbieri
   * date: 20171101
   *
 */
@@ -43,7 +43,7 @@ object ShowNewDocIds extends App {
     System.exit(1)
   }
 
-  if (args.length < 2) usage();
+  if (args.length < 2) usage()
 
   val maxDocs = if (args.length == 2) 1000 else args(2).toInt
   getNewDocsIds(args(0), args(1).toInt, maxDocs).
@@ -64,26 +64,26 @@ object ShowNewDocIds extends App {
     require (days > 0)
     require (maxDocs > 0)
 
-    val directory = FSDirectory.open(new File(indexName).toPath())
-    val reader = DirectoryReader.open(directory);
+    val directory = FSDirectory.open(new File(indexName).toPath)
+    val reader = DirectoryReader.open(directory)
     val searcher = new IndexSearcher(reader)
 
-    val nowCal = new GregorianCalendar(TimeZone.getDefault())
+    val nowCal = new GregorianCalendar(TimeZone.getDefault)
     val today = DateTools.dateToString(DateTools.round(
       nowCal.getTime, DateTools.Resolution.DAY), DateTools.Resolution.DAY)
     val daysAgoCal = nowCal.clone().asInstanceOf[GregorianCalendar]
     daysAgoCal.add(Calendar.DAY_OF_MONTH, -days)  // begin of x days ago
-    val daysAgo = DateTools.dateToString(daysAgoCal.getTime(),
+    val daysAgo = DateTools.dateToString(daysAgoCal.getTime,
                                          DateTools.Resolution.DAY)
     val query = TermRangeQuery.newStringRange("entranceDate", daysAgo,
                                               today, true, true)
     val ids = searcher.search(query, maxDocs).scoreDocs.
                                          foldLeft[Seq[(String,String)]](Seq()) {
       case (seq,sd) =>
-        val doc = reader.document(sd.doc, Set("id","entranceDate").asJava)
+        val doc = reader.document(sd.doc, Set("id", "entranceDate").asJava)
         val id = doc.get("id")
         val entranceDate = doc.get("entranceDate")
-        if (id == null) seq else seq :+ (id,entranceDate)
+        if (id == null) seq else seq :+ ((id, entranceDate))
     }
     reader.close()
     directory.close()

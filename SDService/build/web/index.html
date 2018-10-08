@@ -50,12 +50,12 @@ in a database, for example, LILACS+MEDLINE.</div>
         <h3>Get similar documents</h3>
         <div>Retrieve documents having most of words stored in a set of profiles</div>
         <br/>
-        <div>Syntax: <b>SDService?psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;&amp;outFields=&lt;field&gt;,...,&lt;field&gt;[&amp;lastDays=&lt;val&gt;]</b></div>
+        <div>Syntax: <b>SDService?psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;lastDays=&lt;number_of_days&gt;]</b></div>
         <br/>
         <div><b>psId:</b> personal service record identifier</div>
-        <div><b>profile:</b> profile identifier</div>
-        <div><b>field:</b> tag of similar doc field to be outputed. If no fields were specified all fields will be outputed</div>
-        <div><b>lastDays:</b> if present, shows only documents that are younger than 'val' days. Optional parameter.</div>
+        <div><b>getSimDocs:</b> set of profile identifiers</div>
+        <div><b>outFields:</b> tags of similar doc field to be outputed. If no fields were specified all fields will be outputed. Optional parameter.</div>
+        <div><b>lastDays:</b> if present, shows only documents that are younger than 'number_of_days' days. Optional parameter.</div>
         <br/>
         <div>Example: SDService?psId=Joao Doria&amp;getSimDocs=books,cars,hobbies&amp;outFields=id,date,name</div>
         <br/>
@@ -67,10 +67,11 @@ in a database, for example, LILACS+MEDLINE.</div>
         <h3>Adhoc similar documents</h3>
         <div>Retrieve documents having most of words present in an input string</div>
         <br/>
-        <div>Syntax: <b>SDService?adhocSimilarDocs=&lt;text&gt;[&amp;lastDays=&lt;val&gt;]</b></div>
+        <div>Syntax: <b>SDService?adhocSimilarDocs=&lt;text&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;lastDays=&lt;number_of_days&gt;]</b></div>
         <br/>
-        <div><b>text:</b> words to be used to look for similar documents</div>
-        <div><b>lastDays:</b> if present, shows only documents that are younger than 'val' days. Optional parameter.</div>
+        <div><b>adhocSimilarDocs:</b> words to be used to look for similar documents</div>
+        <div><b>outFields:</b> tags of similar doc field to be outputed. If no fields were specified all fields will be outputed. Optional parameter.</div>
+        <div><b>lastDays:</b> if present, shows only documents that are younger than 'number_of_days' days. Optional parameter.</div>
         <br/>
         <div>Example: SDService?adhocSimilarDocs=books,cars,hobbies</div>
         <br/>
