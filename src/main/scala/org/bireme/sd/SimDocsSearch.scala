@@ -31,6 +31,7 @@ import org.apache.lucene.index.{DirectoryReader, IndexableField}
 import org.apache.lucene.queryparser.classic.{MultiFieldQueryParser, QueryParser}
 import org.apache.lucene.search._
 import org.apache.lucene.store.FSDirectory
+import org.bireme.sd.service.Conf
 
 import scala.collection.JavaConverters._
 import scala.collection.SortedMap
@@ -113,8 +114,11 @@ class SimDocsSearch(val sdIndexPath: String,
     require(maxDocs > 0)
     require(minSim > 0)
 
+    val oFields = if ((outFields == null) || outFields.isEmpty) Conf.idxFldNames
+               else outFields
+
     searchIds(text, fields, maxDocs, minSim, lastDays).map {
-      case (id,score) => (score,loadDoc(id, outFields))
+      case (id,score) => (score,loadDoc(id, oFields))
     }
   }
 

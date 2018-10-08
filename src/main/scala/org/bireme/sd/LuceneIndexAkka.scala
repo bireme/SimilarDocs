@@ -38,6 +38,7 @@ import org.apache.lucene.document.{DateTools, Document, Field, StoredField, Stri
 import org.apache.lucene.index.{DirectoryReader, IndexWriter, IndexWriterConfig, Term}
 import org.apache.lucene.search.{IndexSearcher, TermQuery, TotalHitCountCollector}
 import org.apache.lucene.store.FSDirectory
+import org.bireme.sd.service.Conf
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Await
@@ -198,7 +199,9 @@ class LuceneIndexActor(today: String,
   val isNewIndexSearcher: IndexSearcher = new IndexSearcher(isNewIndexReader)
   val regexp: Regex = """\^d\d+""".r
   val checkXml: CheckXml = new CheckXml()
-  val fldMap: Map[String, Float] = fldIdxNames.foldLeft[Map[String,Float]](Map[String,Float]()) {
+  val fieldsIndexNames = if ((fldIdxNames == null) || (fldIdxNames.isEmpty)) Conf.idxFldNames
+                         else fldIdxNames
+  val fldMap: Map[String, Float] = fieldsIndexNames.foldLeft[Map[String,Float]](Map[String,Float]()) {
     case (map,fname) =>
       val split = fname.split(" *: *", 2)
       if (split.length == 1) map + ((split(0), 1f))
