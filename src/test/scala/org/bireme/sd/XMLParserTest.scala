@@ -12,16 +12,15 @@ object XMLParserTest extends App {
   if (args.length < 1) usage()
 
   val parameters = args.foldLeft[Map[String,String]](Map()) {
-    case (map,par) => {
+    case (map,par) =>
       val split = par.split(" *= *", 2)
       map + ((split(0).substring(1), split(1)))
-    }
   }
 
   val files = if (parameters.contains("file")) Set(parameters("file")) else {
-    (new File(parameters("dir"))).listFiles().foldLeft[Set[String]] (Set()) {
+    new File(parameters("dir")).listFiles().foldLeft[Set[String]] (Set()) {
       case (set,file) =>
-        val xmlFile = file.getPath()
+        val xmlFile = file.getPath
         if (xmlFile.toLowerCase().endsWith(".xml")) set + xmlFile
         else set
     }

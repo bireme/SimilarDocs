@@ -28,7 +28,8 @@ package org.bireme.sd.service
 /** Service that updates all outdated similar document ids (TopIndex)
 *
 * @param topDocs TopIndex Lucene object
-* @author: Heitor Barbieri
+*
+* author: Heitor Barbieri
 * date: 20170524
 */
 class UpdaterService(topDocs: TopIndex) {

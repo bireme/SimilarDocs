@@ -2,13 +2,12 @@ package org.bireme.sd
 
 import java.io.File
 
-import org.apache.lucene.index.{DirectoryReader,IndexReader,Term}
-import org.apache.lucene.search.IndexSearcher
+import org.apache.lucene.index.{DirectoryReader, IndexReader, Term}
+import org.apache.lucene.search.{IndexSearcher, TermQuery, TopDocs}
 import org.apache.lucene.store.FSDirectory
-import org.apache.lucene.search.TermQuery
 
 import scala.collection.JavaConverters._
-import scala.util.{Try, Success, Failure}
+import scala.util.{Failure, Success, Try}
 
 object IndexTest extends App {
   private def usage(): Unit = {
@@ -19,16 +18,16 @@ object IndexTest extends App {
     System.exit(0)
   }
 
-  val size = args.size
+  val size = args.length
   if (size < 1) usage()
 
   val field = if (size > 1) args(1) else "ab"
   val term = if (size > 2) args(2) else "dengue"
 
   val hits = Try[Int] {
-    val directory = FSDirectory.open(new File(args(0)).toPath())
-    val ireader = DirectoryReader.open(directory);
-    val hitNum = checkDocs(new Term(field,term), ireader)
+    val directory: FSDirectory = FSDirectory.open(new File(args(0)).toPath)
+    val ireader: DirectoryReader = DirectoryReader.open(directory)
+    val hitNum: Int = checkDocs(new Term(field,term), ireader)
 
     ireader.close()
     directory.close()
@@ -53,8 +52,8 @@ object IndexTest extends App {
 
     val query = new TermQuery(term)
     val isearcher = new IndexSearcher(ireader)
-    val topDocs = isearcher.search(query, 1000)
-    val totalHits = topDocs.totalHits
+    val topDocs: TopDocs = isearcher.search(query, 1000)
+    val totalHits: Long = topDocs.totalHits
 
     if (totalHits <= 0) throw new Exception("totalHits <= 0")
 

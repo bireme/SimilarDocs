@@ -199,7 +199,7 @@ class LuceneIndexActor(today: String,
   val isNewIndexSearcher: IndexSearcher = new IndexSearcher(isNewIndexReader)
   val regexp: Regex = """\^d\d+""".r
   val checkXml: CheckXml = new CheckXml()
-  val fieldsIndexNames = if ((fldIdxNames == null) || (fldIdxNames.isEmpty)) Conf.idxFldNames
+  val fieldsIndexNames: Set[String] = if ((fldIdxNames == null) || fldIdxNames.isEmpty) Conf.idxFldNames
                          else fldIdxNames
   val fldMap: Map[String, Float] = fieldsIndexNames.foldLeft[Map[String,Float]](Map[String,Float]()) {
     case (map,fname) =>

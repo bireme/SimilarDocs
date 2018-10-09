@@ -84,7 +84,7 @@ class NGramFilter(input: TokenStream,
     */
   private def fillQueue(): Boolean = {
     def fillQueue(qsize: Int): Boolean = {
-      if ((qsize > 0) && (input.incrementToken())) {
+      if ((qsize > 0) && input.incrementToken()) {
         splitAndFill()
         fillQueue(qsize - 1)
       } else queue.nonEmpty

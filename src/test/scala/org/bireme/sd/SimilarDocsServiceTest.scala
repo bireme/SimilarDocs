@@ -21,16 +21,19 @@
 
 package org.bireme.sd
 
-import java.net.{URL,URI}
+import java.net.{URI, URL}
+
 import org.scalatest._
 import org.scalatest.concurrent.Timeouts._
 import org.scalatest.Matchers._
 import org.scalatest.time.SpanSugar._
+
 import scala.io._
+import scala.util.matching.Regex
 
 /** Application which uses ScalaTest to check each function from Similar Documents Service
 *
-* @author: Heitor Barbieri
+* author: Heitor Barbieri
 * date: 20170717
 */
 class SimilarDocsServiceTest extends FlatSpec {
@@ -44,13 +47,13 @@ class SimilarDocsServiceTest extends FlatSpec {
   private def pageContent(url:String): String = {
     require(url != null)
 
-    val url2= new URL(url);
-    val uri = new URI(url2.getProtocol(), url2.getUserInfo(), url2.getHost(),
-                     url2.getPort(), url2.getPath(), url2.getQuery(), url2.getRef())
-    val urlStr = uri.toASCIIString()
+    val url2 = new URL(url)
+    val uri = new URI(url2.getProtocol, url2.getUserInfo, url2.getHost,
+                     url2.getPort, url2.getPath, url2.getQuery, url2.getRef)
+    val urlStr = uri.toASCIIString
 
     var content = ""
-    failAfter(60 seconds) {
+    failAfter(60.seconds) {
       val source = Source.fromURL(urlStr, "utf-8")
       content = source.getLines().mkString("\n")
       source.close()
@@ -74,7 +77,7 @@ class SimilarDocsServiceTest extends FlatSpec {
     val word2 = word.trim
 
     split.foldLeft[Int](0) {
-      case(tot,w) => if (word2.equals(w)) tot + 1 else tot
+      case(tot1,w) => if (word2.equals(w)) tot1 + 1 else tot1
     }
   }
 
@@ -98,7 +101,7 @@ class SimilarDocsServiceTest extends FlatSpec {
       " mortalidade infantil, que consiste na mortalidade infantil" +
       " observada durante um ano, referida ao número de nascidos" +
       " vivos do mesmo período."))
-  val regex = "<(ab|ti)(_[^>]+)?([^<]+)</$1>".r
+  val regex: Regex = "<(ab|ti)(_[^>]+)?([^<]+)</$1>".r
 
   // === Check if the server is accessible ===
   "The Similar Documents Service page" should "be on" in {
@@ -143,7 +146,7 @@ class SimilarDocsServiceTest extends FlatSpec {
   }
 
   // === Check the "Get Similar Documents" service (number of retrieved docs) ===
-  val doc = "<document>".r
+  val doc: Regex = "<document>".r
   profiles.foreach {
     p =>
       val url = s"$service/SDService?psId=$id&getSimDocs=${p._1}"
@@ -155,7 +158,7 @@ class SimilarDocsServiceTest extends FlatSpec {
   }
 
   // === Check the "Get Similar Documents" service (quality of retrieved docs) ===
-  val tot = profiles.foldLeft[Int](0) {
+  val tot: Int = profiles.foldLeft[Int](0) {
     case (i,p) =>
       val url = s"$service/SDService?psId=$id&getSimDocs=${p._1}"
       val content = pageContent(url).toLowerCase()
