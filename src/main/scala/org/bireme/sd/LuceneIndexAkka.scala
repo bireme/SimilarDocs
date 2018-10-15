@@ -344,7 +344,7 @@ object LuceneIndexAkka extends App {
   val xmlDir = args(2)
   val xmlFileFilter = parameters.getOrElse("xmlFileFilter", ".+\\.xml")
   val sIdxFields = parameters.getOrElse("indexedFields", "")
-  val fldIdxNames = if (sIdxFields.isEmpty) Set[String]()
+  val fldIdxNames = if (sIdxFields.isEmpty) Conf.idxFldNames
                      else sIdxFields.split(" *, *").toSet
   val sStrdFields = parameters.getOrElse("storedFields", "")
   val fldStrdNames = if (sStrdFields.isEmpty) Set[String]()
