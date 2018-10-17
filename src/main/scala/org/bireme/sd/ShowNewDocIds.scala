@@ -47,7 +47,7 @@ object ShowNewDocIds extends App {
 
   val maxDocs = if (args.length == 2) 1000 else args(2).toInt
   getNewDocsIds(args(0), args(1).toInt, maxDocs).
-    foreach(x => println(s"id:${x._1} entranceDate=${x._2}"))
+    foreach(x => println(s"id:${x._1} entrance_date=${x._2}"))
 
   /**
     * Shows the ids of Lucene index documents that are younger or equals to 'days'
@@ -55,7 +55,7 @@ object ShowNewDocIds extends App {
     * @param indexName Lucene index path
     * @param days number of days from now used to filter the retrieved ids
     * @param maxDocs maximum number of document ids to be returned
-    * @return a list of document (identifier,entranceDate)
+    * @return a list of document (identifier,entrance_date)
     */
   def getNewDocsIds(indexName: String,
                     days: Int,
@@ -75,15 +75,15 @@ object ShowNewDocIds extends App {
     daysAgoCal.add(Calendar.DAY_OF_MONTH, -days)  // begin of x days ago
     val daysAgo = DateTools.dateToString(daysAgoCal.getTime,
                                          DateTools.Resolution.DAY)
-    val query = TermRangeQuery.newStringRange("entranceDate", daysAgo,
+    val query = TermRangeQuery.newStringRange("entrance_date", daysAgo,
                                               today, true, true)
     val ids = searcher.search(query, maxDocs).scoreDocs.
                                          foldLeft[Seq[(String,String)]](Seq()) {
       case (seq,sd) =>
-        val doc = reader.document(sd.doc, Set("id", "entranceDate").asJava)
+        val doc = reader.document(sd.doc, Set("id", "entrance_date").asJava)
         val id = doc.get("id")
-        val entranceDate = doc.get("entranceDate")
-        if (id == null) seq else seq :+ ((id, entranceDate))
+        val entrance_date = doc.get("entrance_date")
+        if (id == null) seq else seq :+ ((id, entrance_date))
     }
     reader.close()
     directory.close()

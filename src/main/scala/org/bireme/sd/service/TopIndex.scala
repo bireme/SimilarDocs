@@ -251,7 +251,7 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param profiles name of profiles used to find similar documents
     * @param outFields fields of similar documents to be retrieved
     * @param maxDocs the maximun number of similar documents to be retrieved
-    * @param lastDays filter documents whose 'entranceDate' is yonger or equal to x days
+    * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
     * @return an XML document with each desired field and its respective
     *         occurrences, given that fields can have more than one occurrences
     */
@@ -274,7 +274,7 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param profiles name of profiles used to find similar documents
     * @param outFields fields of similar documents to be retrieved
     * @param maxDocs the maximun number of similar documents to be retrieved
-    * @param lastDays filter documents whose 'entranceDate' is yonger or equal to x days
+    * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
     * @return an XML document with each desired field and its respective
     *         occurrences, given that fields can have more than one occurrences
     */
@@ -318,7 +318,7 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param names name of profiles used to find similar documents
     * @param outFlds fields of similar documents to be retrieved
     * @param maxDocs the maximun number of similar documents to be retrieved
-    * @param lastDays filter documents whose 'entranceDate' is yonger or equal to x days
+    * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
     * @return a list of similar documents, where each similar document is a
     *         a collection of field names and its contents. Each fields can
     *         have more than one occurrence
@@ -376,7 +376,7 @@ class TopIndex(simSearch: SimDocsSearch,
     *
     * @param docs list of ids for each profile
     * @param maxDocs the maximum number of ids to be returned
-    * @param lastDays filter documents whose 'entranceDate' is yonger or equal to x days
+    * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
     * @param ids auxiliary id list
     * @return a list of similiar document ids
     */
@@ -420,7 +420,7 @@ class TopIndex(simSearch: SimDocsSearch,
   }
 
   /**
-    * Check if a document is new or not according to its 'entranceDate' flag
+    * Check if a document is new or not according to its 'entrance_date' flag
     *
     * @param id document identifier (personal service document identifier)
     * @param searcher Lucene IndexSearcher object. See Lucene documentation
@@ -443,7 +443,9 @@ class TopIndex(simSearch: SimDocsSearch,
     daysAgoCal.add(Calendar.DAY_OF_MONTH, -days)                // begin of x days ago
     val daysAgo = DateTools.dateToString(daysAgoCal.getTime,
                                          DateTools.Resolution.SECOND)
-    searcher.doc(id).get("entranceDate").compareTo(daysAgo) >= 0
+    val field: String = searcher.doc(id).get("entrance_date")
+
+    (field == null) || (field.compareTo(daysAgo) >= 0)
   }
 
   /**
@@ -468,7 +470,7 @@ class TopIndex(simSearch: SimDocsSearch,
       doc.getFields().asScala.foldLeft[Map[String,List[String]]] (Map()) {
         case  (map, field) =>
           val name = field.name()
-          if ("entranceDate".equals(name)) map
+          if ("entrance_date".equals(name)) map
           else {
             val lst = map.getOrElse(name,List[String]())
             map + ((name, field.stringValue() :: lst))

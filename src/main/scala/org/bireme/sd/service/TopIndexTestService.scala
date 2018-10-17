@@ -35,7 +35,7 @@ object TopIndexTestService extends App {
       "\n\t-sdIndexPath=<path>         : documents Lucene index path" +
       "\n\t-topIndexPath=<path>        : top Lucene index path" +
       "\n\t-decsIndexPath=<path>       : decs Lucene index path" +
-      "\n\t-psId=<id>                  : personal service identification" +
+      "\n\t-psId=<id>                  : personal service identification (user)" +
       "\n\t\n--- and one of the following options: ---\n" +
       "\n\t-addProfile=<name>=<sentence> : add user profile" +
       "\n\t-deleteProfile=<name>         : delete user profile" +

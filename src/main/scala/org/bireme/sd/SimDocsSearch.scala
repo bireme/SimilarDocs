@@ -72,7 +72,7 @@ class SimDocsSearch(val sdIndexPath: String,
     *
     * @param text the text to be searched
     * @param outFields name of the fields that will be show in the output
-    * @param lastDays filter documents whose 'entranceDate' is yonger or equal to x days
+    * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
     * @return a json string of the similar documents
     */
   def search(text: String,
@@ -99,7 +99,7 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param maxDocs maximum number of returned documents
     * @param minSim minimum similarity between the input text and the retrieved
     *               field text
-    * @param lastDays filter documents whose 'entranceDate' is younger or equal to x days
+    * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
     * @return a list of pairs with document score and a map of field name and a
     *         list of its contents
     */
@@ -114,7 +114,7 @@ class SimDocsSearch(val sdIndexPath: String,
     require(maxDocs > 0)
     require(minSim > 0)
 
-    val oFields = if ((outFields == null) || outFields.isEmpty) Conf.idxFldNames
+    val oFields = if ((outFields == null) || outFields.isEmpty) Conf.idxFldNames + "id"
                else outFields
 
     searchIds(text, fields, maxDocs, minSim, lastDays).map {
@@ -130,7 +130,7 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param maxDocs maximum number of returned documents
     * @param minSim minimum similarity between the input text and the retrieved
     *               field text
-    * @param lastDays filter documents whose 'entranceDate' is younger or equal to x days
+    * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
     * @return a list of pairs with document id and document score
     */
   def searchIds(text: String,
@@ -188,7 +188,7 @@ class SimDocsSearch(val sdIndexPath: String,
     *
     * @param text the text to be searched
     * @param fields document fields into where the text will be searched
-    * @param lastDays filter documents whose 'entranceDate' is younger or equal to x days
+    * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
     * @param useOROperator if true the OR operator will be used, if false the AND operator will be used
     * @param useDeCS if true DeCS synonyms will be added to the input text, if false the original input text will be used
     * @return the Lucene query object
@@ -213,10 +213,10 @@ class SimDocsSearch(val sdIndexPath: String,
       case Some(days) =>
         require (days > 0)
         val daysAgoCal: GregorianCalendar = todayCal.clone().asInstanceOf[GregorianCalendar]
-        daysAgoCal.add(Calendar.DAY_OF_MONTH, -days)                // begin of x days ago
+        daysAgoCal.add(Calendar.DAY_OF_MONTH, -days + 1)                // begin of x days ago
         val daysAgo: String = DateTools.dateToString(daysAgoCal.getTime,
                                              DateTools.Resolution.DAY)
-        val query2: TermRangeQuery = TermRangeQuery.newStringRange("entranceDate", daysAgo,
+        val query2: TermRangeQuery = TermRangeQuery.newStringRange("entrance_date", daysAgo,
                                                              today, true, true)
         val builder = new BooleanQuery.Builder()
         builder.add(query1, BooleanClause.Occur.MUST)
@@ -384,7 +384,7 @@ object SimDocsSearch extends App {
     "\n\t[-fields=<field>,<field>,...,<field>] - document fields used to look for similarities" +
     "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
     "\n\t[-minSim=<num>] - minimum similarity level (0 to 1.0) accepted " +
-    "\n\t[-lastDays=<num>] - return only docs that are younger (entranceDate flag) than 'lastDays' days")
+    "\n\t[-lastDays=<num>] - return only docs that are younger (entrance_date flag) than 'lastDays' days")
     System.exit(1)
   }
 

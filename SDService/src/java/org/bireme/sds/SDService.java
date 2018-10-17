@@ -152,16 +152,16 @@ public class SDService extends HttpServlet {
                 } else {
                     final String outFields = request.getParameter("outFields");
                     final String[] oFields = (outFields == null)
-                                    ? new String[0]: outFields.split(" *\\, *");
+                                    ? new String[0]: outFields.split(" *\\, *");      
                     Set<String> fields = new HashSet<>();
                     for (String fld: oFields) {
                         fields.add(fld);
                     }
                     final String lastDaysPar = request.getParameter("lastDays");
-                    final int lastDays = (lastDaysPar == null) ? 365 : 
+                    final int lastDays = (lastDaysPar == null) ? 0 : 
                                            Integer.parseInt(lastDaysPar);
-                    if (lastDays <= 0) {
-                        out.println("<ERROR>'lastDays' parameter should be > 0</ERROR>");
+                    if (lastDays < 0) {
+                        out.println("<ERROR>'lastDays' parameter should be >= 0</ERROR>");
                         return;
                     }
                     out.println(simSearch.search(adhocSimilarDocs, fields.toSet(), lastDays));

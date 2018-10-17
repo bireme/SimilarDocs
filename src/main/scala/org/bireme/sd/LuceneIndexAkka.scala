@@ -64,7 +64,7 @@ class LuceneIndexMain(indexPath: String,
   val ngAnalyzer: NGramAnalyzer = new NGramAnalyzer(NGSize.ngram_min_size,
                                      NGSize.ngram_max_size)
   val analyzerPerField: util.Map[String, Analyzer] = Map[String,Analyzer](
-                                 "entranceDate" -> new KeywordAnalyzer()).asJava
+                                 "entrance_date" -> new KeywordAnalyzer()).asJava
   val analyzer: PerFieldAnalyzerWrapper = new PerFieldAnalyzerWrapper(ngAnalyzer, analyzerPerField)
   val indexPathTrim: String = indexPath.trim
   val indexPath1: String = if (indexPathTrim.endsWith("/"))
@@ -90,7 +90,7 @@ class LuceneIndexMain(indexPath: String,
   val routerIdx: Router = {
     val routees = Vector.fill(idxWorkers) {
       val r = context.actorOf(Props(classOf[LuceneIndexActor], today, indexWriter,
-                                    isNewIndexWriter, fldIdxNames + "entranceDate",
+                                    isNewIndexWriter, fldIdxNames + "entrance_date",
                                     fldStrdNames + "id", decsMap))
       context watch r
       ActorRefRoutee(r)
@@ -221,9 +221,9 @@ class LuceneIndexActor(today: String,
               case (map,idx) =>
                 if (idx % 50000 == 0) log.info(s"[$fname] - $idx")
                 val smap = map.toMap
-                if (updIsNewDocument(smap)) {
-                  val emap = smap + ("entranceDate" -> List(today))
-                  Try(indexWriter.addDocument(map2doc(emap))) match {
+                if (updIsNewDocument(smap)) {                          // if the document is new
+                  val emap = smap + ("entrance_date" -> List(today))    // add the field with the today date
+                  Try(indexWriter.addDocument(map2doc(emap))) match {  // insert the document into the index
                     case Success(_) => ()
                     case Failure(ex) =>
                       val did = smap.getOrElse("id", List(s"? docPos=$idx")).head
@@ -246,17 +246,25 @@ class LuceneIndexActor(today: String,
     log.debug(s"LuceneIndexActor[${self.path.name}] is now finishing")
   }
 
+  /**
+    * Update the id in the new documents index if the id is not already present in that index
+    * @param doc the document where the id will be taken
+    * @return true if a new id is added to the index or false otherwise
+    */
   private def updIsNewDocument(doc: Map[String,List[String]]): Boolean = {
-    val id = doc("id").head
-    val collector = new TotalHitCountCollector()
+    doc.get("id") match {
+      case Some(id: Seq[String]) =>
+        val collector = new TotalHitCountCollector()
 
-    isNewIndexSearcher.search(new TermQuery(new Term("id",id)), collector)
-    if (collector.getTotalHits == 0) {
-      val newDoc = new Document()
-      newDoc.add(new StringField("id", id, Field.Store.YES))
-      isNewIndexWriter.addDocument(newDoc)
-      true
-    } else false
+        isNewIndexSearcher.search(new TermQuery(new Term("id",id.head)), collector)
+        if (collector.getTotalHits == 0) {
+          val newDoc = new Document()
+          newDoc.add(new StringField("id", id.head, Field.Store.YES))
+          isNewIndexWriter.addDocument(newDoc)
+          true
+        } else false
+      case None => false
+    }
   }
 
   /**
@@ -272,8 +280,7 @@ class LuceneIndexActor(today: String,
       case (xtag,lst) =>
         val tag: String = xtag.toLowerCase
 
-        // Add decs descriptors
-        if (decsMap.nonEmpty && (tag == "mj")) {
+        if (decsMap.nonEmpty && (tag == "mj")) {  // Add decs descriptors
           lst.foreach {
             fld => regexp.findFirstIn(fld).foreach {
               subd =>
@@ -287,7 +294,7 @@ class LuceneIndexActor(today: String,
             }
           }
         }
-        if (fldIdxNames.contains(tag) || "entranceDate".equals(tag)) {  // Add indexed fields
+        if (fldIdxNames.contains(tag)) {  // Add indexed fields
           lst.foreach {
             elem =>
               if (elem.length < 10000)  // Bug during indexing. Fix in future. Sorry!
@@ -295,7 +302,8 @@ class LuceneIndexActor(today: String,
               else
                 doc.add(new TextField(tag, elem.substring(0,10000), Field.Store.YES))
           }
-        } else if (fldStrdNames.contains(tag)) { // Add stored fields
+        }
+        if (fldStrdNames.contains(tag)) { // Add stored fields
           lst.foreach {
             elem => doc.add(new StoredField(tag, elem))
           }
