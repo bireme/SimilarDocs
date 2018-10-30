@@ -1,29 +1,12 @@
 /*=========================================================================
 
-    Copyright © 2017 BIREME/PAHO/WHO
+    SimilarDocs © Pan American Health Organization, 2018.
+    See License at: https://github.com/bireme/SimilarDocs/blob/master/LICENSE.txt
 
-    This file is part of SimilarDocs.
+  ==========================================================================*/
 
-    SimilarDocs is free software: you can redistribute it and/or
-    modify it under the terms of the GNU Lesser General Public License as
-    published by the Free Software Foundation, either version 2.1 of
-    the License, or (at your option) any later version.
-
-    SimilarDocs is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Lesser General Public License for more details.
-
-    You should have received a copy of the GNU Lesser General Public
-    License along with SimilarDocs. If not, see <http://www.gnu.org/licenses/>.
-
-=========================================================================*/
 
 package org.bireme.sd.service
-
-//import scala.concurrent.{Await,Future}
-//import scala.concurrent.ExecutionContext.Implicits.global
-//import scala.concurrent.duration._
 
 /** Service that updates all outdated similar document ids (TopIndex)
 *
@@ -33,42 +16,34 @@ package org.bireme.sd.service
 * date: 20170524
 */
 class UpdaterService(topDocs: TopIndex) {
-  var running = false
-  var stopping = false
+  var stopping = false        // the system wants to exit
 
   /** Update the similar docs of all documents that are outdated
+    * @return true if the all updates were succeeded and false if it failed
     */
-  private def updateAll(): Unit = {
-    if (!stopping) topDocs.updateSimilarDocs() match {
-      case Some(_) => updateAll()  // has more documents to update
-      case None => ()
+  private def updateAll(): Boolean = {
+    if (stopping) false
+    else {
+      topDocs.updateSimilarDocs() match {
+        case Some(_) => updateAll() // has more documents to update
+        case None    => true
+      }
     }
   }
 
   /** Update the similar docs of all documents that are outdated
+    * @return true if the start was succeeded and false if it failed
     */
-  def start(): Unit = {
-    if (!running) {
-      while (stopping) Thread.sleep(500)
-      running = true
-      updateAll()
-      running = false
-
-      /*val updAll = Future { updateAll() }
-      val result = Await.ready(updAll, Duration.Inf).value.get
-
-      result match {
-        case _ => running = false
-      }*/
-    }
-  }
+  def start(): Boolean = (!stopping) && updateAll()
 
   /** Stop the service
+    * @return true if the stop was succeeded and false if it failed
     */
-  def stop(): Unit = {
+  def stop(): Boolean = {
     stopping = true
-    while (running) Thread.sleep(500)
+    Thread.sleep(10000)  // wait 10 seconds
     topDocs.resetAllTimes()
     stopping = false
+    true
   }
 }

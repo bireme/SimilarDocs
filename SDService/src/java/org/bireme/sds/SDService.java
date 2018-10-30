@@ -1,23 +1,9 @@
 /*=========================================================================
 
-    Copyright © 2016 BIREME/PAHO/WHO
+    SimilarDocs © Pan American Health Organization, 2018.
+    See License at: https://github.com/bireme/SimilarDocs/blob/master/LICENSE.txt
 
-    This file is part of SimilarDocs.
-
-    SimilarDocs is free software: you can redistribute it and/or
-    modify it under the terms of the GNU Lesser General Public License as
-    published by the Free Software Foundation, either version 2.1 of
-    the License, or (at your option) any later version.
-
-    SimilarDocs is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Lesser General Public License for more details.
-
-    You should have received a copy of the GNU Lesser General Public
-    License along with SimilarDocs. If not, see <http://www.gnu.org/licenses/>.
-
-=========================================================================*/
+  ==========================================================================*/
 
 package org.bireme.sds;
 
@@ -47,7 +33,7 @@ public class SDService extends HttpServlet {
     private TopIndex topIndex;
     private UpdaterService updaterService;
     private SimDocsSearch simSearch;
-    
+
     @Override
     public void init(final ServletConfig config) throws ServletException {
         super.init(config);
@@ -77,7 +63,7 @@ public class SDService extends HttpServlet {
         //updaterService.start(); // Demora muita para finalizar, deixa para atualização do índice
         //System.out.println("After call of 'updaterService.start()'");
     }
-    
+
     @Override
     public void destroy() {
         topIndex.close();
@@ -105,11 +91,11 @@ public class SDService extends HttpServlet {
         final java.util.Enumeration<String> names = request.getHeaderNames();
         while(names.hasMoreElements()) {
             final String name = names.nextElement();
-            System.out.println("[" + name + "]: [" + request.getHeader(name) + "]");              
+            System.out.println("[" + name + "]: [" + request.getHeader(name) + "]");
         }
         final Map<String,String[]> paramMap = request.getParameterMap();
         for (Map.Entry<String,String[]> elem : paramMap.entrySet()) {
-          
+
           System.out.println("\n------------------------------------------------");
           System.out.println("param=[[" + elem.getKey() + "]]");
           for (String value: elem.getValue()) {
@@ -118,32 +104,37 @@ public class SDService extends HttpServlet {
           System.out.println();
         }
         */
-        
+
         response.setContentType("text/xml;charset=UTF-8");
 
         final ServletContext context = request.getServletContext();
         final boolean maintenanceMode =
                               (Boolean)context.getAttribute("MAINTENANCE_MODE");
-        
+
         try (PrintWriter out = response.getWriter()) {
             final String maintenance = request.getParameter("maintenance");
             if (maintenance != null) {
                 final Boolean maint = Boolean.valueOf(maintenance);
 
                 context.setAttribute("MAINTENANCE_MODE", maint);
+                final boolean ok;
                 if (maint) { // maintenance mode is on
-                    updaterService.stop();
+                    ok = updaterService.stop();
                 } else { // maintenance mode is off
-                    updaterService.start();
+                    ok = updaterService.start();
                 }
-                out.println("<result>MAINTENANCE_MODE=" + maint + "</result>");
+                if (ok) {
+                    out.println("<result>MAINTENANCE_MODE=" + maint + "</result>");
+                } else {
+                    out.println("<result>MAINTENANCE_MODE=FAILED</result>");
+                }
                 return;
             }
             if (maintenanceMode) {
                 out.println("<WARNING>System in maintenance mode</WARNING>");
                 return;
             }
-                        
+
             // Ad hoc Similar Docs
             final String adhocSimilarDocs = request.getParameter("adhocSimilarDocs");
             if (adhocSimilarDocs != null) {
@@ -152,13 +143,13 @@ public class SDService extends HttpServlet {
                 } else {
                     final String outFields = request.getParameter("outFields");
                     final String[] oFields = (outFields == null)
-                                    ? new String[0]: outFields.split(" *\\, *");      
+                                    ? new String[0]: outFields.split(" *\\, *");
                     Set<String> fields = new HashSet<>();
                     for (String fld: oFields) {
                         fields.add(fld);
                     }
                     final String lastDaysPar = request.getParameter("lastDays");
-                    final int lastDays = (lastDaysPar == null) ? 0 : 
+                    final int lastDays = (lastDaysPar == null) ? 0 :
                                            Integer.parseInt(lastDaysPar);
                     if (lastDays < 0) {
                         out.println("<ERROR>'lastDays' parameter should be >= 0</ERROR>");
@@ -166,9 +157,9 @@ public class SDService extends HttpServlet {
                     }
                     out.println(simSearch.search(adhocSimilarDocs, fields.toSet(), lastDays));
                 }
-                return;          
+                return;
             }
-            
+
             final String psId = request.getParameter("psId");
             if ((psId == null) || (psId.trim().isEmpty())) {
                 out.println("<ERROR>missing 'psId' parameter</ERROR>");
@@ -181,7 +172,7 @@ public class SDService extends HttpServlet {
                 final String sentence = request.getParameter("sentence");
                 if (addProfile.trim().isEmpty()) {
                     out.println("<ERROR>missing 'addProfile' parameter</ERROR>");
-                } else if ((sentence == null) || 
+                } else if ((sentence == null) ||
                            (sentence.trim().isEmpty())) {
                     out.println("<ERROR>missing 'sentence' parameter</ERROR>");
                 } else {
@@ -222,9 +213,9 @@ public class SDService extends HttpServlet {
                         fields.add(fld);
                     }
                     final String lastDaysPar = request.getParameter("lastDays");
-                    final int lastDays = (lastDaysPar == null) ? 365 : 
+                    final int lastDays = (lastDaysPar == null) ? 365 :
                                            Integer.parseInt(lastDaysPar);
-                    out.println(topIndex.getSimDocsXml(psId, profiles.toSet(), 
+                    out.println(topIndex.getSimDocsXml(psId, profiles.toSet(),
                                               fields.toSet(), 10, lastDays));
                 }
                 return;
@@ -232,7 +223,7 @@ public class SDService extends HttpServlet {
 
             // Show Profiles
             final String showProfiles = request.getParameter("showProfiles");
-            if (showProfiles == null) {                    
+            if (showProfiles == null) {
                 usage(out);
             } else {
                 out.println(topIndex.getProfilesXml(psId)); // showProfiles

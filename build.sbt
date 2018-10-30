@@ -26,7 +26,7 @@ lazy val SDService = (project in file("./SDService")).
 
 
 val luceneVersion = "7.5.0" //"7.3.1"
-val akkaVersion =  "2.5.16" //"2.5.13"
+val akkaVersion =  "2.5.17" // "2.5.16"
 val httpClientVersion = "4.5.6" //"4.5.5"
 val scalaTestVersion = "3.0.5"
 val casbahVersion = "3.1.1"
@@ -47,6 +47,8 @@ libraryDependencies ++= Seq(
   "org.mongodb" %% "casbah" % casbahVersion,
   "com.typesafe.play" %% "play-json" % playVersion
 )
+
+test in assembly := {}
 
 logBuffered in Test := false
 trapExit :=  false  // To allow System.exit() without an exception (TestIndex.scala)

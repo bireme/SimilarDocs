@@ -1,3 +1,10 @@
+/*=========================================================================
+
+    SimilarDocs © Pan American Health Organization, 2018.
+    See License at: https://github.com/bireme/SimilarDocs/blob/master/LICENSE.txt
+
+  ==========================================================================*/
+
 package org.bireme.sd
 
 import java.io.File
