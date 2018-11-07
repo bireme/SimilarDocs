@@ -72,11 +72,12 @@ class LuceneIndexMain(indexPath: String,
   val now: GregorianCalendar = new GregorianCalendar(TimeZone.getDefault)
   val today: String = DateTools.dateToString(DateTools.round(now.getTime, DateTools.Resolution.DAY),
                                                       DateTools.Resolution.DAY)
+  val todaySeconds: String = DateTools.dateToString(now.getTime, DateTools.Resolution.SECOND)
   val decsMap: Map[Int, Set[String]] = if (decsDir.isEmpty) Map[Int,Set[String]]()
                                        else decx2Map(decsDir)
   val routerIdx: Router = {
     val routees = Vector.fill(idxWorkers) {
-      val r = context.actorOf(Props(classOf[LuceneIndexActor], today, indexWriter,
+      val r = context.actorOf(Props(classOf[LuceneIndexActor], today, todaySeconds, indexWriter,
                                     isNewIndexWriter, fldIdxNames + "entrance_date",
                                     fldStrdNames + "id", decsMap))
       context watch r
@@ -177,6 +178,7 @@ class LuceneIndexMain(indexPath: String,
 }
 
 class LuceneIndexActor(today: String,
+                       todaySeconds: String,
                        indexWriter: IndexWriter,
                        isNewIndexWriter: IndexWriter,
                        fldIdxNames: Set[String],
@@ -205,9 +207,9 @@ class LuceneIndexActor(today: String,
           case None =>
             IahxXmlParser.getElements(fname, encoding, Set()).zipWithIndex.
                                                                        foreach {
-              case (map,idx) =>
+              case (set,idx) =>
                 if (idx % 50000 == 0) log.info(s"[$fname] - $idx")
-                val smap = map.toMap
+                val smap = set.toMap
                 if (updIsNewDocument(smap)) {                          // if the document is new
                   val emap = smap + ("entrance_date" -> List(today))    // add the field with the today date
                   Try(indexWriter.addDocument(map2doc(emap))) match {  // insert the document into the index
@@ -247,6 +249,7 @@ class LuceneIndexActor(today: String,
         if (collector.getTotalHits == 0) {
           val newDoc = new Document()
           newDoc.add(new StringField("id", id.head, Field.Store.YES))
+          newDoc.add(new StoredField("entrance_date", todaySeconds))
           isNewIndexWriter.addDocument(newDoc)
           true
         } else false
