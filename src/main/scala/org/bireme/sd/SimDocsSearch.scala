@@ -134,21 +134,24 @@ class SimDocsSearch(val sdIndexPath: String,
     val text2: String = textSeq.mkString(" ")
     val dirReader = getReader
     val searcher = new IndexSearcher(dirReader)
+    val sort = false  // sort documents by date
 
     // Retrieve documents with AND operator if the number of words is less or equal to 5
     val andLst: List[(Int,Float)] =
       if (textSeq.size <= 5) {
         val andQuery = getQuery(text2, fields, lastDays, useOROperator = false, useDeCS = false)
-        sortByDate(searcher, searcher.search(andQuery, 3 * maxDocs).scoreDocs,  maxDocs, minSim)
-      } else
-        List[(Int,Float)]()
+        if (sort) sortByDate(searcher, searcher.search(andQuery, 3 * maxDocs).scoreDocs,  maxDocs, minSim)
+        else getIdScore(searcher.search(andQuery, 3 * maxDocs).scoreDocs,  maxDocs, minSim)
+      }
+      else List[(Int,Float)]()
 
     // If the number of AND documents is not enough, complete with OR documents
     val lst = if (andLst.size < maxDocs) {
       val orQuery = getQuery(text2, fields, lastDays, useOROperator = true, useDeCS = andLst.size < maxWords)
-      val orLst = sortByDate(searcher,
-                             searcher.search(orQuery, 3 * maxDocs).scoreDocs,
-                             maxDocs, minSim)
+      val orLst = if (sort)
+        sortByDate(searcher, searcher.search(orQuery, 3 * maxDocs).scoreDocs, maxDocs, minSim)
+      else getIdScore(searcher.search(orQuery, 3 * maxDocs).scoreDocs,  maxDocs, minSim)
+
       andLst ++ orLst.take(maxDocs - andLst.size)
     } else andLst
 
@@ -268,6 +271,24 @@ class SimDocsSearch(val sdIndexPath: String,
     timeSortedMap.foldLeft[List[(Int,Float)]](List()) {
       case (lst, (_,v)) => lst :+ v
     } ++ dateList
+  }
+
+  /**
+    * Filter a result of a search by date if their scores are bigger than a
+    * limit
+    *
+    * @param searcher Lucene index searcher object
+    * @param scoreDocs result of the Lucene search function
+    * @param maxDocs maximum number of returned documents
+    * @param minSim minimum similarity between the input text and the retrieved
+    *               field text
+    * @return a list of pairs with document id and document score
+    */
+  private def getIdScore(scoreDocs: Array[ScoreDoc],
+                         maxDocs: Int,
+                         minSim: Float): List[(Int,Float)] = {
+    // Get docs whose similarity are bigger than minSim
+    scoreDocs.filter(_.score >= minSim).take(maxDocs).map(sdoc => (sdoc.doc, sdoc.score)).toList
   }
 
   /**
