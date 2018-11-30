@@ -35,6 +35,7 @@ class NGramFilter(input: TokenStream,
   override def reset(): Unit = {
     super.reset()
     queue.clear()
+    ngrams.clear()
   }
 
   /**
