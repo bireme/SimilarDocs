@@ -26,7 +26,7 @@ import scala.collection.JavaConverters._
 */
 object LuceneIndex extends App {
   private def usage(): Unit = {
-    Console.err.println("usage: LuceneIndexAkka" +
+    Console.err.println("usage: LuceneIndex" +
       "\n\t<indexPath> - the name+path to the lucene index to be created" +
       "\n\t<decsIndexPath> - the name+path to the lucene decs index to be created" +
       "\n\t<xmlDir> - directory of xml files used to create the index" +

@@ -27,6 +27,7 @@ class NGramFilter(input: TokenStream,
                   maxSize: Int) extends TokenFilter(input) {
   private val termAtt: CharTermAttribute = addAttribute(classOf[CharTermAttribute])
   private val queue: mutable.Queue[String] = new mutable.Queue[String]()
+  private val ngrams: mutable.Set[String] = mutable.Set[String]()
 
   /**
     * Cleans all internal buffers
@@ -100,10 +101,16 @@ class NGramFilter(input: TokenStream,
     maxTokenSize(len, maxSize) exists {
       maxTokSize =>
         (0 until (len / maxTokSize)).foreach {
-          pos => queue += new String(buffer, pos * maxTokSize, maxTokSize)
+          pos =>
+            val ngram = new String(buffer, pos * maxTokSize, maxTokSize)
+            if (ngrams.contains(ngram)) queue += ngram    // avoiding duplicated ngrams
+            else ngrams += ngram
         }
-        if (len % maxTokSize > 0)
-          queue += new String(buffer, len - maxTokSize, maxTokSize)
+        if (len % maxTokSize > 0) {
+          val ngram = new String(buffer, len - maxTokSize, maxTokSize)
+          if (ngrams.contains(ngram)) queue += ngram      // avoiding duplicated ngrams
+          else ngrams += ngram
+        }
         true
     }
   }
