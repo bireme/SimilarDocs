@@ -71,7 +71,7 @@ class SimDocsSearch(val sdIndexPath: String,
 
     doc2xml(search(text,
                    outFields,
-                   service.Conf.idxFldNames,
+                   Set("_indexed_"), //service.Conf.idxFldNames,
                    service.Conf.maxDocs,
                    service.Conf.minSim,
                    days))
@@ -277,7 +277,6 @@ class SimDocsSearch(val sdIndexPath: String,
     * Filter a result of a search by date if their scores are bigger than a
     * limit
     *
-    * @param searcher Lucene index searcher object
     * @param scoreDocs result of the Lucene search function
     * @param maxDocs maximum number of returned documents
     * @param minSim minimum similarity between the input text and the retrieved
@@ -411,7 +410,7 @@ object SimDocsSearch extends App {
   }
   val fldNames = parameters.get("fields") match {
     case Some(sFields) => sFields.split(" *, *").toSet
-    case None => Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs")//service.Conf.idxFldNames
+    case None => Set("_indexed_")  //Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs")//service.Conf.idxFldNames
   }
   val maxDocs = parameters.getOrElse("maxDocs", "10").toInt
   val minSim = parameters.getOrElse("minSim", "0.5").toFloat

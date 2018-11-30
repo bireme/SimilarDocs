@@ -212,7 +212,7 @@ class LuceneIndexActor(today: String,
                 val smap = set.toMap
                 if (updIsNewDocument(smap)) {                          // if the document is new
                   val emap = smap + ("entrance_date" -> List(today))    // add the field with the today date
-                  Try(indexWriter.addDocument(map2doc(emap))) match {  // insert the document into the index
+                  Try(indexWriter.addDocument(map2docExt(emap))) match {  // insert the document into the index
                     case Success(_) => ()
                     case Failure(ex) =>
                       val did = smap.getOrElse("id", List(s"? docPos=$idx")).head
@@ -298,6 +298,54 @@ class LuceneIndexActor(today: String,
             elem => doc.add(new StoredField(tag, elem))
           }
         }
+    }
+    doc
+  }
+
+  /**
+    * Converts a document from a map of fields into a lucene document (all then will be stored but
+    * no indexed. Create a field 'indexed' with fldIdxNames that will be indexed.
+    *
+    * @param map a document of (field name -> all occurrences of the field)
+    * @return a lucene document
+    */
+  private def map2docExt(map: Map[String,List[String]]): Document = {
+    val doc = new Document()
+    val sbuilder = new StringBuilder
+
+    map.foreach {
+      case (xtag,lst) =>
+        val tag: String = xtag.toLowerCase
+
+        if (decsMap.nonEmpty && (tag == "mj")) {  // Add decs descriptors
+          lst.foreach {
+            fld => regexp.findFirstIn(fld).foreach {
+              subd =>
+                decsMap.get(subd.substring(2).toInt).foreach {
+                  lst2 => lst2.foreach {
+                    descr =>
+                      val fld = new StoredField("decs", descr)
+                      sbuilder.append( " " + descr)
+                      doc.add(fld)
+                  }
+                }
+            }
+          }
+        }
+        if (fldIdxNames.contains(tag)) {  // Add indexed fields
+          lst.foreach {
+            elem =>
+              val fld = if (elem.length < 10000) elem // Bug during indexing. Fix in future. Sorry!
+                        else elem.substring(0,10000)
+              sbuilder.append( " " + fld)
+          }
+        }
+        if (fldStrdNames.contains(tag)) { // Add stored fields
+          lst.foreach {
+            elem => doc.add(new StoredField(tag, elem))
+          }
+        }
+        doc.add(new TextField("_indexed_", sbuilder.toString, Field.Store.YES))
     }
     doc
   }

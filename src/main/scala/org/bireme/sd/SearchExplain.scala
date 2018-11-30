@@ -32,7 +32,7 @@ object SearchExplain extends App {
   }
   if (args.length < 2) usage()
   val fields = if (args.length > 2) args(2).trim.split(" *\\, *").toSet
-               else Conf.idxFldNames
+               else Set("_indexed_") //Conf.idxFldNames
   val dir = FSDirectory.open(new File(args(0)).toPath)
   val reader = DirectoryReader.open(dir)
   val searcher = new IndexSearcher(reader)

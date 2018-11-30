@@ -27,7 +27,7 @@ class NGramFilter(input: TokenStream,
                   maxSize: Int) extends TokenFilter(input) {
   private val termAtt: CharTermAttribute = addAttribute(classOf[CharTermAttribute])
   private val queue: mutable.Queue[String] = new mutable.Queue[String]()
-  private val ngrams: mutable.Set[String] = mutable.Set[String]()
+  private val ngrams: mutable.Set[String] = mutable.Set[String]()  // Avoid duplicated ngram in the same field
 
   /**
     * Cleans all internal buffers
