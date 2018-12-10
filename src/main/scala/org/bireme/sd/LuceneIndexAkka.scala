@@ -144,7 +144,7 @@ class LuceneIndexMain(indexPath: String,
     * From a decs master file, converts it into a map of (decs code -> descriptors)
     *
     * @return a map where the keys are the decs code (its mfn) and the values, the
-              the descriptors in English, Spanish and Protuguese
+              the descriptors in English, Spanish and Portuguese
     */
   private def decx2Map(decsDir: String): Map[Int,Set[String]] = {
     val mst = MasterFactory.getInstance(decsDir).open()
@@ -263,6 +263,7 @@ class LuceneIndexActor(today: String,
     * @param map a document of (field name -> all occurrences of the field)
     * @return a lucene document
     */
+  /*
   private def map2doc(map: Map[String,List[String]]): Document = {
     val doc = new Document()
 
@@ -301,7 +302,8 @@ class LuceneIndexActor(today: String,
     }
     doc
   }
-
+  */
+  
   /**
     * Converts a document from a map of fields into a lucene document (all then will be stored but
     * no indexed. Create a field 'indexed' with fldIdxNames that will be indexed.
@@ -314,7 +316,7 @@ class LuceneIndexActor(today: String,
     val sbuilder = new StringBuilder
 
     map.foreach {
-      case (xtag,lst) =>
+      case (xtag, lst) =>
         val tag: String = xtag.toLowerCase
 
         if (decsMap.nonEmpty && (tag == "mj")) {  // Add decs descriptors
@@ -338,6 +340,7 @@ class LuceneIndexActor(today: String,
               val fld = if (elem.length < 10000) elem // Bug during indexing. Fix in future. Sorry!
                         else elem.substring(0,10000)
               sbuilder.append( " " + fld)
+              doc.add(new StoredField(tag, fld))
           }
         }
         if (fldStrdNames.contains(tag)) { // Add stored fields
@@ -345,8 +348,8 @@ class LuceneIndexActor(today: String,
             elem => doc.add(new StoredField(tag, elem))
           }
         }
-        doc.add(new TextField("_indexed_", sbuilder.toString, Field.Store.YES))
     }
+    doc.add(new TextField("_indexed_", sbuilder.toString, Field.Store.NO))
     doc
   }
 }
