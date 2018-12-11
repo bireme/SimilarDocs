@@ -140,6 +140,7 @@ class SimDocsSearch(val sdIndexPath: String,
     val andLst: List[(Int,Float)] =
       if (textSeq.size <= 5) {
         val andQuery = getQuery(text2, fields, lastDays, useOROperator = false, useDeCS = false)
+println(s"andQuery=$andQuery")
         if (sort) sortByDate(searcher, searcher.search(andQuery, 3 * maxDocs).scoreDocs,  maxDocs, minSim)
         else getIdScore(searcher.search(andQuery, 3 * maxDocs).scoreDocs,  maxDocs, minSim)
       }
@@ -191,8 +192,10 @@ class SimDocsSearch(val sdIndexPath: String,
     require ((text != null) && text.nonEmpty)
     require ((fields != null) && fields.nonEmpty)
 
-    val mqParser: MultiFieldQueryParser = new MultiFieldQueryParser(fields.toArray,
-      new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size))
+    val mqParser: QueryParser = if (fields.size == 1)
+      new QueryParser(fields.head, new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size))
+    else new MultiFieldQueryParser(fields.toArray,
+                                   new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size))
     val textImproved: String =
       if (useDeCS) OneWordDecs.addDecsSynonyms(text, decsSearcher)
       else text
@@ -420,13 +423,13 @@ object SimDocsSearch extends App {
 
   val analyzer = new NGramAnalyzer(NGSize.ngram_min_size,
                                    NGSize.ngram_max_size)
-  val set_text = getNGrams(args(1), analyzer)
+  val set_text = getNGrams(args(2), analyzer)
 
   docs.foreach {
     case (score,doc) =>
       println("\n------------------------------------------------------")
       println(s"score: $score")
-      val sim = getSimilarText(doc, fldNames)
+      val sim = getSimilarText(doc, service.Conf.idxFldNames)
       //println(s"text=$sim")
       val set_similar = getNGrams(sim, analyzer)
       val set_common = set_text.intersect(set_similar)

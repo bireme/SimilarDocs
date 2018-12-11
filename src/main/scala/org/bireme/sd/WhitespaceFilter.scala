@@ -69,7 +69,7 @@ class WhitespaceFilter(input: TokenStream) extends TokenFilter(input) {
       else {
         if (input.incrementToken()) {
           splitAndFill()
-          fillQueue(size - 1)
+          fillQueue(size - queue.size)
         } else queue.nonEmpty
       }
     }

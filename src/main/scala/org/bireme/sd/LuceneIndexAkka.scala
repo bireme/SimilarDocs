@@ -18,6 +18,7 @@ import java.util
 import java.util.regex.{Matcher, Pattern}
 import java.util.{GregorianCalendar, TimeZone}
 
+import akka.event.Logging
 import org.apache.lucene.analysis.Analyzer
 import org.apache.lucene.analysis.core.KeywordAnalyzer
 import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper
@@ -46,6 +47,8 @@ class LuceneIndexMain(indexPath: String,
                       decsDir: String,
                       encoding: String,
                       fullIndexing: Boolean) extends Actor with ActorLogging {
+  context.system.eventStream.setLogLevel(Logging.InfoLevel)
+
   val idxWorkers = 10 // Number of actors to run concurrently
 
   val ngAnalyzer: NGramAnalyzer = new NGramAnalyzer(NGSize.ngram_min_size,
@@ -303,7 +306,7 @@ class LuceneIndexActor(today: String,
     doc
   }
   */
-  
+
   /**
     * Converts a document from a map of fields into a lucene document (all then will be stored but
     * no indexed. Create a field 'indexed' with fldIdxNames that will be indexed.

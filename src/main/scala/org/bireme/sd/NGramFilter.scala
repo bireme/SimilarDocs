@@ -39,27 +39,28 @@ class NGramFilter(input: TokenStream,
   }
 
   /**
-    * Gets the next avalilable token
+    * Gets the next available token
     *
     * @return true if there is a next token, false otherwise
     */
   override def incrementToken(): Boolean = {
     if (queue.isEmpty)
-      if (fillQueue()) setHeadToken()
+      if (fillQueue()) getHeadToken
       else false
-    else setHeadToken()
+    else getHeadToken
   }
 
   /**
-    * Sets the first token from buffer into the token stream
+    * Get the top token from queue into the token stream
     *
     * @return true always
     */
-  private def setHeadToken(): Boolean = {
+  private def getHeadToken: Boolean = {
     clearAttributes()
     termAtt.setEmpty()
-    termAtt.append(queue.dequeue())
-    /*val str = queue.dequeue()
+    if (!queue.isEmpty) termAtt.append(queue.dequeue())
+    /*println(s"queue=$queue")
+    val str = queue.dequeue()
     termAtt.append(str)
     println(s"token=[$str]")*/
     true
@@ -67,52 +68,46 @@ class NGramFilter(input: TokenStream,
 
   /**
     * Fills the buffer with new tokens
-    *
+    * @param maxqsize max number of tokens in the queue
     * @return true if there are tokens inside the buffer,
     * false otherwise
     */
-  private def fillQueue(): Boolean = {
-    def fillQueue(qsize: Int): Boolean = {
-      if ((qsize > 0) && input.incrementToken()) {
-        splitAndFill()
-        fillQueue(qsize - 1)
-      } else queue.nonEmpty
-    }
-
-    fillQueue(1000)
+  private def fillQueue(maxqsize: Int = 1000): Boolean = {
+    if ((queue.size < maxqsize) && input.incrementToken()) {
+      putOneNgram(maxSize, termAtt.buffer(), termAtt.length())
+      fillQueue(maxqsize)
+    } else queue.nonEmpty
   }
 
   /**
-    * Splits the input stream into ngrams and put all tokens
+    * Take from the input stream the biggest ngram available and put it
     * into the buffer
     *
-    * @return true always
+    * @param mtokSize max token size
+    * @param buffer where the token will be extracted
+    * @param bSize input buffer size
     */
-  private def splitAndFill(): Boolean = {
-    def maxTokenSize(bufferLen: Int,
-                     tokSize: Int): Option[Int] = {
-      if (bufferLen < minSize) None
-      else if (bufferLen >= tokSize) Some(tokSize)
-      else maxTokenSize(bufferLen, tokSize - 1)
+  private def putOneNgram(mtokSize: Int,
+                          buffer: Array[Char],
+                          bSize: Int): Unit = {
+    /***
+      * @return the maximum token size that can be found in the remaining of the buffer
+      */
+    def maxTokenSize(rem: Int): Option[Int] = {
+      if (rem < minSize) None
+      else Some(Math.min(mtokSize, rem))
     }
-
-    val buffer = termAtt.buffer()
-    val len = termAtt.length()
-
-    maxTokenSize(len, maxSize) exists {
+//println(s"buffer=${buffer.toList}")
+    maxTokenSize(bSize) foreach {
       maxTokSize =>
-        (0 until (len / maxTokSize)).foreach {
+        (0 until (bSize / maxTokSize)).foreach {
           pos =>
             val ngram = new String(buffer, pos * maxTokSize, maxTokSize)
-            if (ngrams.contains(ngram)) queue += ngram    // avoiding duplicated ngrams
-            else ngrams += ngram
+            if (!ngrams.contains(ngram)) {  // avoiding duplicated ngrams
+              queue += ngram
+              ngrams += ngram
+            }
         }
-        if (len % maxTokSize > 0) {
-          val ngram = new String(buffer, len - maxTokSize, maxTokSize)
-          if (ngrams.contains(ngram)) queue += ngram      // avoiding duplicated ngrams
-          else ngrams += ngram
-        }
-        true
     }
   }
 }
