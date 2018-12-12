@@ -22,7 +22,6 @@ import org.bireme.sd.service.Conf
 
 import scala.collection.JavaConverters._
 import scala.collection.SortedMap
-import scala.collection.immutable.TreeSet
 
 /** Class that looks for similar documents to a given ones
   *
@@ -34,7 +33,7 @@ class SimDocsSearch(val sdIndexPath: String,
   require(sdIndexPath != null)
   require(decsIndexPath != null)
 
-  val maxWords = 15 /* 20 */   // limit the max number of words to be used as input text
+  val maxWords = 20   // limit the max number of words to be used as input text
 
   val sdDirectory: FSDirectory = FSDirectory.open(new File(sdIndexPath).toPath)
   val decsDirectory: FSDirectory = FSDirectory.open(new File(decsIndexPath).toPath)
@@ -140,7 +139,7 @@ class SimDocsSearch(val sdIndexPath: String,
     val andLst: List[(Int,Float)] =
       if (textSeq.size <= 5) {
         val andQuery = getQuery(text2, fields, lastDays, useOROperator = false, useDeCS = false)
-println(s"andQuery=$andQuery")
+//println(s"andQuery=$andQuery")
         if (sort) sortByDate(searcher, searcher.search(andQuery, 3 * maxDocs).scoreDocs,  maxDocs, minSim)
         else getIdScore(searcher.search(andQuery, 3 * maxDocs).scoreDocs,  maxDocs, minSim)
       }
@@ -419,11 +418,12 @@ object SimDocsSearch extends App {
   val minSim = parameters.getOrElse("minSim", "0.5").toFloat
   val lastDays = parameters.get("lastDays").map(_.toInt)
   val search = new SimDocsSearch(args(0), args(1))
+  val maxWords = search.maxWords
   val docs = search.search(args(2), outFields, fldNames, maxDocs, minSim, lastDays)
 
   val analyzer = new NGramAnalyzer(NGSize.ngram_min_size,
                                    NGSize.ngram_max_size)
-  val set_text = getNGrams(args(2), analyzer)
+  val set_text = getNGrams(args(2), analyzer, maxWords)
 
   docs.foreach {
     case (score,doc) =>
@@ -431,9 +431,13 @@ object SimDocsSearch extends App {
       println(s"score: $score")
       val sim = getSimilarText(doc, service.Conf.idxFldNames)
       //println(s"text=$sim")
-      val set_similar = getNGrams(sim, analyzer)
+      val set_similar = getNGrams(sim, analyzer, maxWords)
       val set_common = set_text.intersect(set_similar)
-      print("common ngrams: ")
+      print("original ngrams: ")
+      set_text.foreach(str => print(s"[$str] "))
+      print("\nsimilar ngrams: ")
+      set_similar.foreach(str => print(s"[$str] "))
+      print("\ncommon ngrams: ")
       set_common.foreach(str => print(s"[$str] "))
       println("\n")
       doc.foreach {
@@ -463,10 +467,12 @@ object SimDocsSearch extends App {
     *
     * @param text input text
     * @param analyzer Lucene analyzer class
-    * @return a set of ngrams
+    * @param maxTokens maximum number of tokens to be returned
+    * @return a sequence of ngrams
     */
   private def getNGrams(text: String,
-                        analyzer: Analyzer): Set[String] = {
+                        analyzer: Analyzer,
+                        maxTokens: Int): Seq[String] = {
     require(text != null)
     require(analyzer != null)
 
@@ -474,12 +480,12 @@ object SimDocsSearch extends App {
     val cattr = tokenStream.addAttribute(classOf[CharTermAttribute])
 
     tokenStream.reset()
-    val set = getTokens(tokenStream, cattr, TreeSet[String]())
+    val seq = getTokens(tokenStream, cattr, Seq[String](), maxTokens)
 
     tokenStream.end()
     tokenStream.close()
 
-    set
+    seq
   }
 
   /**
@@ -487,19 +493,21 @@ object SimDocsSearch extends App {
     *
     * @param tokenStream Lucene token stream object
     * @param cattr auxiliary object. See Lucene documentation
-    * @param auxSet temporary working set
-    * @return a set of tokens
+    * @param auxSeq temporary working seq
+    * @param maxTokens maximum number of tokens to be returned
+    * @return a sequence of tokens
     */
   private def getTokens(tokenStream: TokenStream,
                         cattr: CharTermAttribute,
-                        auxSet: Set[String]): Set[String] = {
+                        auxSeq: Seq[String],
+                        maxTokens: Int): Seq[String] = {
     require(tokenStream != null)
     require(cattr != null)
-    require(auxSet != null)
+    require(auxSeq != null)
 
-    if (tokenStream.incrementToken()) {
+    if ((maxTokens > 0) && tokenStream.incrementToken()) {
       val tok = cattr.toString
-      getTokens(tokenStream, cattr, auxSet + tok)
-    } else auxSet
+      getTokens(tokenStream, cattr, auxSeq :+ tok, maxTokens - 1)
+    } else auxSeq
   }
 }

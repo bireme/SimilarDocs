@@ -15,5 +15,5 @@ package org.bireme.sd
 */
 object NGSize {
   val ngram_min_size = 4 //3
-  val ngram_max_size = 5 //5
+  val ngram_max_size = 6 //5 //5
 }

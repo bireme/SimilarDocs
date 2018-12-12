@@ -100,13 +100,10 @@ class NGramFilter(input: TokenStream,
 //println(s"buffer=${buffer.toList}")
     maxTokenSize(bSize) foreach {
       maxTokSize =>
-        (0 until (bSize / maxTokSize)).foreach {
-          pos =>
-            val ngram = new String(buffer, pos * maxTokSize, maxTokSize)
-            if (!ngrams.contains(ngram)) {  // avoiding duplicated ngrams
-              queue += ngram
-              ngrams += ngram
-            }
+        val ngram = new String(buffer, 0, maxTokSize)
+        if (!ngrams.contains(ngram)) {  // avoiding duplicated ngrams
+          queue += ngram
+          ngrams += ngram
         }
     }
   }
