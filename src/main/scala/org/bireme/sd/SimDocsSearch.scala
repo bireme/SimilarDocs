@@ -221,7 +221,8 @@ class SimDocsSearch(val sdIndexPath: String,
         val commonNGrams = simNGrams.intersect(ngrams)
         (commonNGrams.size, scoreDoc)
     }
-    val aux2 = aux.filter(t => t._1 >= minNGrams).sortWith((t1, t2) => t1._1 <= t2._1).reverse.take(maxDocs)
+    val min = Math.min(minNGrams, ngrams.size)
+    val aux2 = aux.filter(t => t._1 >= min).sortWith((t1, t2) => t1._1 <= t2._1).reverse.take(maxDocs)
 
     aux2.map(t => (t._2.doc, t._2.score)).toList
   }
