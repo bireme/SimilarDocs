@@ -121,12 +121,10 @@ class TopIndex(simSearch: SimDocsSearch,
     *
     * @param doc personal services document
     * @param content profile content
-    * @param minSim minimum acceptable similarity between documents
     * @param maxDocs maximum number of similar documents to be retrieved
     */
   private def addProfile(doc: Document,
                          content: String,
-                         minSim: Float = Conf.minSim,
                          maxDocs: Int = Conf.maxDocs): Unit = {
     require(doc != null)
     require((content != null) && (!content.trim.isEmpty))
@@ -149,7 +147,7 @@ class TopIndex(simSearch: SimDocsSearch,
     // Add similar documents ids
     if (getSdIds) {
       doc.removeFields(sdIdFldName)
-      simSearch.searchIds(newContent, idxFldNames, maxDocs, minSim, None).foreach {
+      simSearch.searchIds(newContent, idxFldNames, maxDocs, Conf.minNGrams, None).foreach {
         case (id,_) => doc.add(new StoredField(sdIdFldName, id))
       }
     }
@@ -330,7 +328,7 @@ class TopIndex(simSearch: SimDocsSearch,
             val doc: Document = lst2.head
             val ndoc: Document =
               if (doc.getField(updateFldName).stringValue().equals("0")) {
-                updateSimilarDocs(doc, Conf.minSim, maxDocs)
+                updateSimilarDocs(doc, maxDocs)
               } else doc
             val sdIds: mutable.Seq[IndexableField] = ndoc.getFields().asScala.filter(iFld => iFld.name().equals(sdIdFldName))
             lst :+ sdIds.foldLeft[List[Int]](List()) {
@@ -512,12 +510,10 @@ class TopIndex(simSearch: SimDocsSearch,
   /**
     * Update sdIdFldName fields of one document whose update time is outdated
     *
-    * @param minSim minimum acceptable similarity between documents
     * @param maxDocs maximum number of similar documents to be retrieved
     * @return Some(document) if there was an update otherwise false
     */
-  def updateSimilarDocs(minSim: Float = Conf.minSim,
-                        maxDocs: Int = Conf.maxDocs): Option[Document] = {
+  def updateSimilarDocs(maxDocs: Int = Conf.maxDocs): Option[Document] = {
     val updateTime = new Date().getTime
     val deltaTime =  1000 * 60 * 60 * 8  // 8 hours
     val query = LongPoint.newRangeQuery(updateFldName, 0, updateTime  - deltaTime) // all documents updated before deltaTime from now
@@ -529,7 +525,7 @@ class TopIndex(simSearch: SimDocsSearch,
     // Update 'update time' field
     val retSet = if (topDocs.totalHits == 0) None else {
       val doc = topSearcher.doc(topDocs.scoreDocs(0).doc)
-      val ndoc = updateSimilarDocs(doc, minSim, maxDocs)
+      val ndoc = updateSimilarDocs(doc, maxDocs)
       Some(ndoc)
     }
     topReader.close()
@@ -540,12 +536,10 @@ class TopIndex(simSearch: SimDocsSearch,
     * Update sdIdFldName fields of one document whose update time is outdated
     *
     * @param doc document to be updated
-    * @param minSim minimum acceptable similarity between documents
     * @param maxDocs maximum number of similar documents to be retrieved
     * @return document with its similar doc fields updated
     */
   def updateSimilarDocs(doc: Document,
-                        minSim: Float,
                         maxDocs: Int): Document = {
     val updateTime = new Date().getTime
     val ndoc = new Document()
@@ -575,7 +569,7 @@ class TopIndex(simSearch: SimDocsSearch,
     ndoc.add(new StoredField(contentFldName, content))
 
     // Include 'sd_id' (similar docs) fields
-    simSearch.searchIds(content, idxFldNames, maxDocs, minSim, None).
+    simSearch.searchIds(content, idxFldNames, maxDocs, Conf.minNGrams, None).
       foreach { case (sdId,_) => ndoc.add(new StoredField(sdIdFldName, sdId)) }
 
     // Update document

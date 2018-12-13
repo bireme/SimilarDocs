@@ -21,7 +21,6 @@ import org.apache.lucene.store.FSDirectory
 import org.bireme.sd.service.Conf
 
 import scala.collection.JavaConverters._
-import scala.collection.SortedMap
 
 /** Class that looks for similar documents to a given ones
   *
@@ -37,7 +36,7 @@ class SimDocsSearch(val sdIndexPath: String,
 
   val sdDirectory: FSDirectory = FSDirectory.open(new File(sdIndexPath).toPath)
   val decsDirectory: FSDirectory = FSDirectory.open(new File(decsIndexPath).toPath)
-  val decsReader: DirectoryReader = DirectoryReader.open(decsDirectory)
+  val decsReader: DirectoryReader = getReader
   val decsSearcher: IndexSearcher = new IndexSearcher(decsReader)
 
   val now: GregorianCalendar = new GregorianCalendar(TimeZone.getDefault)
@@ -72,7 +71,7 @@ class SimDocsSearch(val sdIndexPath: String,
                    outFields,
                    Set("_indexed_"), //service.Conf.idxFldNames,
                    service.Conf.maxDocs,
-                   service.Conf.minSim,
+                   service.Conf.minNGrams,
                    days))
   }
 
@@ -83,8 +82,7 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param outFields name of the fields that will be show in the output
     * @param fields document fields into where the text will be searched
     * @param maxDocs maximum number of returned documents
-    * @param minSim minimum similarity between the input text and the retrieved
-    *               field text
+    * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
     * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
     * @return a list of pairs with document score and a map of field name and a
     *         list of its contents
@@ -93,18 +91,18 @@ class SimDocsSearch(val sdIndexPath: String,
              outFields: Set[String],
              fields: Set[String],
              maxDocs: Int,
-             minSim: Float,
+             minNGrams: Int,
              lastDays: Option[Int]): List[(Float,Map[String,List[String]])] = {
     require((text != null) && text.nonEmpty)
     require((fields != null) && fields.nonEmpty)
     require(maxDocs > 0)
-    require(minSim > 0)
+    require(minNGrams > 0)
 
     val oFields = if ((outFields == null) || outFields.isEmpty) Conf.idxFldNames + "id"
                else outFields
 
-    searchIds(text, fields, maxDocs, minSim, lastDays).map {
-      case (id,score) => (score,loadDoc(id, oFields))
+    searchIds(text, fields, maxDocs, minNGrams, lastDays).map {
+      case (id,score) => (score, loadDoc(id, oFields))
     }
   }
 
@@ -114,46 +112,30 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param text the text to be searched
     * @param fields document fields into where the text will be searched
     * @param maxDocs maximum number of returned documents
-    * @param minSim minimum similarity between the input text and the retrieved
-    *               field text
+    * @param minNGrams minimum number of common ngrams retrieved to consider returning a document field text
     * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
     * @return a list of pairs with document id and document score
     */
   def searchIds(text: String,
                 fields: Set[String],
                 maxDocs: Int,
-                minSim: Float,
+                minNGrams: Int,
                 lastDays: Option[Int]): List[(Int,Float)] = {
     require ((text != null) && text.nonEmpty)
     require ((fields != null) && fields.nonEmpty)
     require (maxDocs > 0)
-    require (minSim > 0)
+    require (minNGrams > 0)
 
     val textSeq: Seq[String] = uniformText(text)
     val text2: String = textSeq.mkString(" ")
-    val dirReader = getReader
+    val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
+    val ngrams: Seq[String] = getNGrams(text2, analyzer, maxWords)
+    val dirReader: DirectoryReader = getReader
     val searcher = new IndexSearcher(dirReader)
-    val sort = false  // sort documents by date
-
-    // Retrieve documents with AND operator if the number of words is less or equal to 5
-    val andLst: List[(Int,Float)] =
-      if (textSeq.size <= 5) {
-        val andQuery = getQuery(text2, fields, lastDays, useOROperator = false, useDeCS = false)
-//println(s"andQuery=$andQuery")
-        if (sort) sortByDate(searcher, searcher.search(andQuery, 3 * maxDocs).scoreDocs,  maxDocs, minSim)
-        else getIdScore(searcher.search(andQuery, 3 * maxDocs).scoreDocs,  maxDocs, minSim)
-      }
-      else List[(Int,Float)]()
-
-    // If the number of AND documents is not enough, complete with OR documents
-    val lst = if (andLst.size < maxDocs) {
-      val orQuery = getQuery(text2, fields, lastDays, useOROperator = true, useDeCS = andLst.size < maxWords)
-      val orLst = if (sort)
-        sortByDate(searcher, searcher.search(orQuery, 3 * maxDocs).scoreDocs, maxDocs, minSim)
-      else getIdScore(searcher.search(orQuery, 3 * maxDocs).scoreDocs,  maxDocs, minSim)
-
-      andLst ++ orLst.take(maxDocs - andLst.size)
-    } else andLst
+    val lst = {
+      val orQuery = getQuery(text2, fields, lastDays, useDeCS = true)
+      getIdScore(searcher.search(orQuery, 10 * maxDocs).scoreDocs, ngrams, analyzer, maxDocs, minNGrams)
+    }
 
     dirReader.close()
     lst
@@ -179,14 +161,12 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param text the text to be searched
     * @param fields document fields into where the text will be searched
     * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
-    * @param useOROperator if true the OR operator will be used, if false the AND operator will be used
     * @param useDeCS if true DeCS synonyms will be added to the input text, if false the original input text will be used
     * @return the Lucene query object
     */
   private def getQuery(text: String,
                        fields: Set[String],
                        lastDays: Option[Int],
-                       useOROperator: Boolean,
                        useDeCS: Boolean): Query = {
     require ((text != null) && text.nonEmpty)
     require ((fields != null) && fields.nonEmpty)
@@ -198,7 +178,8 @@ class SimDocsSearch(val sdIndexPath: String,
     val textImproved: String =
       if (useDeCS) OneWordDecs.addDecsSynonyms(text, decsSearcher)
       else text
-    if (!useOROperator) mqParser.setDefaultOperator(QueryParser.Operator.AND)
+
+    mqParser.setDefaultOperator(QueryParser.Operator.OR)
     val query1: Query =  mqParser.parse(textImproved)
 
     lastDays match {
@@ -219,77 +200,104 @@ class SimDocsSearch(val sdIndexPath: String,
   }
 
   /**
-    * Filter a result of a search by date if their scores are bigger than a
-    * limit otherwise use the default sorting that uses only the score
-    *
-    * @param searcher Lucene index searcher object
-    * @param scoreDocs result of the Lucene search function
-    * @param maxDocs maximum number of returned documents
-    * @param minSim minimum similarity between the input text and the retrieved
-    *               field text
-    * @param minDateSim minimum similarity used to sort documents only by date
-    * @return a list of pairs with document id and document score
-    */
-  private def sortByDate(searcher: IndexSearcher,
-                         scoreDocs: Array[ScoreDoc],
-                         maxDocs: Int,
-                         minSim: Float,
-                         minDateSim: Float = 80.0f): List[(Int,Float)] = {
-    require (searcher != null)
-    require (scoreDocs != null)
-    require (maxDocs > 0)
-    require (minSim > 0)
-    require (minDateSim >= minSim)
-
-    def sortByDate(seq: Seq[ScoreDoc],
-                   curMap: SortedMap[String,(Int,Float)]):
-                                               SortedMap[String,(Int,Float)] = {
-      if (seq.isEmpty) curMap.take(maxDocs)
-      else {
-        val sdoc: ScoreDoc = seq.head
-        val time: String = searcher.doc(sdoc.doc, Set("entry_date").asJava).get("entry_date")
-        val ttime: String = if (time == null) today // to be at the end of the map
-                            else time.trim.replaceAll("[^0-9]+", "")
-        sortByDate(seq.tail, curMap + ((s"${ttime}_${sdoc.doc}",
-          (sdoc.doc, sdoc.score))))
-      }
-    }
-
-    // Split docs between the ones who are younger than minDateSim and the others
-    val (timeSeq, othersSeq) = scoreDocs.partition(_.score >= minDateSim)
-
-    // Sort the younger docs by date
-    val timeSortedMap = sortByDate(timeSeq,
-                                   SortedMap.empty[String,(Int,Float)](Ordering[String].reverse))
-
-    // Get the older docs whose similarity are bigger than minSim
-    val dateSeq: Array[ScoreDoc] = othersSeq.filter(_.score >= minSim)
-    val dateList = dateSeq.take(maxDocs - timeSortedMap.size).
-                                           foldLeft[List[(Int,Float)]](List()) {
-      case (lst, sdoc)=> lst :+ ((sdoc.doc, sdoc.score))
-    }
-
-    // Join both lists
-    timeSortedMap.foldLeft[List[(Int,Float)]](List()) {
-      case (lst, (_,v)) => lst :+ v
-    } ++ dateList
-  }
-
-  /**
-    * Filter a result of a search by date if their scores are bigger than a
-    * limit
+    * Get retrieved document's ids and scores filtering by 
     *
     * @param scoreDocs result of the Lucene search function
     * @param maxDocs maximum number of returned documents
-    * @param minSim minimum similarity between the input text and the retrieved
-    *               field text
+    * @param minNGrams minimum number of common ngrams retrieved to consider returning a document field text
     * @return a list of pairs with document id and document score
     */
   private def getIdScore(scoreDocs: Array[ScoreDoc],
+                         ngrams: Seq[String],
+                         analyzer: Analyzer,
                          maxDocs: Int,
-                         minSim: Float): List[(Int,Float)] = {
-    // Get docs whose similarity are bigger than minSim
-    scoreDocs.filter(_.score >= minSim).take(maxDocs).map(sdoc => (sdoc.doc, sdoc.score)).toList
+                         minNGrams: Int): List[(Int,Float)] = {
+
+    val aux: Array[(Int, ScoreDoc)] = scoreDocs.map {
+      scoreDoc =>
+        val docStr: String = loadDoc(scoreDoc.doc, service.Conf.idxFldNames)
+          .foldLeft("") { case (str, (_, lst)) => str + " " + lst.mkString(" ") }
+        val simNGrams = getNGrams(docStr, analyzer, maxWords)
+        val commonNGrams = simNGrams.intersect(ngrams)
+        (commonNGrams.size, scoreDoc)
+    }
+    val aux2 = aux.filter(t => t._1 >= minNGrams).sortWith((t1, t2) => t1._1 <= t2._1).reverse.take(maxDocs)
+
+    aux2.map(t => (t._2.doc, t._2.score)).toList
+  }
+
+  /**
+    * Loads the document content given its id and desired fields
+    *
+    * @param id Lucene document id
+    * @param fields desired document fields
+    * @return the document as a map of field name and a list of its contents
+    */
+  private def loadDoc(id: Int,
+                      fields: Set[String]): Map[String,List[String]] = {
+    require(id > 0)
+    require((fields != null) && fields.nonEmpty)
+
+    val dirReader: DirectoryReader = getReader
+    val map = asScalaBuffer[IndexableField](dirReader.document(id, fields.asJava).getFields()).
+      foldLeft[Map[String,List[String]]] (Map()) {
+      case (map2,fld) =>
+        val name = fld.name()
+        val lst = map2.getOrElse(name, List())
+        map2 + ((name, fld.stringValue() :: lst))
+    }
+
+    dirReader.close()
+    map
+  }
+
+    /**
+    * Given an input text, returns all of its ngrams
+    *
+    * @param text input text
+    * @param analyzer Lucene analyzer class
+    * @param maxTokens maximum number of tokens to be returned
+    * @return a sequence of ngrams
+    */
+  private def getNGrams(text: String,
+                        analyzer: Analyzer,
+                        maxTokens: Int): Seq[String] = {
+    require(text != null)
+    require(analyzer != null)
+
+    val tokenStream = analyzer.tokenStream(null, text)
+    val cattr: CharTermAttribute = tokenStream.addAttribute(classOf[CharTermAttribute])
+
+    tokenStream.reset()
+    val seq = getTokens(tokenStream, cattr, Seq[String](), maxTokens)
+
+    tokenStream.end()
+    tokenStream.close()
+
+    seq
+  }
+
+  /**
+    * Returns all tokens from a token stream
+    *
+    * @param tokenStream Lucene token stream object
+    * @param cattr auxiliary object. See Lucene documentation
+    * @param auxSeq temporary working seq
+    * @param maxTokens maximum number of tokens to be returned
+    * @return a sequence of tokens
+    */
+  private def getTokens(tokenStream: TokenStream,
+                        cattr: CharTermAttribute,
+                        auxSeq: Seq[String],
+                        maxTokens: Int): Seq[String] = {
+    require(tokenStream != null)
+    require(cattr != null)
+    require(auxSeq != null)
+
+    if ((maxTokens > 0) && tokenStream.incrementToken()) {
+      val tok = cattr.toString
+      getTokens(tokenStream, cattr, auxSeq :+ tok, maxTokens - 1)
+    } else auxSeq
   }
 
   /**
@@ -350,37 +358,12 @@ class SimDocsSearch(val sdIndexPath: String,
     } + "</documents>"
   }
 
- /**
-   * Open a new DirectoryReader if necessary, otherwise use the old one
-   *
-   * @return an DirectoryReader reflecting all changes made in the Lucene index
-   */
-  def getReader: DirectoryReader = DirectoryReader.open(sdDirectory)
-
   /**
-    * Loads the document content given its id and desired fields
+    * Open a new DirectoryReader if necessary, otherwise use the old one
     *
-    * @param id Lucene document id
-    * @param fields desired document fields
-    * @return the document as a map of field name and a list of its contents
+    * @return an DirectoryReader reflecting all changes made in the Lucene index
     */
-  private def loadDoc(id: Int,
-                      fields: Set[String]): Map[String,List[String]] = {
-    require(id > 0)
-    require((fields != null) && fields.nonEmpty)
-
-    val dirReader = getReader
-    val map = asScalaBuffer[IndexableField](dirReader.document(id, fields.asJava).getFields()).
-                                    foldLeft[Map[String,List[String]]] (Map()) {
-      case (map2,fld) =>
-        val name = fld.name()
-        val lst = map2.getOrElse(name, List())
-        map2 + ((name, fld.stringValue() :: lst))
-    }
-
-    dirReader.close()
-    map
-  }
+  def getReader: DirectoryReader = DirectoryReader.open(sdDirectory)
 }
 
 object SimDocsSearch extends App {
@@ -392,7 +375,7 @@ object SimDocsSearch extends App {
     "\n\t[<-outFields=<field>,<field>,...,<field>] - document fields used will be show in the output" +
     "\n\t[-fields=<field>,<field>,...,<field>] - document fields used to look for similarities" +
     "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
-    "\n\t[-minSim=<num>] - minimum similarity level (0 to 1.0) accepted " +
+    "\n\t[-minNGrams=<num>] - minimum number of common ngrams retrieved to consider returning a document field text" +
     "\n\t[-lastDays=<num>] - return only docs that are younger (entrance_date flag) than 'lastDays' days")
     System.exit(1)
   }
@@ -406,32 +389,30 @@ object SimDocsSearch extends App {
       else map + ((split(0).substring(1), split(1)))
   }
 
-  val outFields = parameters.get("outFields") match {
+  val outFields: Set[String] = parameters.get("outFields") match {
     case Some(sFields) => sFields.split(" *, *").toSet
     case None => Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs")//service.Conf.idxFldNames
   }
-  val fldNames = parameters.get("fields") match {
+  val fldNames: Set[String] = parameters.get("fields") match {
     case Some(sFields) => sFields.split(" *, *").toSet
     case None => Set("_indexed_")  //Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs")//service.Conf.idxFldNames
   }
-  val maxDocs = parameters.getOrElse("maxDocs", "10").toInt
-  val minSim = parameters.getOrElse("minSim", "0.5").toFloat
-  val lastDays = parameters.get("lastDays").map(_.toInt)
-  val search = new SimDocsSearch(args(0), args(1))
-  val maxWords = search.maxWords
-  val docs = search.search(args(2), outFields, fldNames, maxDocs, minSim, lastDays)
-
-  val analyzer = new NGramAnalyzer(NGSize.ngram_min_size,
-                                   NGSize.ngram_max_size)
-  val set_text = getNGrams(args(2), analyzer, maxWords)
+  val maxDocs: Int = parameters.getOrElse("maxDocs", "10").toInt
+  val minNGrams: Int = parameters.getOrElse("minNGrams", Conf.minNGrams.toString).toInt
+  val lastDays: Option[Int] = parameters.get("lastDays").map(_.toInt)
+  val search: SimDocsSearch = new SimDocsSearch(args(0), args(1))
+  val maxWords: Int = search.maxWords
+  val docs: List[(Float,Map[String,List[String]])] = search.search(args(2), outFields, fldNames, maxDocs, minNGrams, lastDays)
+  val analyzer: NGramAnalyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
+  val set_text = search.getNGrams(args(2), analyzer, maxWords)
 
   docs.foreach {
-    case (score,doc) =>
+    case (score, doc) =>
       println("\n------------------------------------------------------")
       println(s"score: $score")
-      val sim = getSimilarText(doc, service.Conf.idxFldNames)
+      val sim = getDocumentText(doc, service.Conf.idxFldNames)
       //println(s"text=$sim")
-      val set_similar = getNGrams(sim, analyzer, maxWords)
+      val set_similar = search.getNGrams(sim, analyzer, maxWords)
       val set_common = set_text.intersect(set_similar)
       print("original ngrams: ")
       set_text.foreach(str => print(s"[$str] "))
@@ -449,65 +430,16 @@ object SimDocsSearch extends App {
   }
   //println(search.doc2json(docs))
 
-  private def getSimilarText(doc: Map[String,List[String]],
-                             fNames: Set[String]): String = {
+  private def getDocumentText(doc: Map[String,List[String]],
+                              fNames: Set[String]): String = {
     require(doc != null)
     require(fNames != null)
 
     fNames.foldLeft[String]("") {
       case (str, name) => doc.get(name) match {
-        case Some(content) => str + " " + content
+        case Some(contentList) => str + " " + contentList.mkString(" ")
         case None => str
       }
     }
-  }
-
-  /**
-    * Given an input text, returns all of its ngrams
-    *
-    * @param text input text
-    * @param analyzer Lucene analyzer class
-    * @param maxTokens maximum number of tokens to be returned
-    * @return a sequence of ngrams
-    */
-  private def getNGrams(text: String,
-                        analyzer: Analyzer,
-                        maxTokens: Int): Seq[String] = {
-    require(text != null)
-    require(analyzer != null)
-
-    val tokenStream = analyzer.tokenStream(null, text)
-    val cattr = tokenStream.addAttribute(classOf[CharTermAttribute])
-
-    tokenStream.reset()
-    val seq = getTokens(tokenStream, cattr, Seq[String](), maxTokens)
-
-    tokenStream.end()
-    tokenStream.close()
-
-    seq
-  }
-
-  /**
-    * Returns all tokens from a token stream
-    *
-    * @param tokenStream Lucene token stream object
-    * @param cattr auxiliary object. See Lucene documentation
-    * @param auxSeq temporary working seq
-    * @param maxTokens maximum number of tokens to be returned
-    * @return a sequence of tokens
-    */
-  private def getTokens(tokenStream: TokenStream,
-                        cattr: CharTermAttribute,
-                        auxSeq: Seq[String],
-                        maxTokens: Int): Seq[String] = {
-    require(tokenStream != null)
-    require(cattr != null)
-    require(auxSeq != null)
-
-    if ((maxTokens > 0) && tokenStream.incrementToken()) {
-      val tok = cattr.toString
-      getTokens(tokenStream, cattr, auxSeq :+ tok, maxTokens - 1)
-    } else auxSeq
   }
 }
