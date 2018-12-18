@@ -222,7 +222,7 @@ class SimDocsSearch(val sdIndexPath: String,
         (commonNGrams.size, scoreDoc)
     }
     val min = Math.min(minNGrams, ngrams.size)
-    val aux2 = aux.filter(t => t._1 >= min).sortWith((t1, t2) => t1._1 <= t2._1).reverse.take(maxDocs)
+    val aux2 = aux.filter(t => t._1 >= min).sortWith((t1, t2) => t1._1 <   t2._1).reverse.take(maxDocs)
 
     aux2.map(t => (t._2.doc, t._2.score)).toList
   }
@@ -429,6 +429,7 @@ object SimDocsSearch extends App {
           }
       }
   }
+  search.close()
   //println(search.doc2json(docs))
 
   private def getDocumentText(doc: Map[String,List[String]],
