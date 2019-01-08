@@ -274,8 +274,8 @@ class TopIndex(simSearch: SimDocsSearch,
     require(maxDocs > 0)
 
     val head = """<?xml version="1.0" encoding="UTF-8"?><documents>"""
-    getSimDocs(psId, profiles, outFields, maxDocs, lastDays).
-                                                       foldLeft[String] (head) {
+    val simDocs = getSimDocs(psId, profiles, outFields, maxDocs, lastDays)
+    simDocs.foldLeft[String] (head) {
       case (str,map) =>
         s"$str<document>" + map.foldLeft[String]("") {
           case (str2, (tag,lst)) =>
@@ -318,8 +318,8 @@ class TopIndex(simSearch: SimDocsSearch,
     require(outFlds != null)
     require(maxDocs > 0)
 
-    val tuser = user.trim()
-    val docIds = names.foldLeft[List[List[Int]]](List()) {
+    val tuser: String = user.trim()
+    val docIds: List[List[Int]] = names.foldLeft[List[List[Int]]](List()) {
       case (lst, name) =>
         val tname = name.trim()
         val id = s"${tuser}_$tname"
@@ -331,8 +331,11 @@ class TopIndex(simSearch: SimDocsSearch,
                 updateSimilarDocs(doc, maxDocs)
               } else doc
             val sdIds: mutable.Seq[IndexableField] = ndoc.getFields().asScala.filter(iFld => iFld.name().equals(sdIdFldName))
-            lst :+ sdIds.foldLeft[List[Int]](List()) {
-              case (lst3, ifld) => lst3 :+ ifld.numericValue().intValue()
+            if (sdIds.isEmpty) lst
+            else {
+              lst :+ sdIds.foldLeft[List[Int]](List()) {
+                case (lst3, ifld) => lst3 :+ ifld.numericValue().intValue()
+              }
             }
           case None => lst
         }
@@ -511,11 +514,11 @@ class TopIndex(simSearch: SimDocsSearch,
     * Update sdIdFldName fields of one document whose update time is outdated
     *
     * @param maxDocs maximum number of similar documents to be retrieved
-    * @return Some(document) if there was an update otherwise false
+    * @return Some(document) if there was an update otherwise None
     */
   def updateSimilarDocs(maxDocs: Int = Conf.maxDocs): Option[Document] = {
     val updateTime = new Date().getTime
-    val deltaTime =  1000 * 60 * 60 * 8  // 8 hours
+    val deltaTime =  1000 * 60 * 60 * 2 // 2 hours // 8 hours
     val query = LongPoint.newRangeQuery(updateFldName, 0, updateTime  - deltaTime) // all documents updated before deltaTime from now
     val topReader = DirectoryReader.open(topWriter)
     val topSearcher = new IndexSearcher(topReader)
@@ -627,4 +630,62 @@ class TopIndex(simSearch: SimDocsSearch,
     topWriter.commit()
     topReader.close()
   }
+}
+
+object TopIndex extends App {
+  private def usage(): Unit = {
+    Console.err.println("usage: TopIndex" +
+      "\n\t<sdIndexPath> - lucene Index where the similar document will be searched" +
+      "\n\t<decsIndexPath> - lucene Index where the one word decs synonyms document will be searched" +
+      "\n\t<topIndexPath> - lucene Index where the user profiles are stored" +
+      "\n\t<psId> - personal service identifier" +
+      "\n\t-profiles=<prof1>,<prof2>,...,<prof>] - user profiles used to search the documents" +
+      "\n\t[<-outFields=<field>,<field>,...,<field>] - document fields used will be show in the output" +
+      "\n\t[-fields=<field>,<field>,...,<field>] - document fields used to look for similarities" +
+      "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
+      "\n\t[-lastDays=<num>] - return only docs that are younger (entrance_date flag) than 'lastDays' days" +
+      "\n\t[--preprocess] - pre process the similar documents to increase speed")
+
+    System.exit(1)
+  }
+
+  private def preProcess(topIndex: TopIndex): Unit = {
+    topIndex.updateSimilarDocs() match {
+      case Some(_) =>
+        print(".")
+        preProcess(topIndex)
+      case None => println()
+    }
+  }
+
+  if (args.length < 5) usage()
+
+  val parameters = args.drop(5).foldLeft[Map[String,String]](Map()) {
+    case (map,par) =>
+      val split = par.split(" *= *", 2)
+      if (split.length == 1) map + ((split(0).substring(2), ""))
+      else map + ((split(0).substring(1), split(1)))
+  }
+
+  val profiles: Set[String] = args(4).drop(9).split(" *, *").toSet
+  val outFields: Set[String] = parameters.get("outFields") match {
+    case Some(sFields) => sFields.split(" *, *").toSet
+    case None => Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs")//service.Conf.idxFldNames
+  }
+  val fldNames: Set[String] = parameters.get("fields") match {
+    case Some(sFields) => sFields.split(" *, *").toSet
+    case None => Set("_indexed_")  //Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs")//service.Conf.idxFldNames
+  }
+  val maxDocs: Int = parameters.getOrElse("maxDocs", "10").toInt
+  val lastDays: Int = parameters.getOrElse("lastDays", "0").toInt
+  val preprocess: Boolean = parameters.contains("preprocess")
+  val search: SimDocsSearch = new SimDocsSearch(args(0), args(1))
+  val topIndex = new TopIndex(search, args(2), fldNames)
+  if (preprocess) preProcess(topIndex)
+
+  val xml = topIndex.getSimDocsXml(args(3), profiles, outFields, maxDocs, lastDays)
+
+  println(s"xml=$xml")
+
+  topIndex.close()
 }
