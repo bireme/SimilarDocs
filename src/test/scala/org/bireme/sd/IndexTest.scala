@@ -12,6 +12,7 @@ import java.io.File
 import org.apache.lucene.index.{DirectoryReader, IndexReader, Term}
 import org.apache.lucene.search.{IndexSearcher, TermQuery, TopDocs}
 import org.apache.lucene.store.FSDirectory
+import org.bireme.sd.service.Conf
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
@@ -20,7 +21,6 @@ object IndexTest extends App {
   private def usage(): Unit = {
     Console.err.println("usage: IndexTest\n" +
       "\t\t<indexPath> - path to Lucene index\n" +
-      "\t\t[<field>] - field name to be used in TermQuery. Default is 'ab'\n" +
       "\t\t[<term>] - term used to verify the number of hits. Default is 'dengue'")
     System.exit(0)
   }
@@ -28,13 +28,13 @@ object IndexTest extends App {
   val size = args.length
   if (size < 1) usage()
 
-  val field = if (size > 1) args(1) else "ab"
   val term = if (size > 2) args(2) else "dengue"
+
 
   val hits = Try[Int] {
     val directory: FSDirectory = FSDirectory.open(new File(args(0)).toPath)
     val ireader: DirectoryReader = DirectoryReader.open(directory)
-    val hitNum: Int = checkDocs(new Term(field,term), ireader)
+    val hitNum: Int = checkDocs(new Term(Conf.indexedField, term), ireader)
 
     ireader.close()
     directory.close()

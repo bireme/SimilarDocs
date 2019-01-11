@@ -5,7 +5,6 @@
 
   ==========================================================================*/
 
-
 package org.bireme.sd.service
 
 import java.nio.file.Paths
@@ -29,14 +28,12 @@ import scala.collection.mutable
   *
   * @param simSearch similar documents search engine object
   * @param topIndexPath path/name of the TopIndex Lucene index
-  * @param idxFldNames names of document fields used to find similar docs
   *
   * author: Heitor Barbieri
   * date: 20170601
 */
 class TopIndex(simSearch: SimDocsSearch,
-               topIndexPath: String,
-               idxFldNames: Set[String] = Conf.idxFldNames) {
+               topIndexPath: String) {
   require(simSearch != null)
   require((topIndexPath != null) && (!topIndexPath.trim.isEmpty))
 
@@ -147,7 +144,7 @@ class TopIndex(simSearch: SimDocsSearch,
     // Add similar documents ids
     if (getSdIds) {
       doc.removeFields(sdIdFldName)
-      simSearch.searchIds(newContent, idxFldNames, maxDocs, Conf.minNGrams, None).foreach {
+      simSearch.searchIds(newContent, maxDocs, Conf.minNGrams, None).foreach {
         case (id,_) => doc.add(new StoredField(sdIdFldName, id))
       }
     }
@@ -572,7 +569,7 @@ class TopIndex(simSearch: SimDocsSearch,
     ndoc.add(new StoredField(contentFldName, content))
 
     // Include 'sd_id' (similar docs) fields
-    simSearch.searchIds(content, idxFldNames, maxDocs, Conf.minNGrams, None).
+    simSearch.searchIds(content, maxDocs, Conf.minNGrams, None).
       foreach { case (sdId,_) => ndoc.add(new StoredField(sdIdFldName, sdId)) }
 
     // Update document
@@ -641,7 +638,6 @@ object TopIndex extends App {
       "\n\t<psId> - personal service identifier" +
       "\n\t-profiles=<prof1>,<prof2>,...,<prof>] - user profiles used to search the documents" +
       "\n\t[<-outFields=<field>,<field>,...,<field>] - document fields used will be show in the output" +
-      "\n\t[-fields=<field>,<field>,...,<field>] - document fields used to look for similarities" +
       "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
       "\n\t[-lastDays=<num>] - return only docs that are younger (entrance_date flag) than 'lastDays' days" +
       "\n\t[--preprocess] - pre process the similar documents to increase speed")
@@ -672,15 +668,11 @@ object TopIndex extends App {
     case Some(sFields) => sFields.split(" *, *").toSet
     case None => Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs")//service.Conf.idxFldNames
   }
-  val fldNames: Set[String] = parameters.get("fields") match {
-    case Some(sFields) => sFields.split(" *, *").toSet
-    case None => Set("_indexed_")  //Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs")//service.Conf.idxFldNames
-  }
   val maxDocs: Int = parameters.getOrElse("maxDocs", "10").toInt
   val lastDays: Int = parameters.getOrElse("lastDays", "0").toInt
   val preprocess: Boolean = parameters.contains("preprocess")
   val search: SimDocsSearch = new SimDocsSearch(args(0), args(1))
-  val topIndex = new TopIndex(search, args(2), fldNames)
+  val topIndex = new TopIndex(search, args(2))
   if (preprocess) preProcess(topIndex)
 
   val xml = topIndex.getSimDocsXml(args(3), profiles, outFields, maxDocs, lastDays)

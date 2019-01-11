@@ -309,7 +309,7 @@ class LuceneIndexActor(today: String,
 
   /**
     * Converts a document from a map of fields into a lucene document (all then will be stored but
-    * no indexed. Create a field 'indexed' with fldIdxNames that will be indexed.
+    * no indexed. Create a field '_indexed_' with fldIdxNames that will be indexed.
     *
     * @param map a document of (field name -> all occurrences of the field)
     * @return a lucene document
@@ -337,7 +337,7 @@ class LuceneIndexActor(today: String,
             }
           }
         }
-        if (fldIdxNames.contains(tag)) {  // Add indexed fields
+        if (fldIdxNames.contains(tag)) {  // Add indexed + stored fields as stored fields
           lst.foreach {
             elem =>
               val fld = if (elem.length < 10000) elem // Bug during indexing. Fix in future. Sorry!
@@ -352,7 +352,7 @@ class LuceneIndexActor(today: String,
           }
         }
     }
-    doc.add(new TextField("_indexed_", sbuilder.toString, Field.Store.NO))
+    doc.add(new TextField(Conf.indexedField, sbuilder.toString, Field.Store.NO)) // Add _indexed_ field as indexed field
     doc
   }
 }

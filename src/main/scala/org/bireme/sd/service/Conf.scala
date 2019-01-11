@@ -20,4 +20,6 @@ object Conf {
                         "ab",
                         "ab_pt","ab_en","ab_es","ab_it","ab_fr","ab_de","ab_ru",
                         "ti_eng","ab_french","decs")
+
+  val indexedField: String = "_indexed_" // Unique field which contains all document and that will be indexed
 }

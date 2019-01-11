@@ -51,7 +51,7 @@ object TopIndexTestService extends App {
   val cleanSimDocs = parameters.contains("cleanSimDocs")
   val showProfiles = parameters.contains("showProfiles")
   val simDocs = new SimDocsSearch(sdIndexPath, decsIndexPath)
-  val topIndex = new TopIndex(simDocs, topIndexPath, Conf.idxFldNames)
+  val topIndex = new TopIndex(simDocs, topIndexPath)
   addProfile match {
     case Some(profile) =>
       val split = profile.trim().split(" *\\= *", 2)

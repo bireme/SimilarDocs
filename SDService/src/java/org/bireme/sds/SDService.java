@@ -55,7 +55,7 @@ public class SDService extends HttpServlet {
         Tools.deleteLockFile(decsIndexPath);
 
         simSearch = new SimDocsSearch(sdIndexPath, decsIndexPath);
-        topIndex = new TopIndex(simSearch, topIndexPath, Conf.idxFldNames());
+        topIndex = new TopIndex(simSearch, topIndexPath);
         updaterService = new UpdaterService(topIndex);
 
         context.setAttribute("MAINTENANCE_MODE", Boolean.FALSE);

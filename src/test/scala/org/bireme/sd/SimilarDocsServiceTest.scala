@@ -25,7 +25,7 @@ import scala.util.matching.Regex
 class SimilarDocsServiceTest extends FlatSpec {
 
   /**
-    * Load the content of a web page and check if there is a Timeouts
+    * Load the content of a web page and check if there is a timeout
     *
     * @param url the address to the page to be downloaded
     * @return the page content
@@ -48,7 +48,7 @@ class SimilarDocsServiceTest extends FlatSpec {
     content
   }
 
- /**
+ /**maintenance=false
    * Count how many times a word appears in a String
    *
    * @param content the string into which the word will be searched
@@ -72,7 +72,7 @@ class SimilarDocsServiceTest extends FlatSpec {
   //val service = "http://localhost:8084"
 
   val id = "Téster!@paho.org"
-  val profiles = Map(
+  val profiles: Map[String, String] = Map(
     "é profile 0" -> "humano",
     "é profile 1" -> "zika dengue",
     "é profile 2" -> "febre amarela",
@@ -121,7 +121,7 @@ class SimilarDocsServiceTest extends FlatSpec {
   }
 
   // === Check the 'Show Profiles' service ===
-  s"The user '$id'" should "retrieve his profiles" in {
+  s"The user '$id'" should "retrieve his/her profiles" in {
     val profs = "<name>([^<]+)</name>\\s+<content>([^<]+)</content>".r
     val url = s"$service/SDService?psId=$id&showProfiles="
     val content = pageContent(url)
@@ -144,21 +144,19 @@ class SimilarDocsServiceTest extends FlatSpec {
   }
 
   // === Check the "Get Similar Documents" service (quality of retrieved docs) ===
-  val tot: Int = profiles.foldLeft[Int](0) {
-    case (i,p) =>
-      val url = s"$service/SDService?psId=$id&getSimDocs=${p._1}"
+  profiles.foreach {
+    prof =>
+      val url = s"$service/SDService?psId=$id&getSimDocs=${prof._1}"
       val content = pageContent(url).toLowerCase()
-      val profWords = content.split("\\s+").foldLeft[Set[String]](Set()) {
-        case (s,word) => s + word
+      val profWords: Set[String] = prof._2.split("\\s+").toSet
+      val common: Int = profWords.foldLeft[Int](0) {
+        case (tot, word) => tot + getOccurrences(content, word)
       }
-      i + profWords.foldLeft[Int](0) {
-        case (i2, word) => i2 + getOccurrences(content, word)
+      s"The user '$id'" should
+        "retrieve documents with at least 10 match profile words" in {
+        common should be >= 10
       }
   }
-  s"The user '$id'" should
-    "retrieve documents with at least 10 match profile words" in {
-      tot should be >= 10
-    }
 
   // === Check the 'Delete Profile' service ===
   profiles.foreach {
@@ -167,7 +165,7 @@ class SimilarDocsServiceTest extends FlatSpec {
       val prof = s"<name>$profName</name>\\s+<content>[^<]+</content>".r
       val url = s"$service/SDService?psId=$id&deleteProfile=$profName"
 
-      s"The user '$id'" should s"delete his profile [$profName]" in {
+      s"The user '$id'" should s"delete his/her profile [$profName]" in {
         prof.findFirstIn(pageContent(url)) should be (None)
       }
   }

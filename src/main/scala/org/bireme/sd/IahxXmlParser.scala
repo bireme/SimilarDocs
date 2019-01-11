@@ -68,7 +68,10 @@ object IahxXmlParser {
 
     if (gotoOpenDocTag(lines)) {
       if (lines.isEmpty) None
-      else Some(getFields(fldNames, auxMap, lines))
+      else {
+        val flds: mutable.Map[String, List[String]] = getFields(fldNames, auxMap, lines)
+        Some(flds)
+      }
     } else None
   }
 

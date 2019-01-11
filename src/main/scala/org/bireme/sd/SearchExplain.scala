@@ -10,14 +10,13 @@ package org.bireme.sd
 
 import java.io.File
 
-import org.bireme.sd.service.Conf
-
 import org.apache.lucene.analysis.core.KeywordAnalyzer
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
-import org.apache.lucene.queryparser.classic.{MultiFieldQueryParser,QueryParser}
-import org.apache.lucene.search.{IndexSearcher,Query,TotalHitCountCollector}
-import org.apache.lucene.store.FSDirectory
 import org.apache.lucene.index.DirectoryReader
+import org.apache.lucene.queryparser.classic.QueryParser
+import org.apache.lucene.search.{IndexSearcher, Query, TotalHitCountCollector}
+import org.apache.lucene.store.FSDirectory
+import org.bireme.sd.service.Conf
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.TreeMap
@@ -26,13 +25,10 @@ import scala.collection.immutable.TreeMap
 
 object SearchExplain extends App {
   private def usage(): Unit = {
-    Console.err.println("usage: SearchExplain <indexPath> <text> " +
-      "[<field>,<field>,...,<field>]")
+    Console.err.println("usage: SearchExplain <indexPath> <text>")
     System.exit(1)
   }
   if (args.length < 2) usage()
-  val fields = if (args.length > 2) args(2).trim.split(" *\\, *").toSet
-               else Set("_indexed_") //Conf.idxFldNames
   val dir = FSDirectory.open(new File(args(0)).toPath)
   val reader = DirectoryReader.open(dir)
   val searcher = new IndexSearcher(reader)
@@ -103,7 +99,7 @@ object SearchExplain extends App {
   private def getTotalHits(text: String): Int = {
     val collector = new TotalHitCountCollector()
     val analyzer = new KeywordAnalyzer()
-    val mqParser = new MultiFieldQueryParser(fields.toArray, analyzer)
+    val mqParser = new QueryParser(Conf.indexedField, analyzer)
     val query = mqParser.parse(text)
 
     searcher.search(query, collector)
@@ -114,7 +110,7 @@ object SearchExplain extends App {
     val collector = new TotalHitCountCollector()
     val analyzer = new NGramAnalyzer(NGSize.ngram_min_size,
                                      NGSize.ngram_max_size)
-    val mqParser = new MultiFieldQueryParser(fields.toArray, analyzer)
+    val mqParser = new QueryParser(Conf.indexedField, analyzer)
     val query = mqParser.parse(text)
     searcher.search(query, collector)
     collector.getTotalHits
@@ -141,7 +137,7 @@ object SearchExplain extends App {
   private def getQuery(text: String,
                        useOR: Boolean): Query = {
     val analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
-    val mqParser = new MultiFieldQueryParser(fields.toArray, analyzer)
+    val mqParser = new QueryParser(Conf.indexedField, analyzer)
     if (!useOR) mqParser.setDefaultOperator(QueryParser.Operator.AND)
 
     mqParser.parse(text)
