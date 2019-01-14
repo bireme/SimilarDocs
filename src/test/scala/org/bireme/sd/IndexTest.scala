@@ -20,12 +20,13 @@ object IndexTest extends App {
   private def usage(): Unit = {
     Console.err.println("usage: IndexTest\n" +
       "\t\t<indexPath> - path to Lucene index\n" +
+      "\t\t<field> - document field\n" +
       "\t\t[<term>] - term used to verify the number of hits. Default is 'dengue'")
     System.exit(0)
   }
 
   val size = args.length
-  if (size < 1) usage()
+  if (size < 2) usage()
 
   val term = if (size > 2) args(2) else "dengue"
 
@@ -33,7 +34,7 @@ object IndexTest extends App {
   val hits = Try[Int] {
     val directory: FSDirectory = FSDirectory.open(new File(args(0)).toPath)
     val ireader: DirectoryReader = DirectoryReader.open(directory)
-    val hitNum: Int = checkDocs(new Term("descriptor", term), ireader)
+    val hitNum: Int = checkDocs(new Term(args(2), term), ireader)
 
     ireader.close()
     directory.close()
