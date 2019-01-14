@@ -12,7 +12,6 @@ import java.io.File
 import org.apache.lucene.index.{DirectoryReader, IndexReader, Term}
 import org.apache.lucene.search.{IndexSearcher, TermQuery, TopDocs}
 import org.apache.lucene.store.FSDirectory
-import org.bireme.sd.service.Conf
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
@@ -34,7 +33,7 @@ object IndexTest extends App {
   val hits = Try[Int] {
     val directory: FSDirectory = FSDirectory.open(new File(args(0)).toPath)
     val ireader: DirectoryReader = DirectoryReader.open(directory)
-    val hitNum: Int = checkDocs(new Term(Conf.indexedField, term), ireader)
+    val hitNum: Int = checkDocs(new Term("descriptor", term), ireader)
 
     ireader.close()
     directory.close()
