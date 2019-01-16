@@ -34,7 +34,7 @@ object IndexTest extends App {
   val hits = Try[Int] {
     val directory: FSDirectory = FSDirectory.open(new File(args(0)).toPath)
     val ireader: DirectoryReader = DirectoryReader.open(directory)
-    val hitNum: Int = checkDocs(new Term(args(2), term), ireader)
+    val hitNum: Int = checkDocs(new Term(args(1), term), ireader)
 
     ireader.close()
     directory.close()
