@@ -32,7 +32,7 @@ class SimDocsSearch(val sdIndexPath: String,
   require(sdIndexPath != null)
   require(decsIndexPath != null)
 
-  val maxWords = 20   // limit the max number of words to be used as input text
+  val maxWords = 100 /*20*/   // limit the max number of words to be used as input text
 
   val sdDirectory: FSDirectory = FSDirectory.open(new File(sdIndexPath).toPath)
   val decsDirectory: FSDirectory = FSDirectory.open(new File(decsIndexPath).toPath)
@@ -58,20 +58,25 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param text the text to be searched
     * @param outFields name of the fields that will be show in the output
     * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
+    * @param explain if true add original, similar and common ngrams to the each outputed similar document
     * @return a json string of the similar documents
     */
   def search(text: String,
              outFields: Set[String],
-             lastDays: Int): String = {
+             lastDays: Int,
+             explain: Boolean): String = {
     require((text != null) && (!text.isEmpty))
 
     val days = if (lastDays <= 0) None else Some(lastDays)
 
-    doc2xml(search(text,
-                   outFields,
-                   service.Conf.maxDocs,
-                   service.Conf.minNGrams,
-                   days))
+    val docs: List[(Float, Map[String, List[String]])] =
+      search(text, outFields, service.Conf.maxDocs, service.Conf.minNGrams, days)
+    val docs2 = docs.map {
+      doc =>
+        val ngrams = if (explain) Some(getCommonNGrams(text, doc._2)) else None
+        (doc._1, doc._2, ngrams)
+    }
+    doc2xml(docs2)
   }
 
   /**
@@ -127,7 +132,7 @@ class SimDocsSearch(val sdIndexPath: String,
     val searcher = new IndexSearcher(dirReader)
     val lst = {
       val orQuery = getQuery(text2, lastDays, useDeCS = true)
-println(s"===> getIdScore docs=${searcher.search(orQuery, 10).totalHits} orQuery=$orQuery")
+//println(s"===> getIdScore docs=${searcher.search(orQuery, 10).totalHits} orQuery=$orQuery")
       getIdScore(searcher.search(orQuery, 10 * maxDocs).scoreDocs, ngrams, analyzer, maxDocs, minNGrams)
     }
 
@@ -192,6 +197,8 @@ println(s"===> getIdScore docs=${searcher.search(orQuery, 10).totalHits} orQuery
     * Get retrieved document's ids and scores filtering by 
     *
     * @param scoreDocs result of the Lucene search function
+    * @param ngrams sequence of ngrams of the original text
+    * @param analyzer Lucene analyzer class
     * @param maxDocs maximum number of returned documents
     * @param minNGrams minimum number of common ngrams retrieved to consider returning a document field text
     * @return a list of pairs with document id and document score
@@ -206,12 +213,12 @@ println(s"===> getIdScore docs=${searcher.search(orQuery, 10).totalHits} orQuery
       scoreDoc =>
         val docStr: String = loadDoc(scoreDoc.doc, service.Conf.idxFldNames)
           .foldLeft("") { case (str, (_, lst)) => str + " " + lst.mkString(" ") }
-        val simNGrams = getNGrams(docStr, analyzer, maxWords)
-        val commonNGrams = simNGrams.intersect(ngrams)
+        val simNGrams: Seq[String] = getNGrams(docStr, analyzer, maxWords)
+        val commonNGrams: Seq[String] = simNGrams.intersect(ngrams)
         (commonNGrams.size, scoreDoc)
     }
     val min = Math.min(minNGrams, ngrams.size)
-    val aux2 = aux.filter(t => t._1 >= min).sortWith((t1, t2) => t1._1 <   t2._1).reverse.take(maxDocs)
+    val aux2 = aux.filter(t => t._1 >= min).sortWith((t1, t2) => t1._1 < t2._1).reverse.take(maxDocs)
 
     aux2.map(t => (t._2.doc, t._2.score)).toList
   }
@@ -291,6 +298,43 @@ println(s"===> getIdScore docs=${searcher.search(orQuery, 10).totalHits} orQuery
   }
 
   /**
+    * Given an original document and a similar one, return a triple (original doc ngrams, similar doc ngrams, common ngrams)
+    * @param original the string representing the original document
+    * @param doc a map representing the similar document
+    * @return a triple of (original doc ngrams, similar doc ngrams, common ngrams)
+    */
+  def getCommonNGrams(original: String,
+                      doc: Map[String,List[String]]): (List[String], List[String], List[String]) = {
+    val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
+    val sim = getDocumentText(doc, service.Conf.idxFldNames)
+    val set_original = getNGrams(Tools.strongUniformString(original), analyzer, maxWords)
+    val set_similar = getNGrams(Tools.strongUniformString(sim), analyzer, maxWords)
+    val set_common = set_original.intersect(set_similar)
+
+    (set_original.toList, set_similar.toList, set_common.toList)
+  }
+
+  /**
+    * Given a document represented by a map (field->content) and the desired fields, return a string representation of
+    * the document
+    * @param doc the input document represented as a map
+    * @param fNames the desired fields used to create the output
+    * @return the string representation of the document.
+    */
+  private def getDocumentText(doc: Map[String,List[String]],
+                              fNames: Set[String]): String = {
+    require(doc != null)
+    require(fNames != null)
+
+    fNames.foldLeft[String]("") {
+      case (str, name) => doc.get(name) match {
+        case Some(contentList) => str + " " + contentList.mkString(" ")
+        case None => str
+      }
+    }
+  }
+
+  /**
     * Convert a document represented by a list of (score, map of fields) into
     * a json String
     *
@@ -326,16 +370,26 @@ println(s"===> getIdScore docs=${searcher.search(orQuery, 10).totalHits} orQuery
     * Convert a document represented by a list of (score, map of fields) into
     * a xml String
     *
-    * @param docs a list of (score, document[map of fields])
+    * @param docs a list of (score, document[map of fields], (original_ngrams, similar_ngrams, common_ngrams))
     * @return a xml string representation of the document
     **/
-  def doc2xml(docs: List[(Float,Map[String,List[String]])]): String = {
+  def doc2xml(docs: List[(Float,
+                          Map[String,List[String]],
+                          Option[(List[String], List[String], List[String])]
+                          )]): String = {
     require (docs != null)
 
     docs.foldLeft[String]("<?xml version=\"1.0\" encoding=\"UTF-8\"?><documents>") {
       case (str, doc) =>
-        val fields = doc._2.toList   // List[(String,List[String])]
-        val jflds = fields.foldLeft[String]("") {
+        val fields: List[(String, List[String])] = doc._2.toList
+        val fields2 = doc._3 match {
+          case Some((original, similar, common)) =>
+            fields :+ ("original_ngrams" -> List(original.mkString(", "))) :+
+                      ("similar_ngrams" -> List(similar.mkString(", "))) :+
+                      ("common_ngrams" -> List(common.mkString(", ")))
+          case None => fields
+        }
+        val jflds = fields2.foldLeft[String]("") {
           case (str2, fld) => fld._2.foldLeft[String](str2) {       // fld = (String,List[String])
             case (str3, content) =>
               val content2 =
@@ -388,19 +442,15 @@ object SimDocsSearch extends App {
   val search: SimDocsSearch = new SimDocsSearch(args(0), args(1))
   val maxWords: Int = search.maxWords
   val docs: List[(Float,Map[String,List[String]])] = search.search(args(2), outFields, maxDocs, minNGrams, lastDays)
-  val analyzer: NGramAnalyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
-  val set_text = search.getNGrams(args(2), analyzer, maxWords)
 
   docs.foreach {
     case (score, doc) =>
+      val (set_original, set_similar, set_common) = search.getCommonNGrams(args(2), doc)
+
       println("\n------------------------------------------------------")
       println(s"score: $score")
-      val sim = getDocumentText(doc, service.Conf.idxFldNames)
-      //println(s"text=$sim")
-      val set_similar = search.getNGrams(sim, analyzer, maxWords)
-      val set_common = set_text.intersect(set_similar)
       print("original ngrams: ")
-      set_text.foreach(str => print(s"[$str] "))
+      set_original.foreach(str => print(s"[$str] "))
       print("\nsimilar ngrams: ")
       set_similar.foreach(str => print(s"[$str] "))
       print("\ncommon ngrams: ")
@@ -415,17 +465,4 @@ object SimDocsSearch extends App {
   }
   search.close()
   //println(search.doc2json(docs))
-
-  private def getDocumentText(doc: Map[String,List[String]],
-                              fNames: Set[String]): String = {
-    require(doc != null)
-    require(fNames != null)
-
-    fNames.foldLeft[String]("") {
-      case (str, name) => doc.get(name) match {
-        case Some(contentList) => str + " " + contentList.mkString(" ")
-        case None => str
-      }
-    }
-  }
 }

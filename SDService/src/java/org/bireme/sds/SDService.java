@@ -17,7 +17,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.bireme.sd.SimDocsSearch;
-import org.bireme.sd.service.Conf;
 import org.bireme.sd.service.UpdaterService;
 import org.bireme.sd.service.TopIndex;
 
@@ -155,7 +154,11 @@ public class SDService extends HttpServlet {
                         out.println("<ERROR>'lastDays' parameter should be >= 0</ERROR>");
                         return;
                     }
-                    out.println(simSearch.search(adhocSimilarDocs, fields.toSet(), lastDays));
+                    final String explainPar = request.getParameter("explain");
+                    final Boolean explain = (explainPar == null) ? false :
+                                            (explainPar.trim().isEmpty()) ? true :
+                                             Boolean.parseBoolean(explainPar);
+                    out.println(simSearch.search(adhocSimilarDocs, fields.toSet(), lastDays, explain));
                 }
                 return;
             }
@@ -239,7 +242,7 @@ public class SDService extends HttpServlet {
         out.println("psId=&lt;id&gt;&amp;deleteProfile=&lt;id&gt;");
         out.println("psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;&amp;[outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;lastDays=&lt;num&gt;]");
         out.println("psId=&lt;id&gt;&amp;showProfiles=true");
-        out.println("adhocSimDocs=&lt;sentence&gt;[outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;lastDays=&lt;num&gt;]");
+        out.println("adhocSimDocs=&lt;sentence&gt;[outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;lastDays=&lt;num&gt;][&amp;explain=&lt;bool&gt;]");
         out.println("</SYNTAX>");
     }
 

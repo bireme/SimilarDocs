@@ -126,7 +126,7 @@ class TopIndex(simSearch: SimDocsSearch,
     require(doc != null)
     require((content != null) && (!content.trim.isEmpty))
 
-    val newContent: String = Tools.strongUniformString(content)
+    val newContent: String = Tools.strongUniformString(content, sort = true)
     val oldContent: String = doc.get(contentFldName)
 
     // Add profile field

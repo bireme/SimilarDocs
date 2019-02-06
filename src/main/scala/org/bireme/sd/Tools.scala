@@ -44,19 +44,35 @@ object Tools {
 
   /**
     * Converts all input charactes into a-z, 0-9, '_', '-' and spaces. Removes
-    * adjacent whites and sort the words.
+    * adjacent whites and optionally sort the words.
     *
     * @param in input string to be converted
     * @return the converted string
     */
-  def strongUniformString(in: String): String = {
+  def strongUniformString(in: String,
+                          sort: Boolean = false): String = {
     require(in != null)
 
-    val s1 = Normalizer.normalize(in.toLowerCase(), Form.NFD)
-    val s2 = s1.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
+    val s1: String = Normalizer.normalize(in.toLowerCase(), Form.NFD)
+    val s2: String = s1.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
+    val split: Array[String] = s2.replaceAll("[^\\w\\-]", " ").trim().split(" +")
+                               .filter(_.length >= 3)
+    val seq: Seq[String] =
+      if (sort) TreeSet(split: _*).toSeq
+      else {
+        val set = scala.collection.mutable.Set[String]()
 
-    TreeSet(s2.replaceAll("[^\\w\\-]", " ").trim().split(" +"): _*).
-                                             filter(_.length >= 3).mkString(" ")
+        split.foldLeft(Seq[String]()) {
+          case (sq, tok) =>
+            if (set.contains(tok)) sq
+            else {
+              set += tok
+              sq :+ tok
+            }
+        }
+      }
+
+    seq.mkString(" ")
   }
 
   /**
