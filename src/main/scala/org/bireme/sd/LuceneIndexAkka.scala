@@ -260,13 +260,13 @@ class LuceneIndexActor(today: String,
     }
   }
 
-  /**
+  /*
     * Converts a document from a map of fields into a lucene document
     *
     * @param map a document of (field name -> all occurrences of the field)
     * @return a lucene document
-    */
-  /*
+    *
+
   private def map2doc(map: Map[String,List[String]]): Document = {
     val doc = new Document()
 
