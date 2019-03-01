@@ -59,7 +59,7 @@ class SimilarDocsServiceTest extends FlatSpec {
     require (content != null)
     require (word != null)
 
-    val split = content.trim.split("[\\s\\<\\>]+")
+    val split = content.trim.split("[\\s\\<\\>\\,\\.]+")
     val word2 = word.trim
 
     split.foldLeft[Int](0) {
@@ -138,8 +138,8 @@ class SimilarDocsServiceTest extends FlatSpec {
       val url = s"$service/SDService?psId=$id&getSimDocs=${p._1}"
       val content = pageContent(url)
 
-      s"The user '$id'" should s"retrieve at least 8 documents with profile [${p._1}]" in {
-        doc.findAllMatchIn(content).size should be >= 8
+      s"The user '$id'" should s"retrieve at least 7 documents with profile [${p._1}]" in {
+        doc.findAllMatchIn(content).size should be >= 7
       }
   }
 
@@ -148,13 +148,14 @@ class SimilarDocsServiceTest extends FlatSpec {
     prof =>
       val url = s"$service/SDService?psId=$id&getSimDocs=${prof._1}"
       val content = pageContent(url).toLowerCase
-      val profWords: Set[String] = prof._2.split("\\s+").map(_.toLowerCase).toSet
+      val profWords: Set[String] = prof._2.toLowerCase.replaceAll("\\[\\-\\,\\:\\_]", " ").
+        split("[\\s+\\,\\.]").filter(_.size > 3).toSet
       val common: Int = profWords.foldLeft[Int](0) {
         case (tot, word) => tot + getOccurrences(content, word)
       }
       s"The user '$id'" should
-        s"retrieve documents with at least 10 match profile [$prof] words" in {
-        common should be >= 9
+        s"retrieve documents with at least 7 match profile [$prof] words" in {
+        common should be >= 7
       }
   }
 
