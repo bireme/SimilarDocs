@@ -81,8 +81,8 @@ class LuceneIndexMain(indexPath: String,
   val routerIdx: Router = {
     val routees = Vector.fill(idxWorkers) {
       val r = context.actorOf(Props(classOf[LuceneIndexActor], today, todaySeconds, indexWriter,
-                                    isNewIndexWriter, fldIdxNames + "entrance_date",
-                                    fldStrdNames + "id", decsMap))
+                                    isNewIndexWriter, fldIdxNames ++ Set("entrance_date", "id"),
+                                    fldStrdNames, decsMap))
       context watch r
       ActorRefRoutee(r)
     }
@@ -205,22 +205,23 @@ class LuceneIndexActor(today: String,
       log.debug(s"[${self.path.name}] received a requisition to index $fname")
       try {
         checkXml.check(fname) match {
-          case Some(errMess) => log.error("skipping document => " +
-            s"file:[$fname] - $errMess")
+          case Some(errMess) => log.error(s"skipping document => file:[$fname] - $errMess")
           case None =>
-            IahxXmlParser.getElements(fname, encoding, Set()).zipWithIndex.
-                                                                       foreach {
+            IahxXmlParser.getElements(fname, encoding, Set()).zipWithIndex.foreach {
               case (set,idx) =>
                 if (idx % 50000 == 0) log.info(s"[$fname] - $idx")
-                val smap = set.toMap
+                val smap: Map[String, List[String]] = set.toMap
                 if (updIsNewDocument(smap)) {                          // if the document is new
                   val emap = smap + ("entrance_date" -> List(today))    // add the field with the today date
-                  Try(indexWriter.addDocument(map2docExt(emap))) match {  // insert the document into the index
+                  //Try(indexWriter.addDocument(map2docExt(emap))) match {  // insert the document into the index
+                  Try {
+                    val idTerm: Term = new Term("id", smap("id").head)
+                    indexWriter.updateDocument(idTerm, map2docExt(emap))
+                  } match {  // insert the document into the index if new or update if there is a duplicated one
                     case Success(_) => ()
                     case Failure(ex) =>
                       val did = smap.getOrElse("id", List(s"? docPos=$idx")).head
-                      log.error(s"skipping document => file:[$fname]" +
-                                s" id:[$did] -${ex.toString}")
+                      log.error(s"skipping document => file:[$fname] id:[$did] -${ex.toString}")
                   }
                 }
             }

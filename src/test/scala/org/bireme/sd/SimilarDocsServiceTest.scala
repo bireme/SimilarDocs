@@ -48,7 +48,7 @@ class SimilarDocsServiceTest extends FlatSpec {
     content
   }
 
- /**maintenance=false
+ /**
    * Count how many times a word appears in a String
    *
    * @param content the string into which the word will be searched
