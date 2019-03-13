@@ -187,8 +187,6 @@ class LuceneIndexActor(today: String,
                        fldIdxNames: Set[String],
                        fldStrdNames: Set[String],
                        decsMap: Map[Int,Set[String]]) extends Actor with ActorLogging {
-  val isNewIndexReader: DirectoryReader = DirectoryReader.open(isNewIndexWriter)
-  val isNewIndexSearcher: IndexSearcher = new IndexSearcher(isNewIndexReader)
   val regexp: Regex = """\^d\d+""".r
   val checkXml: CheckXml = new CheckXml()
   val fieldsIndexNames: Set[String] = if ((fldIdxNames == null) || fldIdxNames.isEmpty) Conf.idxFldNames
@@ -213,11 +211,7 @@ class LuceneIndexActor(today: String,
                 val smap: Map[String, List[String]] = set.toMap
                 if (updIsNewDocument(smap)) {                          // if the document is new
                   val emap = smap + ("entrance_date" -> List(today))    // add the field with the today date
-                  //Try(indexWriter.addDocument(map2docExt(emap))) match {  // insert the document into the index
-                  Try {
-                    val idTerm: Term = new Term("id", smap("id").head)
-                    indexWriter.updateDocument(idTerm, map2docExt(emap))
-                  } match {  // insert the document into the index if new or update if there is a duplicated one
+                  Try(indexWriter.addDocument(map2docExt(emap))) match {  // insert the document into the index
                     case Success(_) => ()
                     case Failure(ex) =>
                       val did = smap.getOrElse("id", List(s"? docPos=$idx")).head
@@ -235,7 +229,6 @@ class LuceneIndexActor(today: String,
   }
 
   override def postStop(): Unit = {
-    isNewIndexReader.close()
     log.debug(s"LuceneIndexActor[${self.path.name}] is now finishing")
   }
 
@@ -247,16 +240,25 @@ class LuceneIndexActor(today: String,
   private def updIsNewDocument(doc: Map[String,List[String]]): Boolean = {
     doc.get("id") match {
       case Some(id: Seq[String]) =>
-        val collector = new TotalHitCountCollector()
+        Try {
+          val isNewIndexReader: DirectoryReader = DirectoryReader.open(isNewIndexWriter)
+          val isNewIndexSearcher: IndexSearcher = new IndexSearcher(isNewIndexReader)
+          val collector = new TotalHitCountCollector()
 
-        isNewIndexSearcher.search(new TermQuery(new Term("id",id.head)), collector)
-        if (collector.getTotalHits == 0) {
-          val newDoc = new Document()
-          newDoc.add(new StringField("id", id.head, Field.Store.YES))
-          newDoc.add(new StoredField("entrance_date", todaySeconds))
-          isNewIndexWriter.addDocument(newDoc)
-          true
-        } else false
+          isNewIndexSearcher.search(new TermQuery(new Term("id",id.head)), collector)
+          if (collector.getTotalHits == 0) {
+            val newDoc = new Document()
+            newDoc.add(new StringField("id", id.head, Field.Store.YES))
+            newDoc.add(new StoredField("entrance_date", todaySeconds))
+            isNewIndexWriter.addDocument(newDoc)
+            isNewIndexWriter.flush()
+            isNewIndexReader.close()
+            true
+          } else false
+        } match {
+          case Success(b) => b
+          case Failure(_) => false
+        }
       case None => false
     }
   }
