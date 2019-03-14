@@ -162,7 +162,7 @@ object ShowUsedNGrams extends App {
     else {
       val query =  mqParser.parse(tok)
 
-      searcher.search(query, 1).totalHits > 0
+      searcher.search(query, 1).totalHits.value > 0
     }
   }
 }

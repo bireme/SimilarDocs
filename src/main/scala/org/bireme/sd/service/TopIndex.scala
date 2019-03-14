@@ -496,7 +496,7 @@ class TopIndex(simSearch: SimDocsSearch,
 //println(s"query=$query")
     val docs = topSearcher.search(query, Integer.MAX_VALUE)
 //println(s"totalHits=${docs.totalHits} query=[$query]")
-    val result = docs.totalHits match {
+    val result = docs.totalHits.value match {
       case 0 => None
       case _ => docs.scoreDocs.foldLeft[Option[List[Document]]] (Some(List[Document]())) {
         case (slst, sdoc) => slst.map(_ :+ topSearcher.doc(sdoc.doc))
@@ -523,7 +523,7 @@ class TopIndex(simSearch: SimDocsSearch,
 //println(s"###documentos a serem atualizados:${topDocs.totalHits} 0<=x<=${updateTime  - deltaTime}")
 
     // Update 'update time' field
-    val retSet = if (topDocs.totalHits == 0) None else {
+    val retSet = if (topDocs.totalHits.value == 0) None else {
       val doc = topSearcher.doc(topDocs.scoreDocs(0).doc)
       val ndoc = updateSimilarDocs(doc, maxDocs)
       Some(ndoc)

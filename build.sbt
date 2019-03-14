@@ -25,7 +25,7 @@ lazy val SDService = (project in file("./SDService")).
   )
 
 
-val luceneVersion = "7.5.0" //"7.3.1"
+val luceneVersion = "8.0.0" //"7.5.0"
 val akkaVersion =  "2.5.19" // "2.5.17" // "2.5.16"
 val httpClientVersion = "4.5.6" //"4.5.5"
 val scalaTestVersion = "3.0.5"

@@ -49,7 +49,8 @@ object ShowTotalHits extends App {
     Try {
       getFields(reader).foldLeft(TreeMap[String, Long]()) {
         case (map, field) =>
-          val terms: Terms = MultiFields.getTerms(reader, field)
+          //val terms: Terms = MultiFields.getTerms(reader, field)
+          val terms: Terms = MultiTerms.getTerms(reader, field)
 
           if (terms == null) map
           else getTermsCount(terms.iterator(), map)
@@ -74,7 +75,8 @@ object ShowTotalHits extends App {
   private def getFields(reader: IndexReader): Set[String] = {
     val finfos: FieldInfos = reader match {
       case lf: LeafReader => lf.getFieldInfos
-      case _ => MultiFields.getMergedFieldInfos(reader)
+      //case _ => MultiFields.getMergedFieldInfos(reader)
+      case _ => FieldInfos.getMergedFieldInfos(reader)
     }
     finfos.asScala.map(fi => fi.name).toSet
   }

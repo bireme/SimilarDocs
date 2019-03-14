@@ -15,7 +15,7 @@ object Conf {
 
   val maxDocs: Int = 10
 
-  val idxFldNames = Set("ti",
+  val idxFldNames = Set("id", "ti",
                         "ti_pt","ti_en","ti_es","ti_it","ti_fr","ti_de","ti_ru",
                         "ab",
                         "ab_pt","ab_en","ab_es","ab_it","ab_fr","ab_de","ab_ru",

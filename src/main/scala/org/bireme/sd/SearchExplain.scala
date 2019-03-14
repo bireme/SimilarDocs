@@ -131,7 +131,7 @@ object SearchExplain extends App {
 
         seq :+ ((doc, id, score))
     }
-    (totalHits, docs)
+    (totalHits.value, docs)
   }
 
   private def getQuery(text: String,

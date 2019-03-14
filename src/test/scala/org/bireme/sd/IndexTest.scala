@@ -60,7 +60,7 @@ object IndexTest extends App {
     val query = new TermQuery(term)
     val isearcher = new IndexSearcher(ireader)
     val topDocs: TopDocs = isearcher.search(query, 1000)
-    val totalHits: Long = topDocs.totalHits
+    val totalHits: Long = topDocs.totalHits.value
 
     if (totalHits <= 0) throw new Exception("totalHits <= 0")
 

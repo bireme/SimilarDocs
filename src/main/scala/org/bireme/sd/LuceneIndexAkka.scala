@@ -4,6 +4,12 @@
     See License at: https://github.com/bireme/SimilarDocs/blob/master/LICENSE.txt
 
   ==========================================================================*/
+/*=========================================================================
+
+    SimilarDocs © Pan American Health Organization, 2018.
+    See License at: https://github.com/bireme/SimilarDocs/blob/master/LICENSE.txt
+
+  ==========================================================================*/
 
 
 package org.bireme.sd
@@ -340,18 +346,21 @@ class LuceneIndexActor(today: String,
             }
           }
         }
-        if (fldIdxNames.contains(tag)) {  // Add indexed + stored fields as stored fields
-          lst.foreach {
-            elem =>
-              val fld = if (elem.length < 10000) elem // Bug during indexing. Fix in future. Sorry!
-                        else elem.substring(0,10000)
-              sbuilder.append( " " + fld)
-              doc.add(new StoredField(tag, fld))
+        else if (tag.equals("id")) doc.add(new StringField("id", tag, Field.Store.YES))
+        else {
+          if (fldIdxNames.contains(tag)) {  // Add indexed + stored fields as stored fields
+            lst.foreach {
+              elem =>
+                val fld = if (elem.length < 10000) elem // Bug during indexing. Fix in future. Sorry!
+                          else elem.substring(0,10000)
+                sbuilder.append( " " + fld)
+                doc.add(new StoredField(tag, fld))
+            }
           }
-        }
-        if (fldStrdNames.contains(tag)) { // Add stored fields
-          lst.foreach {
-            elem => doc.add(new StoredField(tag, elem))
+          if (fldStrdNames.contains(tag)) { // Add stored fields
+            lst.foreach {
+              elem => doc.add(new StoredField(tag, elem))
+            }
           }
         }
     }
@@ -435,5 +444,5 @@ object LuceneIndexAkka extends App {
       system.terminate(); throw e
   }
 
-  Await.result(system.whenTerminated, 6 hours)
+  Await.result(system.whenTerminated, 12 hours)
 }
