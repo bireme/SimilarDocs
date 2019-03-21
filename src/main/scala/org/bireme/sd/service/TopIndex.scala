@@ -329,11 +329,7 @@ class TopIndex(simSearch: SimDocsSearch,
               } else doc
             val sdIds: mutable.Seq[IndexableField] = ndoc.getFields().asScala.filter(iFld => iFld.name().equals(sdIdFldName))
             if (sdIds.isEmpty) lst
-            else {
-              lst :+ sdIds.foldLeft[List[Int]](List()) {
-                case (lst3, ifld) => lst3 :+ ifld.numericValue().intValue()
-              }
-            }
+            else lst :+ sdIds.map( _.stringValue().toInt).toList
           case None => lst
         }
     }

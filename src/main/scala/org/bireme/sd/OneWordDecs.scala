@@ -32,35 +32,36 @@ object OneWordDecs {
     val indexWriter = new IndexWriter(directory, config)
     val mst = MasterFactory.getInstance(decsDir).open()
 
-    mst.iterator().asScala.foreach {
-      createDoc(_).foreach(doc => indexWriter.addDocument(doc))
-    }
+    mst.iterator().asScala.foreach(rec => createDoc(rec).foreach(indexWriter.addDocument(_)))
     indexWriter.forceMerge(1)
     indexWriter.close()
     directory.close()
   }
 
-  private def createDoc(rec: Record): Seq[Document] = {
+  private def createDoc(rec: Record): Option[Document] = {
     if (rec.isActive) {
       // Create a set with synonyms with only one word
       val sims = getFldSyns(rec, 50) ++ getFldSyns(rec, 23)
 
-      if (sims.isEmpty) Seq()
-      else (1 to 3).foldLeft[Seq[Document]](Seq()) {
-        case (seq,tag) =>
-          val fld = rec.getField(tag,1)
-          if (fld == null) seq
-          else {
-            val doc = new Document()
-            doc.add(new TextField("descriptor",
-              Tools.uniformString(fld.getContent.trim()), Field.Store.YES))
-            doc.add(new StoredField("id", rec.getMfn))
-            sims.foreach(syn => doc.add(new StoredField("synonym",
-                                              Tools.uniformString(syn.trim()))))
-            seq :+ doc
-          }
+      if (sims.isEmpty) None
+      else {
+        val doc = new Document()
+        val fld1 = rec.getField(1,1)
+        val fld2 = rec.getField(2,1)
+        val fld3 = rec.getField(3,1)
+
+        doc.add(new StoredField("id", rec.getMfn))
+        if (fld1 != null) doc.add(new TextField("descriptor",
+          Tools.uniformString(fld1.getContent.trim()), Field.Store.YES))
+        if (fld2 != null) doc.add(new TextField("descriptor",
+          Tools.uniformString(fld2.getContent.trim()), Field.Store.YES))
+        if (fld3 != null) doc.add(new TextField("descriptor",
+          Tools.uniformString(fld3.getContent.trim()), Field.Store.YES))
+        sims.foreach(syn => doc.add(new StoredField("synonym",
+          Tools.uniformString(syn.trim()))))
+        Some(doc)
       }
-    } else Seq()
+    } else None
   }
 
   private def getFldSyns(rec: Record,
