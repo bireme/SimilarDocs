@@ -131,7 +131,8 @@ object SearchExplain extends App {
 
         seq :+ ((doc, id, score))
     }
-    (totalHits.value, docs)
+    //(totalHits.value, docs) Lucene 8.0.0
+    (totalHits, docs)
   }
 
   private def getQuery(text: String,

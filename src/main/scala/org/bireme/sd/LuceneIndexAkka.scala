@@ -346,7 +346,7 @@ class LuceneIndexActor(today: String,
             }
           }
         }
-        else if (tag.equals("id")) doc.add(new StringField("id", tag, Field.Store.YES))
+        else if (tag.equals("id")) doc.add(new StringField("id", lst.head, Field.Store.YES))
         else {
           if (fldIdxNames.contains(tag)) {  // Add indexed + stored fields as stored fields
             lst.foreach {

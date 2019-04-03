@@ -108,7 +108,8 @@ object OneWordDecs {
       val query: TermQuery = new TermQuery(new Term("descriptor", descrStr))
       val topDocs: TopDocs = decsSearcher.search(query, 1)
 
-      if (topDocs.totalHits.value > 0) {
+      // if (topDocs.totalHits.value > 0) { Lucene 8.0.0
+      if (topDocs.totalHits > 0) {
         val doc = decsSearcher.doc(topDocs.scoreDocs(0).doc)
         doc.getFields("synonym").foldLeft[Set[String]](Set()) {
           case (set,fld) => set + fld.stringValue()

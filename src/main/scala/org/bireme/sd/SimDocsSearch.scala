@@ -130,7 +130,7 @@ class SimDocsSearch(val sdIndexPath: String,
     val ngrams: Seq[String] = getNGrams(text2, analyzer, maxWords)
     val dirReader: DirectoryReader = getReader
     val searcher = new IndexSearcher(dirReader)
-    val lst = {
+    val lst: List[(Int,Float)] = {
       val orQuery = getQuery(text2, lastDays, useDeCS = true)
 //println(s"===> getIdScore docs=${searcher.search(orQuery, 10).totalHits} orQuery=$orQuery")
       getIdScore(searcher.search(orQuery, 10 * maxDocs).scoreDocs, ngrams, analyzer, maxDocs, minNGrams)
