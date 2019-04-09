@@ -32,6 +32,7 @@ val scalaTestVersion = "3.0.7" //"3.0.5"
 val casbahVersion = "3.1.1"
 val playVersion = "2.7.2" //"2.6.10"
 val hairyfotrVersion = "0.1.17"
+val mapdb = "3.0.7"
 
 libraryDependencies ++= Seq(
   "org.apache.lucene" % "lucene-core" % luceneVersion,
@@ -45,7 +46,8 @@ libraryDependencies ++= Seq(
   "org.scalactic" %% "scalactic" % scalaTestVersion,
   "org.scalatest" %% "scalatest" % scalaTestVersion % "test",
   "org.mongodb" %% "casbah" % casbahVersion,
-  "com.typesafe.play" %% "play-json" % playVersion
+  "com.typesafe.play" %% "play-json" % playVersion,
+  "org.mapdb" % "mapdb" % mapdb
 )
 
 test in assembly := {}

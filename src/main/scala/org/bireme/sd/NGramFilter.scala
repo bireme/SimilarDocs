@@ -58,7 +58,7 @@ class NGramFilter(input: TokenStream,
   private def getHeadToken: Boolean = {
     clearAttributes()
     termAtt.setEmpty()
-    if (!queue.isEmpty) termAtt.append(queue.dequeue())
+    if (queue.nonEmpty) termAtt.append(queue.dequeue())
     /*println(s"queue=$queue")
     val str = queue.dequeue()
     termAtt.append(str)

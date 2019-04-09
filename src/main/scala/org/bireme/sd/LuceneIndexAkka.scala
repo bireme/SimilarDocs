@@ -4,48 +4,42 @@
     See License at: https://github.com/bireme/SimilarDocs/blob/master/LICENSE.txt
 
   ==========================================================================*/
-/*=========================================================================
-
-    SimilarDocs © Pan American Health Organization, 2018.
-    See License at: https://github.com/bireme/SimilarDocs/blob/master/LICENSE.txt
-
-  ==========================================================================*/
 
 
 package org.bireme.sd
 
-import akka.actor.{Actor, ActorLogging, ActorSystem}
-import akka.actor.{PoisonPill, Props, Terminated}
-import akka.routing.{ActorRefRoutee, Broadcast, RoundRobinRoutingLogic, Router}
-import bruma.master._
 import java.io.File
 import java.nio.file.Path
-import java.util
+import java.{lang, util}
 import java.util.regex.{Matcher, Pattern}
 import java.util.{GregorianCalendar, TimeZone}
 
+import akka.actor.{Actor, ActorLogging, ActorSystem, PoisonPill, Props, Terminated}
 import akka.event.Logging
+import akka.routing.{ActorRefRoutee, Broadcast, RoundRobinRoutingLogic, Router}
+import bruma.master._
 import org.apache.lucene.analysis.Analyzer
 import org.apache.lucene.analysis.core.KeywordAnalyzer
 import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper
 import org.apache.lucene.document.{DateTools, Document, Field, StoredField, StringField, TextField}
-import org.apache.lucene.index.{DirectoryReader, IndexWriter, IndexWriterConfig, Term}
-import org.apache.lucene.search.{IndexSearcher, TermQuery, TotalHitCountCollector}
+import org.apache.lucene.index.{IndexWriter, IndexWriterConfig, Term}
 import org.apache.lucene.store.FSDirectory
 import org.bireme.sd.service.Conf
+import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
 import scala.util.matching.Regex
+import scala.util.{Failure, Success, Try}
 
 case class Finishing()
 
 class LuceneIndexMain(indexPath: String,
                       decsIndexPath: String,
+                      idsIndexPath: String,
                       xmlDir: String,
                       xmlFileFilter: String,
                       fldIdxNames: Set[String],
@@ -72,23 +66,22 @@ class LuceneIndexMain(indexPath: String,
   if (fullIndexing) config.setOpenMode(IndexWriterConfig.OpenMode.CREATE)
   else config.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
   val indexWriter: IndexWriter = new IndexWriter(directory, config)
-  val isNewIndexPath: Path = new File(indexPath1 + "_isNew").toPath
-  val isNewDirectory: FSDirectory = FSDirectory.open(isNewIndexPath)
-  val isNewConfig: IndexWriterConfig = new IndexWriterConfig(new KeywordAnalyzer)
-  if (fullIndexing) isNewConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE)
-  else isNewConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
-  val isNewIndexWriter: IndexWriter = new IndexWriter(isNewDirectory, isNewConfig)
+
+  val db: DB = DBMaker.fileDB(s"$idsIndexPath/allDocIds.db").closeOnJvmShutdown().make
+  val allDocIds: HTreeMap[lang.Integer, lang.Long] = db.hashMap("idMap2", Serializer.INTEGER, Serializer.LONG).createOrOpen()
+  if (fullIndexing) allDocIds.clear()
+
   val now: GregorianCalendar = new GregorianCalendar(TimeZone.getDefault)
   val today: String = DateTools.dateToString(DateTools.round(now.getTime, DateTools.Resolution.DAY),
                                                       DateTools.Resolution.DAY)
-  val todaySeconds: String = DateTools.dateToString(now.getTime, DateTools.Resolution.SECOND)
+  //val todaySeconds: String = DateTools.dateToString(now.getTime, DateTools.Resolution.SECOND)
   val decsMap: Map[Int, Set[String]] = if (decsDir.isEmpty) Map[Int,Set[String]]()
                                        else decx2Map(decsDir)
   val routerIdx: Router = {
     val routees = Vector.fill(idxWorkers) {
-      val r = context.actorOf(Props(classOf[LuceneIndexActor], today, todaySeconds, indexWriter,
-                                    isNewIndexWriter, fldIdxNames ++ Set("entrance_date", "id"),
-                                    fldStrdNames, decsMap))
+      val r = context.actorOf(Props(classOf[LuceneIndexActor], today, indexWriter,
+                                    fldIdxNames ++ Set("entrance_date", "id"),
+                                    fldStrdNames, decsMap, allDocIds))
       context watch r
       ActorRefRoutee(r)
     }
@@ -124,13 +117,8 @@ class LuceneIndexMain(indexPath: String,
     indexWriter.forceMerge(1)
     indexWriter.close()
     directory.close()
+    db.close()
     log.info("Optimizing index 'sdIndex - end'")
-    log.info("Optimizing index - 'sdIndex_isNew' - begin")
-    isNewIndexWriter.commit()
-    isNewIndexWriter.forceMerge(1)
-    isNewIndexWriter.close()
-    isNewDirectory.close()
-    log.info("Optimizing index - 'sdIndex_isNew' - end")
     context.system.terminate()
   }
 
@@ -187,12 +175,12 @@ class LuceneIndexMain(indexPath: String,
 }
 
 class LuceneIndexActor(today: String,
-                       todaySeconds: String,
+                       //todaySeconds: String,
                        indexWriter: IndexWriter,
-                       isNewIndexWriter: IndexWriter,
                        fldIdxNames: Set[String],
                        fldStrdNames: Set[String],
-                       decsMap: Map[Int,Set[String]]) extends Actor with ActorLogging {
+                       decsMap: Map[Int,Set[String]],
+                       allDocIds: HTreeMap[lang.Integer, lang.Long]) extends Actor with ActorLogging {
   val regexp: Regex = """\^d\d+""".r
   val checkXml: CheckXml = new CheckXml()
   val fieldsIndexNames: Set[String] = if ((fldIdxNames == null) || fldIdxNames.isEmpty) Conf.idxFldNames
@@ -214,16 +202,7 @@ class LuceneIndexActor(today: String,
             IahxXmlParser.getElements(fname, encoding, Set()).zipWithIndex.foreach {
               case (set,idx) =>
                 if (idx % 50000 == 0) log.info(s"[$fname] - $idx")
-                val smap: Map[String, List[String]] = set.toMap
-                if (updIsNewDocument(smap)) {                          // if the document is new
-                  val emap = smap + ("entrance_date" -> List(today))    // add the field with the today date
-                  Try(indexWriter.addDocument(map2docExt(emap))) match {  // insert the document into the index
-                    case Success(_) => ()
-                    case Failure(ex) =>
-                      val did = smap.getOrElse("id", List(s"? docPos=$idx")).head
-                      log.error(s"skipping document => file:[$fname] id:[$did] -${ex.toString}")
-                  }
-                }
+                createNewDocument(fname, set.toMap)
             }
         }
       } catch {
@@ -239,82 +218,38 @@ class LuceneIndexActor(today: String,
   }
 
   /**
-    * Update the id in the new documents index if the id is not already present in that index
-    * @param doc the document where the id will be taken
-    * @return true if a new id is added to the index or false otherwise
+    * Create a new document if the id is not already present in that index
+    * @param fname the name of file with this document
+    * @param doc the document to be stored and indexed
     */
-  private def updIsNewDocument(doc: Map[String,List[String]]): Boolean = {
+  private def createNewDocument(fname: String,
+                                doc: Map[String, List[String]]): Unit = {
     doc.get("id") match {
       case Some(id: Seq[String]) =>
+        val sid = id.head
+        val hid: Int = sid.hashCode
+        val ndoc: Map[String, List[String]] = doc + ("entrance_date" -> List(today)) // add 'entrance_date' field
+
         Try {
-          val isNewIndexReader: DirectoryReader = DirectoryReader.open(isNewIndexWriter)
-          val isNewIndexSearcher: IndexSearcher = new IndexSearcher(isNewIndexReader)
-          val collector = new TotalHitCountCollector()
+          val lastModified: Long = new File(fname).lastModified()
 
-          isNewIndexSearcher.search(new TermQuery(new Term("id",id.head)), collector)
-          if (collector.getTotalHits == 0) {
-            val newDoc = new Document()
-            newDoc.add(new StringField("id", id.head, Field.Store.YES))
-            newDoc.add(new StoredField("entrance_date", todaySeconds))
-            isNewIndexWriter.addDocument(newDoc)
-            isNewIndexWriter.flush()
-            isNewIndexReader.close()
-            true
-          } else false
+          Option(allDocIds.get(hid)) match {
+            case Some(modified: lang.Long) =>
+              if (lastModified > modified) {
+                indexWriter.updateDocument(new Term(sid), map2docExt(ndoc)) // update the document into the index
+                allDocIds.put(hid, lastModified)
+              }
+            case _ =>
+              indexWriter.addDocument(map2docExt(ndoc)) // insert the document into the index
+              allDocIds.put(hid, lastModified)
+          }
         } match {
-          case Success(b) => b
-          case Failure(_) => false
+          case Success(_) => ()
+          case Failure(ex) => log.error(s"skipping document => file:[$fname] id:[$sid] -${ex.toString}")
         }
-      case None => false
+      case Some(_) | None => ()
     }
   }
-
-  /*
-    * Converts a document from a map of fields into a lucene document
-    *
-    * @param map a document of (field name -> all occurrences of the field)
-    * @return a lucene document
-    *
-
-  private def map2doc(map: Map[String,List[String]]): Document = {
-    val doc = new Document()
-
-    map.foreach {
-      case (xtag,lst) =>
-        val tag: String = xtag.toLowerCase
-
-        if (decsMap.nonEmpty && (tag == "mj")) {  // Add decs descriptors
-          lst.foreach {
-            fld => regexp.findFirstIn(fld).foreach {
-              subd =>
-                decsMap.get(subd.substring(2).toInt).foreach {
-                  lst2 => lst2.foreach {
-                    descr =>
-                      val fld = new TextField("decs", descr, Field.Store.YES)
-                      doc.add(fld)
-                  }
-                }
-            }
-          }
-        }
-        if (fldIdxNames.contains(tag)) {  // Add indexed fields
-          lst.foreach {
-            elem =>
-              if (elem.length < 10000)  // Bug during indexing. Fix in future. Sorry!
-                doc.add(new TextField(tag, elem, Field.Store.YES))
-              else
-                doc.add(new TextField(tag, elem.substring(0,10000), Field.Store.YES))
-          }
-        }
-        if (fldStrdNames.contains(tag)) { // Add stored fields
-          lst.foreach {
-            elem => doc.add(new StoredField(tag, elem))
-          }
-        }
-    }
-    doc
-  }
-  */
 
   /**
     * Converts a document from a map of fields into a lucene document (all then will be stored but
@@ -384,6 +319,7 @@ object LuceneIndexAkka extends App {
     Console.err.println("usage: LuceneIndexAkka" +
       "\n\t<indexPath> - the name+path to the lucene index to be created" +
       "\n\t<decsIndexPath> - the name+path to the lucene index to be created" +
+      "\n\t<idIndexPath> - the ids index of already indexed/stored documents" +
       "\n\t<xmlDir> - directory of xml files used to create the index" +
       "\n\t[-xmlFileFilter=<regExp>] - regular expression used to filter xml files" +
       "\n\t[-indexedFields=<field1>,...,<fieldN>] - xml doc fields to be indexed and stored" +
@@ -394,9 +330,9 @@ object LuceneIndexAkka extends App {
     System.exit(1)
   }
 
-  if (args.length < 3) usage()
+  if (args.length < 4) usage()
 
-  val parameters = args.drop(3).foldLeft[Map[String,String]](Map()) {
+  val parameters = args.drop(4).foldLeft[Map[String,String]](Map()) {
     case (map,par) =>
       val split = par.split(" *= *", 2)
       if (split.length == 1) map + ((split(0).substring(2), ""))
@@ -405,7 +341,8 @@ object LuceneIndexAkka extends App {
 
   val indexPath = args(0)
   val decsIndexPath = args(1)
-  val xmlDir = args(2)
+  val idIndexPath = args(2)
+  val xmlDir = args(3)
   val xmlFileFilter = parameters.getOrElse("xmlFileFilter", ".+\\.xml")
   val sIdxFields = parameters.getOrElse("indexedFields", "")
   val fldIdxNames = if (sIdxFields.isEmpty) Conf.idxFldNames
@@ -420,8 +357,8 @@ object LuceneIndexAkka extends App {
 
   val system = ActorSystem("Main")
   try {
-    val props = Props(classOf[LuceneIndexMain], indexPath, decsIndexPath, xmlDir,
-                      xmlFileFilter, fldIdxNames, fldStrdNames, decsDir, encoding,
+    val props = Props(classOf[LuceneIndexMain], indexPath, decsIndexPath, idIndexPath,
+                      xmlDir, xmlFileFilter, fldIdxNames, fldStrdNames, decsDir, encoding,
                       fullIndexing)
     system.actorOf(props, "app")
 
@@ -444,5 +381,5 @@ object LuceneIndexAkka extends App {
       system.terminate(); throw e
   }
 
-  Await.result(system.whenTerminated, 12 hours)
+  Await.result(system.whenTerminated, 24 hours)
 }
