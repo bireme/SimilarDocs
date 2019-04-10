@@ -5,7 +5,6 @@
 
   ==========================================================================*/
 
-
 package org.bireme.sd
 
 import java.io.File
@@ -51,14 +50,12 @@ class LuceneIndexMain(indexPath: String,
 
   val idxWorkers = 10 // Number of actors to run concurrently
 
-  val ngAnalyzer: NGramAnalyzer = new NGramAnalyzer(NGSize.ngram_min_size,
-                                     NGSize.ngram_max_size)
+  val ngAnalyzer: NGramAnalyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
   val analyzerPerField: util.Map[String, Analyzer] = Map[String,Analyzer](
                                  "entrance_date" -> new KeywordAnalyzer()).asJava
   val analyzer: PerFieldAnalyzerWrapper = new PerFieldAnalyzerWrapper(ngAnalyzer, analyzerPerField)
   val indexPathTrim: String = indexPath.trim
-  val indexPath1: String = if (indexPathTrim.endsWith("/"))
-                               indexPathTrim.substring(0, indexPathTrim.length - 1)
+  val indexPath1: String = if (indexPathTrim.endsWith("/")) indexPathTrim.substring(0, indexPathTrim.length - 1)
                            else indexPathTrim
   val indexPath2: Path = new File(indexPath1).toPath
   val directory: FSDirectory = FSDirectory.open(indexPath2)
@@ -67,28 +64,15 @@ class LuceneIndexMain(indexPath: String,
   else config.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
   val indexWriter: IndexWriter = new IndexWriter(directory, config)
 
+  val dbFiles: DB = DBMaker.fileDB(s"$idsIndexPath/fileLastModified.db").closeOnJvmShutdown().make
   val db: DB = DBMaker.fileDB(s"$idsIndexPath/allDocIds.db").closeOnJvmShutdown().make
-  val allDocIds: HTreeMap[lang.Integer, lang.Long] = db.hashMap("idMap2", Serializer.INTEGER, Serializer.LONG).createOrOpen()
-  if (fullIndexing) allDocIds.clear()
-
-  val now: GregorianCalendar = new GregorianCalendar(TimeZone.getDefault)
-  val today: String = DateTools.dateToString(DateTools.round(now.getTime, DateTools.Resolution.DAY),
-                                                      DateTools.Resolution.DAY)
-  //val todaySeconds: String = DateTools.dateToString(now.getTime, DateTools.Resolution.SECOND)
-  val decsMap: Map[Int, Set[String]] = if (decsDir.isEmpty) Map[Int,Set[String]]()
-                                       else decx2Map(decsDir)
-  val routerIdx: Router = {
-    val routees = Vector.fill(idxWorkers) {
-      val r = context.actorOf(Props(classOf[LuceneIndexActor], today, indexWriter,
-                                    fldIdxNames ++ Set("entrance_date", "id"),
-                                    fldStrdNames, decsMap, allDocIds))
-      context watch r
-      ActorRefRoutee(r)
-    }
-    Router(RoundRobinRoutingLogic(), routees)
-    //Router(SmallestMailboxRoutingLogic(), routees)
+  val allDocIds: HTreeMap.KeySet[Integer] = db.hashSet("idSet", Serializer.INTEGER).createOrOpen()
+  val lastModfied: HTreeMap[String, lang.Long] = db.hashMap("modFile", Serializer.STRING, Serializer.LONG).createOrOpen()
+  if (fullIndexing) {
+    allDocIds.clear()
+    lastModfied.clear()
   }
-  val matcher: Matcher = Pattern.compile(xmlFileFilter).matcher("")
+  val routerIdx: Router = createActors()
   var activeIdx: Int = idxWorkers
 
   // Create decs index
@@ -96,21 +80,53 @@ class LuceneIndexMain(indexPath: String,
   OneWordDecs.createIndex(decsDir, decsIndexPath)
 
   // Create similar docs index
-  new File(xmlDir).listFiles().sorted.foreach {
-    file =>
-      if (file.isFile) {
-        val fname = file.getName
-        matcher.reset(fname)
-        if (matcher.matches) {
-          indexFile(file.getPath, encoding)
-        }
-      }
-  }
+  createSimDocsIndex(xmlDir)
 
   // finishing Actors
-  //routerIdx.route(Broadcast(PoisonPill), self)
-  //self ! PoisonPill
   routerIdx.route(Broadcast(Finishing()), self)
+
+  private def createActors(): Router = {
+    val now: GregorianCalendar = new GregorianCalendar(TimeZone.getDefault)
+    val today: String = DateTools.dateToString(DateTools.round(now.getTime, DateTools.Resolution.DAY),
+      DateTools.Resolution.DAY)
+    val decsMap: Map[Int, Set[String]] = if (decsDir.isEmpty) Map[Int,Set[String]]()
+    else decx2Map(decsDir)
+
+    val routees = Vector.fill(idxWorkers) {
+      val r = context.actorOf(Props(classOf[LuceneIndexActor], today, indexWriter,
+        fldIdxNames ++ Set("entrance_date", "id"),
+        fldStrdNames, decsMap, allDocIds))
+      context watch r
+      ActorRefRoutee(r)
+    }
+
+    Router(RoundRobinRoutingLogic(), routees)
+  }
+
+  private def createSimDocsIndex(xmlDir: String): Unit = {
+    val matcher: Matcher = Pattern.compile(xmlFileFilter).matcher("")
+
+    new File(xmlDir).listFiles().sorted.foreach {
+      file =>
+        if (file.isFile) {
+          val fname = file.getName
+          matcher.reset(fname)
+          if (matcher.matches) {
+            val fileLastModified: Long = file.lastModified()
+            Option(lastModfied.get(fname)) match {
+              case Some(modified: lang.Long) =>
+                if (fileLastModified > modified) {
+                  indexFile(file.getPath, encoding)
+                  lastModfied.put(fname, fileLastModified)
+                }
+              case _ =>
+                indexFile(file.getPath, encoding)
+                lastModfied.put(fname, fileLastModified)
+            }
+          }
+        }
+    }
+  }
 
   override def postStop(): Unit = {
     log.info("Optimizing index 'sdIndex' - begin")
@@ -180,7 +196,7 @@ class LuceneIndexActor(today: String,
                        fldIdxNames: Set[String],
                        fldStrdNames: Set[String],
                        decsMap: Map[Int,Set[String]],
-                       allDocIds: HTreeMap[lang.Integer, lang.Long]) extends Actor with ActorLogging {
+                       allDocIds: HTreeMap.KeySet[Integer]) extends Actor with ActorLogging {
   val regexp: Regex = """\^d\d+""".r
   val checkXml: CheckXml = new CheckXml()
   val fieldsIndexNames: Set[String] = if ((fldIdxNames == null) || fldIdxNames.isEmpty) Conf.idxFldNames
@@ -218,7 +234,7 @@ class LuceneIndexActor(today: String,
   }
 
   /**
-    * Create a new document if the id is not already present in that index
+    * Create a new document if the id is not already present in that index or update an old one
     * @param fname the name of file with this document
     * @param doc the document to be stored and indexed
     */
@@ -231,17 +247,11 @@ class LuceneIndexActor(today: String,
         val ndoc: Map[String, List[String]] = doc + ("entrance_date" -> List(today)) // add 'entrance_date' field
 
         Try {
-          val lastModified: Long = new File(fname).lastModified()
-
-          Option(allDocIds.get(hid)) match {
-            case Some(modified: lang.Long) =>
-              if (lastModified > modified) {
-                indexWriter.updateDocument(new Term(sid), map2docExt(ndoc)) // update the document into the index
-                allDocIds.put(hid, lastModified)
-              }
-            case _ =>
-              indexWriter.addDocument(map2docExt(ndoc)) // insert the document into the index
-              allDocIds.put(hid, lastModified)
+          if (allDocIds.contains(hid)) {
+            indexWriter.updateDocument(new Term(sid), map2docExt(ndoc)) // update the document in the index
+          } else {
+            indexWriter.addDocument(map2docExt(ndoc)) // insert the document into the index
+            allDocIds.add(hid)
           }
         } match {
           case Success(_) => ()
