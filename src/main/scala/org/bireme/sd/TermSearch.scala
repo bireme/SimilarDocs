@@ -10,6 +10,8 @@ package org.bireme.sd
 
 import java.io.File
 
+import org.apache.lucene.search.TopDocs
+
 //import org.apache.lucene.index.{DirectoryReader,Term}
 import org.apache.lucene.search.{IndexSearcher,TermQuery}
 import org.apache.lucene.store.FSDirectory
@@ -24,19 +26,21 @@ object TermSearch extends App {
   }
   if (args.length != 3) usage()
 
-  val dir = FSDirectory.open(new File(args(0)).toPath)
-  val config = new IndexWriterConfig(new KeywordAnalyzer)
+  val dir: FSDirectory = FSDirectory.open(new File(args(0)).toPath)
+  val config: IndexWriterConfig = new IndexWriterConfig(new KeywordAnalyzer)
   config.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
-  val indexWriter = new IndexWriter(dir, config)
+  val indexWriter: IndexWriter = new IndexWriter(dir, config)
 
-  val reader = DirectoryReader.open(indexWriter)
-  val searcher = new IndexSearcher(reader)
+  val reader: DirectoryReader = DirectoryReader.open(indexWriter)
+  val searcher: IndexSearcher = new IndexSearcher(reader)
 
-  val query = new TermQuery(new Term(args(1), args(2)))
+  val query: TermQuery = new TermQuery(new Term(args(1), args(2)))
+  //val docs: TopDocs = searcher.search(query, Integer.MAX_VALUE)   Out of memory
+  val top: TopDocs = searcher.search(query, 1000)
 
-  val docs = searcher.search(query, Integer.MAX_VALUE)
+  println(s"Hits: ${top.totalHits}")
 
-  println(s"Hits: ${docs.totalHits}")
+  top.scoreDocs.foreach(sd => println(s"lucene doc id:${sd.doc}"))
 
   reader.close()
 }

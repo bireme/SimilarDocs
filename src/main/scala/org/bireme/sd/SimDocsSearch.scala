@@ -22,7 +22,7 @@ import org.bireme.sd.service.Conf
 
 import scala.collection.JavaConverters._
 
-/** Class that looks for similar documents to a given ones
+/** Class that looks for similar documents of given ones
   *
   * @param sdIndexPath similar documents index path
   * @param decsIndexPath decs index path

@@ -67,10 +67,10 @@ class LuceneIndexMain(indexPath: String,
   val dbFiles: DB = DBMaker.fileDB(s"$idsIndexPath/fileLastModified.db").closeOnJvmShutdown().make
   val db: DB = DBMaker.fileDB(s"$idsIndexPath/allDocIds.db").closeOnJvmShutdown().make
   val allDocIds: HTreeMap.KeySet[Integer] = db.hashSet("idSet", Serializer.INTEGER).createOrOpen()
-  val lastModfied: HTreeMap[String, lang.Long] = db.hashMap("modFile", Serializer.STRING, Serializer.LONG).createOrOpen()
+  val lastModified: HTreeMap[String, lang.Long] = db.hashMap("modFile", Serializer.STRING, Serializer.LONG).createOrOpen()
   if (fullIndexing) {
     allDocIds.clear()
-    lastModfied.clear()
+    lastModified.clear()
   }
   val routerIdx: Router = createActors()
   var activeIdx: Int = idxWorkers
@@ -113,15 +113,15 @@ class LuceneIndexMain(indexPath: String,
           matcher.reset(fname)
           if (matcher.matches) {
             val fileLastModified: Long = file.lastModified()
-            Option(lastModfied.get(fname)) match {
+            Option(lastModified.get(fname)) match {
               case Some(modified: lang.Long) =>
                 if (fileLastModified > modified) {
                   indexFile(file.getPath, encoding)
-                  lastModfied.put(fname, fileLastModified)
+                  lastModified.put(fname, fileLastModified)
                 }
               case _ =>
                 indexFile(file.getPath, encoding)
-                lastModfied.put(fname, fileLastModified)
+                lastModified.put(fname, fileLastModified)
             }
           }
         }
@@ -248,7 +248,7 @@ class LuceneIndexActor(today: String,
 
         Try {
           if (allDocIds.contains(hid)) {
-            indexWriter.updateDocument(new Term(sid), map2docExt(ndoc)) // update the document in the index
+            indexWriter.updateDocument(new Term("id", sid), map2docExt(ndoc)) // update the document in the index
           } else {
             indexWriter.addDocument(map2docExt(ndoc)) // insert the document into the index
             allDocIds.add(hid)
