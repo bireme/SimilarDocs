@@ -8,28 +8,26 @@
 package org.bireme.sd
 
 import java.io.File
+import java.lang
 import java.nio.file.Path
-import java.{lang, util}
+import java.text.{DateFormat, SimpleDateFormat}
 import java.util.regex.{Matcher, Pattern}
-import java.util.{GregorianCalendar, TimeZone}
 
 import akka.actor.{Actor, ActorLogging, ActorSystem, PoisonPill, Props, Terminated}
 import akka.event.Logging
 import akka.routing.{ActorRefRoutee, Broadcast, RoundRobinRoutingLogic, Router}
 import bruma.master._
 import org.apache.lucene.analysis.Analyzer
-import org.apache.lucene.analysis.core.KeywordAnalyzer
-import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper
-import org.apache.lucene.document.{DateTools, Document, Field, StoredField, StringField, TextField}
-import org.apache.lucene.index.{IndexWriter, IndexWriterConfig, Term}
+import org.apache.lucene.document.{Document, Field, StoredField, StringField, TextField}
+import org.apache.lucene.index._
 import org.apache.lucene.store.FSDirectory
 import org.bireme.sd.service.Conf
 import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.language.postfixOps
 import scala.util.control.NonFatal
 import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
@@ -38,7 +36,7 @@ case class Finishing()
 
 class LuceneIndexMain(indexPath: String,
                       decsIndexPath: String,
-                      idsIndexPath: String,
+                      modifiedIndexPath: String,
                       xmlDir: String,
                       xmlFileFilter: String,
                       fldIdxNames: Set[String],
@@ -49,11 +47,7 @@ class LuceneIndexMain(indexPath: String,
   context.system.eventStream.setLogLevel(Logging.InfoLevel)
 
   val idxWorkers = 10 // Number of actors to run concurrently
-
-  val ngAnalyzer: NGramAnalyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
-  val analyzerPerField: util.Map[String, Analyzer] = Map[String,Analyzer](
-                                 "entrance_date" -> new KeywordAnalyzer()).asJava
-  val analyzer: PerFieldAnalyzerWrapper = new PerFieldAnalyzerWrapper(ngAnalyzer, analyzerPerField)
+  val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
   val indexPathTrim: String = indexPath.trim
   val indexPath1: String = if (indexPathTrim.endsWith("/")) indexPathTrim.substring(0, indexPathTrim.length - 1)
                            else indexPathTrim
@@ -64,14 +58,22 @@ class LuceneIndexMain(indexPath: String,
   else config.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
   val indexWriter: IndexWriter = new IndexWriter(directory, config)
 
-  val dbFiles: DB = DBMaker.fileDB(s"$idsIndexPath/fileLastModified.db").closeOnJvmShutdown().make
-  val db: DB = DBMaker.fileDB(s"$idsIndexPath/allDocIds.db").closeOnJvmShutdown().make
-  val allDocIds: HTreeMap.KeySet[Integer] = db.hashSet("idSet", Serializer.INTEGER).createOrOpen()
-  val lastModified: HTreeMap[String, lang.Long] = db.hashMap("modFile", Serializer.STRING, Serializer.LONG).createOrOpen()
+  val modFile = new File(modifiedIndexPath)
+  if (!modFile.exists()) modFile.mkdirs()
   if (fullIndexing) {
-    allDocIds.clear()
-    lastModified.clear()
+    new File(modFile, "fileLastModified.db").delete()
+    new File(modFile, "docLastModified.db").delete()
   }
+
+  val dbLastModified: DB = DBMaker.fileDB(s"$modifiedIndexPath/fileLastModified.db").closeOnJvmShutdown().make
+  val docLastModified: DB = DBMaker.fileDB(s"$modifiedIndexPath/docLastModified.db").closeOnJvmShutdown().make
+  val lastModifiedFile: HTreeMap[String, lang.Long] = dbLastModified.hashMap("modFile", Serializer.STRING, Serializer.LONG).createOrOpen()
+  val lastModifiedDoc: HTreeMap[String, lang.Long] = dbLastModified.hashMap("modFile", Serializer.STRING, Serializer.LONG).createOrOpen()
+  if (fullIndexing) {
+    lastModifiedFile.clear()
+    lastModifiedDoc.clear()
+  }
+
   val routerIdx: Router = createActors()
   var activeIdx: Int = idxWorkers
 
@@ -86,16 +88,12 @@ class LuceneIndexMain(indexPath: String,
   routerIdx.route(Broadcast(Finishing()), self)
 
   private def createActors(): Router = {
-    val now: GregorianCalendar = new GregorianCalendar(TimeZone.getDefault)
-    val today: String = DateTools.dateToString(DateTools.round(now.getTime, DateTools.Resolution.DAY),
-      DateTools.Resolution.DAY)
     val decsMap: Map[Int, Set[String]] = if (decsDir.isEmpty) Map[Int,Set[String]]()
-    else decx2Map(decsDir)
+                                         else decx2Map(decsDir)
 
     val routees = Vector.fill(idxWorkers) {
-      val r = context.actorOf(Props(classOf[LuceneIndexActor], today, indexWriter,
-        fldIdxNames ++ Set("entrance_date", "id"),
-        fldStrdNames, decsMap, allDocIds))
+      val r = context.actorOf(Props(classOf[LuceneIndexActor], indexWriter,
+        fldIdxNames, fldStrdNames, decsMap, lastModifiedDoc))
       context watch r
       ActorRefRoutee(r)
     }
@@ -113,15 +111,15 @@ class LuceneIndexMain(indexPath: String,
           matcher.reset(fname)
           if (matcher.matches) {
             val fileLastModified: Long = file.lastModified()
-            Option(lastModified.get(fname)) match {
+            Option(lastModifiedFile.get(fname)) match {
               case Some(modified: lang.Long) =>
                 if (fileLastModified > modified) {
                   indexFile(file.getPath, encoding)
-                  lastModified.put(fname, fileLastModified)
+                  lastModifiedFile.put(fname, fileLastModified)
                 }
               case _ =>
                 indexFile(file.getPath, encoding)
-                lastModified.put(fname, fileLastModified)
+                lastModifiedFile.put(fname, fileLastModified)
             }
           }
         }
@@ -133,8 +131,9 @@ class LuceneIndexMain(indexPath: String,
     indexWriter.forceMerge(1)
     indexWriter.close()
     directory.close()
-    db.close()
     log.info("Optimizing index 'sdIndex - end'")
+    dbLastModified.close()
+    docLastModified.close()
     context.system.terminate()
   }
 
@@ -190,13 +189,11 @@ class LuceneIndexMain(indexPath: String,
   }
 }
 
-class LuceneIndexActor(today: String,
-                       //todaySeconds: String,
-                       indexWriter: IndexWriter,
+class LuceneIndexActor(indexWriter: IndexWriter,
                        fldIdxNames: Set[String],
                        fldStrdNames: Set[String],
                        decsMap: Map[Int,Set[String]],
-                       allDocIds: HTreeMap.KeySet[Integer]) extends Actor with ActorLogging {
+                       lastModifiedDoc: HTreeMap[String, lang.Long]) extends Actor with ActorLogging {
   val regexp: Regex = """\^d\d+""".r
   val checkXml: CheckXml = new CheckXml()
   val fieldsIndexNames: Set[String] = if ((fldIdxNames == null) || fldIdxNames.isEmpty) Conf.idxFldNames
@@ -207,6 +204,7 @@ class LuceneIndexActor(today: String,
       if (split.length == 1) map + ((split(0), 1f))
       else map + ((split(0), split(1).toFloat))
   }
+  val formatter: DateFormat = new SimpleDateFormat("yyyy-MM-dd")
 
   def receive: PartialFunction[Any, Unit] = {
     case (fname:String, encoding:String) =>
@@ -215,10 +213,13 @@ class LuceneIndexActor(today: String,
         checkXml.check(fname) match {
           case Some(errMess) => log.error(s"skipping document => file:[$fname] - $errMess")
           case None =>
-            IahxXmlParser.getElements(fname, encoding, Set()).zipWithIndex.foreach {
-              case (set,idx) =>
-                if (idx % 50000 == 0) log.info(s"[$fname] - $idx")
-                createNewDocument(fname, set.toMap)
+            IahxXmlParser.getElements(fname, encoding, Set[String]()).zipWithIndex.foreach {
+              case (mmap: mutable.Map[String, List[String]], idx) =>
+                createNewDocument(fname, mmap.toMap)
+                if (idx % 50000 == 0) {
+                  indexWriter.flush()
+                  log.info(s"[$fname] - $idx")
+                }
             }
         }
       } catch {
@@ -243,15 +244,25 @@ class LuceneIndexActor(today: String,
     doc.get("id") match {
       case Some(id: Seq[String]) =>
         val sid = id.head
-        val hid: Int = sid.hashCode
-        val ndoc: Map[String, List[String]] = doc + ("entrance_date" -> List(today)) // add 'entrance_date' field
-
         Try {
-          if (allDocIds.contains(hid)) {
-            indexWriter.updateDocument(new Term("id", sid), map2docExt(ndoc)) // update the document in the index
-          } else {
-            indexWriter.addDocument(map2docExt(ndoc)) // insert the document into the index
-            allDocIds.add(hid)
+          doc.get("update_date").foreach {
+            lst =>
+              lst.headOption.foreach {
+                upd =>
+                  if (upd.nonEmpty) {
+                    val updTimeNew: Long = formatter.parse(upd).getTime
+                    Option(lastModifiedDoc.get(sid)) match {
+                      case Some(mdate) =>
+                        if (updTimeNew > mdate) {
+                          indexWriter.updateDocument(new Term("id", sid), map2docExt(doc)) // update the document in the index
+                          lastModifiedDoc.put(sid, updTimeNew)
+                        }
+                      case None =>
+                        indexWriter.addDocument(map2docExt(doc)) // insert the document into the index
+                        lastModifiedDoc.put(sid, updTimeNew)
+                    }
+                  }
+              }
           }
         } match {
           case Success(_) => ()
@@ -292,6 +303,8 @@ class LuceneIndexActor(today: String,
           }
         }
         else if (tag.equals("id")) doc.add(new StringField("id", lst.head, Field.Store.YES))
+        else if (tag.equals("db")) doc.add(new StringField("db", lst.head, Field.Store.YES))
+        else if (tag.equals("update_date")) doc.add(new StringField("update_date", lst.head, Field.Store.YES))
         else {
           if (fldIdxNames.contains(tag)) {  // Add indexed + stored fields as stored fields
             lst.foreach {
@@ -391,5 +404,5 @@ object LuceneIndexAkka extends App {
       system.terminate(); throw e
   }
 
-  Await.result(system.whenTerminated, 24 hours)
+  Await.result(system.whenTerminated, 24.hours)
 }

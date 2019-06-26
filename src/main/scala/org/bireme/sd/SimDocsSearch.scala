@@ -9,12 +9,15 @@
 package org.bireme.sd
 
 import java.io.File
+import java.text.{DateFormat, SimpleDateFormat}
+import java.util
 import java.util.{Calendar, GregorianCalendar, TimeZone}
 
+import org.apache.lucene.analysis.core.KeywordAnalyzer
+import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import org.apache.lucene.analysis.{Analyzer, TokenStream}
-import org.apache.lucene.document.DateTools
-import org.apache.lucene.index.{DirectoryReader, IndexableField}
+import org.apache.lucene.index.{DirectoryReader, IndexableField, Term}
 import org.apache.lucene.queryparser.classic.QueryParser
 import org.apache.lucene.search._
 import org.apache.lucene.store.FSDirectory
@@ -44,7 +47,8 @@ class SimDocsSearch(val sdIndexPath: String,
   val month: Int = now.get(Calendar.MONTH)
   val day: Int = now.get(Calendar.DAY_OF_MONTH)
   val todayCal: GregorianCalendar = new GregorianCalendar(year, month, day, 0, 0) // begin of today
-  val today: String = DateTools.dateToString(todayCal.getTime, DateTools.Resolution.DAY)
+  val formatter: DateFormat = new SimpleDateFormat("yyyy-MM-dd")
+  val today: String = formatter.format(todayCal.getTime)
 
   def close(): Unit = {
     sdDirectory.close()
@@ -57,20 +61,23 @@ class SimDocsSearch(val sdIndexPath: String,
     *
     * @param text the text to be searched
     * @param outFields name of the fields that will be show in the output
-    * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
+    * @param sources filter the valid values of the document field 'db'
+    * @param lastDays filter documents whose 'update_date' is younger or equal to lastDays days
     * @param explain if true add original, similar and common ngrams to the each outputed similar document
     * @return a json string of the similar documents
     */
   def search(text: String,
              outFields: Set[String],
+             sources: Set[String],
              lastDays: Int,
              explain: Boolean): String = {
     require((text != null) && (!text.isEmpty))
 
-    val days = if (lastDays <= 0) None else Some(lastDays)
+    val days: Option[Int] = if (lastDays <= 0) None else Some(lastDays)
+    val srcs: Option[Set[String]] = if ((sources == null) || sources.isEmpty) None else Some(sources)
 
     val docs: List[(Float, Map[String, List[String]])] =
-      search(text, outFields, service.Conf.maxDocs, service.Conf.minNGrams, days)
+      search(text, outFields, service.Conf.maxDocs, service.Conf.minNGrams, srcs, days)
     val docs2 = docs.map {
       doc =>
         val ngrams = if (explain) Some(getCommonNGrams(text, doc._2)) else None
@@ -86,7 +93,8 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param outFields name of the fields that will be show in the output
     * @param maxDocs maximum number of returned documents
     * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
-    * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
+    * @param sources filter the valid values of the document field 'db'
+    * @param lastDays filter documents whose 'update_date' is younger or equal to lastDays days
     * @return a list of pairs with document score and a map of field name and a
     *         list of its contents
     */
@@ -94,6 +102,7 @@ class SimDocsSearch(val sdIndexPath: String,
              outFields: Set[String],
              maxDocs: Int,
              minNGrams: Int,
+             sources: Option[Set[String]],
              lastDays: Option[Int]): List[(Float,Map[String,List[String]])] = {
     require((text != null) && text.nonEmpty)
     require(maxDocs > 0)
@@ -102,7 +111,7 @@ class SimDocsSearch(val sdIndexPath: String,
     val oFields = if ((outFields == null) || outFields.isEmpty) Conf.idxFldNames + "id"
                else outFields
 
-    searchIds(text, maxDocs, minNGrams, lastDays).map {
+    searchIds(text, sources, maxDocs, minNGrams, lastDays).map {
       case (id,score) => (score, loadDoc(id, oFields))
     }
   }
@@ -111,12 +120,14 @@ class SimDocsSearch(val sdIndexPath: String,
     * Searches for documents having a string in some fields
     *
     * @param text the text to be searched
+    * @param sources filter the valid values of the document field 'db'
     * @param maxDocs maximum number of returned documents
     * @param minNGrams minimum number of common ngrams retrieved to consider returning a document field text
-    * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
+    * @param lastDays filter documents whose 'update_date' is younger or equal to lastDays days
     * @return a list of pairs with document id and document score
     */
   def searchIds(text: String,
+                sources: Option[Set[String]],
                 maxDocs: Int,
                 minNGrams: Int,
                 lastDays: Option[Int]): List[(Int,Float)] = {
@@ -127,15 +138,21 @@ class SimDocsSearch(val sdIndexPath: String,
     val textSeq: Seq[String] = uniformText(text)
     val text2: String = textSeq.mkString(" ")
     val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
+    val perFieldAnalyzer: Analyzer = {
+      val hash = new util.HashMap[String,Analyzer]()
+      hash.put("id", new KeywordAnalyzer())
+      hash.put("db", new KeywordAnalyzer())
+      hash.put("update_date", new KeywordAnalyzer())
+      new PerFieldAnalyzerWrapper(analyzer, hash)
+    }
     val ngrams: Seq[String] = getNGrams(text2, analyzer, maxWords)
     val dirReader: DirectoryReader = getReader
     val searcher = new IndexSearcher(dirReader)
     val lst: List[(Int,Float)] = {
-      val orQuery = getQuery(text2, lastDays, useDeCS = true)
+      val orQuery = getQuery(text2, sources, lastDays, useDeCS = true)
 //println(s"===> getIdScore docs=${searcher.search(orQuery, 10).totalHits} orQuery=$orQuery")
-      getIdScore(searcher.search(orQuery, 10 * maxDocs).scoreDocs, ngrams, analyzer, maxDocs, minNGrams)
+      getIdScore(searcher.search(orQuery, 10 * maxDocs).scoreDocs, ngrams, perFieldAnalyzer, maxDocs, minNGrams)
     }
-
     dirReader.close()
     lst
   }
@@ -158,39 +175,47 @@ class SimDocsSearch(val sdIndexPath: String,
     * Create the query object to be used in a search method call.
     *
     * @param text the text to be searched
-    * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
+    * @param sources filter the valid values of the document field 'db'
+    * @param lastDays filter documents whose 'update_date' is younger or equal to lastDays days
     * @param useDeCS if true DeCS synonyms will be added to the input text, if false the original input text will be used
     * @return the Lucene query object
     */
   private def getQuery(text: String,
+                       sources: Option[Set[String]],
                        lastDays: Option[Int],
                        useDeCS: Boolean): Query = {
     require ((text != null) && text.nonEmpty)
 
-    val mqParser: QueryParser =
-      new QueryParser(Conf.indexedField, new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size))
-    val textImproved: String =
-      if (useDeCS) OneWordDecs.addDecsSynonyms(text, decsSearcher)
-      else text
+    val queryText: Option[Query] =  Some {
+      val mqParser: QueryParser =
+        new QueryParser(Conf.indexedField, new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size))
+      val textImproved: String =
+        if (useDeCS) OneWordDecs.addDecsSynonyms(text, decsSearcher)
+        else text
 
-    mqParser.setDefaultOperator(QueryParser.Operator.OR)
-    val query1: Query =  mqParser.parse(textImproved)
-
-    lastDays match {
-      case Some(days) =>
-        require (days > 0)
-        val daysAgoCal: GregorianCalendar = todayCal.clone().asInstanceOf[GregorianCalendar]
-        daysAgoCal.add(Calendar.DAY_OF_MONTH, -days + 1)                // begin of x days ago
-        val daysAgo: String = DateTools.dateToString(daysAgoCal.getTime,
-                                             DateTools.Resolution.DAY)
-        val query2: TermRangeQuery = TermRangeQuery.newStringRange("entrance_date", daysAgo,
-                                                             today, true, true)
-        val builder = new BooleanQuery.Builder()
-        builder.add(query1, BooleanClause.Occur.MUST)
-        builder.add(query2, BooleanClause.Occur.MUST)
-        builder.build
-      case None => query1
+      mqParser.setDefaultOperator(QueryParser.Operator.OR)
+      mqParser.parse(textImproved)
     }
+    val querySources: Option[Query] = sources.map {
+      set =>
+        val builder: BooleanQuery.Builder = new BooleanQuery.Builder()
+        set.foreach(src => builder.add(new TermQuery(new Term("db", src)), BooleanClause.Occur.SHOULD))
+        builder.build
+    }
+    val queryLastDays: Option[Query] = lastDays map {
+      days =>
+        val daysAgoCal: GregorianCalendar = todayCal.clone().asInstanceOf[GregorianCalendar]
+        daysAgoCal.add(Calendar.DAY_OF_MONTH, -days + 1) // begin of x days ago
+
+        val daysAgo: String = formatter.format(daysAgoCal.getTime)
+        TermRangeQuery.newStringRange("update_date", daysAgo,
+          today, true, true)
+    }
+    val qbuilder: BooleanQuery.Builder = new BooleanQuery.Builder()
+    Seq(queryText, querySources, queryLastDays).flatten.foreach {
+      qbuilder.add(_, BooleanClause.Occur.MUST)
+    }
+    qbuilder.build
   }
 
   /**
@@ -232,7 +257,7 @@ class SimDocsSearch(val sdIndexPath: String,
     */
   private def loadDoc(id: Int,
                       fields: Set[String]): Map[String,List[String]] = {
-    require(id > 0)
+    require(id >= 0)
     require((fields != null) && fields.nonEmpty)
 
     val dirReader: DirectoryReader = getReader
@@ -419,7 +444,8 @@ object SimDocsSearch extends App {
     "\n\t[<-outFields=<field>,<field>,...,<field>] - document fields used will be show in the output" +
     "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
     "\n\t[-minNGrams=<num>] - minimum number of common ngrams retrieved to consider returning a document field text" +
-    "\n\t[-lastDays=<num>] - return only docs that are younger (entrance_date flag) than 'lastDays' days")
+    "\n\t[-sources=<src1>,<src2>,...,<src>] - return only docs that have the value of their field 'db' equal to <srci>" +
+    "\n\t[-lastDays=<num>] - return only docs that are younger than 'lastDays' days compared to update_date flag")
     System.exit(1)
   }
 
@@ -434,14 +460,15 @@ object SimDocsSearch extends App {
 
   val outFields: Set[String] = parameters.get("outFields") match {
     case Some(sFields) => sFields.split(" *, *").toSet
-    case None => Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs")//service.Conf.idxFldNames
+    case None => Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs", "id", "db", "update_date")//service.Conf.idxFldNames
   }
   val maxDocs: Int = parameters.getOrElse("maxDocs", "10").toInt
   val minNGrams: Int = parameters.getOrElse("minNGrams", Conf.minNGrams.toString).toInt
+  val sources: Option[Set[String]] = parameters.get("sources").map(_.split(" *\\, *").toSet)
   val lastDays: Option[Int] = parameters.get("lastDays").map(_.toInt)
   val search: SimDocsSearch = new SimDocsSearch(args(0), args(1))
   val maxWords: Int = search.maxWords
-  val docs: List[(Float,Map[String,List[String]])] = search.search(args(2), outFields, maxDocs, minNGrams, lastDays)
+  val docs: List[(Float,Map[String,List[String]])] = search.search(args(2), outFields, maxDocs, minNGrams, sources, lastDays)
 
   docs.foreach {
     case (score, doc) =>

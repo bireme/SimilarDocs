@@ -144,7 +144,7 @@ class TopIndex(simSearch: SimDocsSearch,
     // Add similar documents ids
     if (getSdIds) {
       doc.removeFields(sdIdFldName)
-      simSearch.searchIds(newContent, maxDocs, Conf.minNGrams, None).foreach {
+      simSearch.searchIds(newContent, None, maxDocs, Conf.minNGrams, None).foreach {
         case (id,_) => doc.add(new StoredField(sdIdFldName, id))
       }
     }
@@ -567,7 +567,7 @@ class TopIndex(simSearch: SimDocsSearch,
     ndoc.add(new StoredField(contentFldName, content))
 
     // Include 'sd_id' (similar docs) fields
-    simSearch.searchIds(content, maxDocs, Conf.minNGrams, None).
+    simSearch.searchIds(content, None, maxDocs, Conf.minNGrams, None).
       foreach { case (sdId,_) => ndoc.add(new StoredField(sdIdFldName, sdId)) }
 
     // Update document

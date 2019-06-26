@@ -147,6 +147,14 @@ public class SDService extends HttpServlet {
                     for (String fld: oFields) {
                         fields.add(fld);
                     }
+                    
+                    final String srcs = request.getParameter("sources");
+                    final String[] sources = (srcs == null)
+                                    ? new String[0]: srcs.split(" *\\, *");
+                    Set<String> srcSet = new HashSet<>();
+                    for (String src: sources) {
+                        srcSet.add(src);
+                    }                    
                     final String lastDaysPar = request.getParameter("lastDays");
                     final int lastDays = (lastDaysPar == null) ? 0 :
                                            Integer.parseInt(lastDaysPar);
@@ -158,7 +166,8 @@ public class SDService extends HttpServlet {
                     final Boolean explain = (explainPar == null) ? false :
                                             (explainPar.trim().isEmpty()) ? true :
                                              Boolean.parseBoolean(explainPar);
-                    out.println(simSearch.search(adhocSimilarDocs, fields.toSet(), lastDays, explain));
+                    out.println(simSearch.search(adhocSimilarDocs, fields.toSet(), 
+                                            srcSet.toSet(), lastDays, explain));
                 }
                 return;
             }
@@ -240,9 +249,9 @@ public class SDService extends HttpServlet {
         out.println("--- and one of the following options: ---");
         out.println("psId=&lt;id&gt;&amp;addProfile=&lt;id&gt;&amp;sentence=&lt;sentence&gt;");
         out.println("psId=&lt;id&gt;&amp;deleteProfile=&lt;id&gt;");
-        out.println("psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;&amp;[outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;lastDays=&lt;num&gt;]");
+        out.println("psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;lastDays=&lt;num&gt;]");
         out.println("psId=&lt;id&gt;&amp;showProfiles=true");
-        out.println("adhocSimDocs=&lt;sentence&gt;[outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;lastDays=&lt;num&gt;][&amp;explain=&lt;bool&gt;]");
+        out.println("adhocSimDocs=&lt;sentence&gt;[outFields=&lt;field&gt;,...,&lt;field&gt;][sources=&lt;src&gt;,...,&lt;src&gt;][&amp;lastDays=&lt;num&gt;][&amp;explain=&lt;bool&gt;]");
         out.println("</SYNTAX>");
     }
 
