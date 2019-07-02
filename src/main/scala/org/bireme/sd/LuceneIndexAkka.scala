@@ -204,7 +204,7 @@ class LuceneIndexActor(indexWriter: IndexWriter,
       if (split.length == 1) map + ((split(0), 1f))
       else map + ((split(0), split(1).toFloat))
   }
-  val formatter: DateFormat = new SimpleDateFormat("yyyy-MM-dd")
+  val formatter: DateFormat = new SimpleDateFormat("yyyyMMdd")
 
   def receive: PartialFunction[Any, Unit] = {
     case (fname:String, encoding:String) =>
@@ -215,7 +215,10 @@ class LuceneIndexActor(indexWriter: IndexWriter,
           case None =>
             IahxXmlParser.getElements(fname, encoding, Set[String]()).zipWithIndex.foreach {
               case (mmap: mutable.Map[String, List[String]], idx) =>
-                createNewDocument(fname, mmap.toMap)
+                Try(createNewDocument(fname, mmap.toMap)) match {
+                  case Success(_) => ()
+                  case Failure(ex) => log.error(s"skipping document => file:[$fname] - ${ex.getMessage}")
+                }
                 if (idx % 50000 == 0) {
                   indexWriter.flush()
                   log.info(s"[$fname] - $idx")
