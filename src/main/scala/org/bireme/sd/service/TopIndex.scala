@@ -14,7 +14,7 @@ import org.apache.lucene.document._
 import org.apache.lucene.index._
 import org.apache.lucene.search.{IndexSearcher, MatchAllDocsQuery, TermQuery}
 import org.apache.lucene.store.FSDirectory
-import org.bireme.sd.{SimDocsSearch, Tools}
+import org.bireme.sd.{DocumentIterator, SimDocsSearch, Tools}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -179,6 +179,32 @@ class TopIndex(simSearch: SimDocsSearch,
 
     topWriter.deleteDocuments(new Term(idFldName, id))
     topWriter.commit()
+  }
+
+  /**
+    * @return a xml document with the users from all personal services documents
+    */
+  def getUsersXml: String = {
+    val head = """<?xml version="1.0" encoding="UTF-8"?><users>"""
+
+    getUsers.foldLeft[String](head) {
+      case(str, user) => str + s"<user>$user</user>"
+    } + "</users>"
+  }
+
+  /**
+    * @return a collection of users from all personal services documents
+    */
+  def getUsers: Set[String] = {
+    val docIter: DocumentIterator = new DocumentIterator(DirectoryReader.open(topWriter), Some(Set("user")))
+
+    docIter.foldLeft(Set[String]()) {
+      case (set, doc) =>
+        Option(doc.get("user")) match {
+          case Some(user) => set + user
+          case None => set
+        }
+    }
   }
 
   /**
@@ -420,11 +446,11 @@ class TopIndex(simSearch: SimDocsSearch,
     val month = now.get(Calendar.MONTH)
     val day = now.get(Calendar.DAY_OF_MONTH)
     val todayCal = new GregorianCalendar(year, month, day, 0, 0) // begin of today
-    val daysAgoCal = todayCal.clone().asInstanceOf[GregorianCalendar]
+    val daysAgoCal: GregorianCalendar = todayCal.clone().asInstanceOf[GregorianCalendar]
     daysAgoCal.add(Calendar.DAY_OF_MONTH, -days)                // begin of x days ago
-    val daysAgo = DateTools.dateToString(daysAgoCal.getTime,
-                                         DateTools.Resolution.SECOND)
-    val field: String = searcher.doc(id).get("entrance_date")
+    val daysAgo: String = DateTools.dateToString(daysAgoCal.getTime,
+                                         DateTools.Resolution.DAY)
+    val field: String = searcher.doc(id).get("update_date")
 
     (field == null) || (field.compareTo(daysAgo) >= 0)
   }

@@ -171,6 +171,13 @@ public class SDService extends HttpServlet {
                 }
                 return;
             }
+            
+            // Show Users
+            final String showUsers = request.getParameter("showUsers");
+            if (showUsers != null) {
+                out.println(topIndex.getUsersXml()); // showUsers
+                return;
+            }
 
             final String psId = request.getParameter("psId");
             if ((psId == null) || (psId.trim().isEmpty())) {
@@ -231,8 +238,8 @@ public class SDService extends HttpServlet {
                                               fields.toSet(), 10, lastDays));
                 }
                 return;
-            }
-
+            }            
+            
             // Show Profiles
             final String showProfiles = request.getParameter("showProfiles");
             if (showProfiles == null) {
@@ -250,6 +257,7 @@ public class SDService extends HttpServlet {
         out.println("psId=&lt;id&gt;&amp;addProfile=&lt;id&gt;&amp;sentence=&lt;sentence&gt;");
         out.println("psId=&lt;id&gt;&amp;deleteProfile=&lt;id&gt;");
         out.println("psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;lastDays=&lt;num&gt;]");
+        out.println("psId=&lt;id&gt;&amp;showUsers=true");
         out.println("psId=&lt;id&gt;&amp;showProfiles=true");
         out.println("adhocSimDocs=&lt;sentence&gt;[outFields=&lt;field&gt;,...,&lt;field&gt;][sources=&lt;src&gt;,...,&lt;src&gt;][&amp;lastDays=&lt;num&gt;][&amp;explain=&lt;bool&gt;]");
         out.println("</SYNTAX>");

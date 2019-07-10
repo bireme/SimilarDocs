@@ -47,7 +47,7 @@ class SimDocsSearch(val sdIndexPath: String,
   val month: Int = now.get(Calendar.MONTH)
   val day: Int = now.get(Calendar.DAY_OF_MONTH)
   val todayCal: GregorianCalendar = new GregorianCalendar(year, month, day, 0, 0) // begin of today
-  val formatter: DateFormat = new SimpleDateFormat("yyyy-MM-dd")
+  val formatter: DateFormat = new SimpleDateFormat("yyyyMMdd")
   val today: String = formatter.format(todayCal.getTime)
 
   def close(): Unit = {
