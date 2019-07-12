@@ -7,19 +7,20 @@
 
 package org.bireme.sd
 
-import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
+import org.h2.mvstore.{MVMap, MVStore}
+
 
 object IdSearch extends App {
   private def usage(): Unit = {
-    Console.err.println("usage: IdSearch <mapDBFilePath> <id>")
+    Console.err.println("usage: IdSearch <mapDBFilePath> <tableName> <id>")
     System.exit(1)
   }
-  if (args.length != 2) usage()
+  if (args.length != 3) usage()
 
-  val db: DB = DBMaker.fileDB(args(0)).closeOnJvmShutdown().make
-  val allDocIds: HTreeMap.KeySet[Integer] = db.hashSet("idSet", Serializer.INTEGER).createOrOpen()
+  val store: MVStore = MVStore.open(args(0))
+  val allDocIds: MVMap[String, Long] = store.openMap(args(1))
 
-  println("Contains: "+ allDocIds.contains(args(1).hashCode))
+  println("Contains: " + Option(allDocIds.get(args(2))).isEmpty)
 
-  db.close()
+  store.close()
 }

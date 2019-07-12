@@ -20,7 +20,7 @@ object UpdaterBatchService extends App {
     Console.err.println("usage: UpdateBatchService:\n" +
       "\n\t-sdIndexPath=<path>     : documents Lucene index path" +
       "\n\t-topIndexPath=<path>    : top indexes directory path" +
-      "\n\t-decsIndexPath=<path>    : decs indexes directory path"
+      "\n\t-decsIndexPath=<path>   : decs indexes directory path"
     )
     System.exit(1)
   }

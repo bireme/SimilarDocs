@@ -232,7 +232,7 @@ public class SDService extends HttpServlet {
                         fields.add(fld);
                     }
                     final String lastDaysPar = request.getParameter("lastDays");
-                    final int lastDays = (lastDaysPar == null) ? 365 :
+                    final int lastDays = (lastDaysPar == null) ? 0: //365 :
                                            Integer.parseInt(lastDaysPar);
                     out.println(topIndex.getSimDocsXml(psId, profiles.toSet(),
                                               fields.toSet(), 10, lastDays));
@@ -259,7 +259,7 @@ public class SDService extends HttpServlet {
         out.println("psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;lastDays=&lt;num&gt;]");
         out.println("psId=&lt;id&gt;&amp;showUsers=true");
         out.println("psId=&lt;id&gt;&amp;showProfiles=true");
-        out.println("adhocSimDocs=&lt;sentence&gt;[outFields=&lt;field&gt;,...,&lt;field&gt;][sources=&lt;src&gt;,...,&lt;src&gt;][&amp;lastDays=&lt;num&gt;][&amp;explain=&lt;bool&gt;]");
+        out.println("adhocSimilarDocs=&lt;sentence&gt;[outFields=&lt;field&gt;,...,&lt;field&gt;][sources=&lt;src&gt;,...,&lt;src&gt;][&amp;lastDays=&lt;num&gt;][&amp;explain=&lt;bool&gt;]");
         out.println("</SYNTAX>");
     }
 

@@ -8,7 +8,6 @@
 package org.bireme.sd
 
 import java.io.File
-import java.lang
 import java.nio.file.Path
 import java.text.{DateFormat, SimpleDateFormat}
 import java.util.regex.{Matcher, Pattern}
@@ -22,7 +21,7 @@ import org.apache.lucene.document.{Document, Field, StoredField, StringField, Te
 import org.apache.lucene.index._
 import org.apache.lucene.store.FSDirectory
 import org.bireme.sd.service.Conf
-import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
+import org.h2.mvstore.{MVMap, MVStore}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -65,10 +64,13 @@ class LuceneIndexMain(indexPath: String,
     new File(modFile, "docLastModified.db").delete()
   }
 
-  val dbLastModified: DB = DBMaker.fileDB(s"$modifiedIndexPath/fileLastModified.db").closeOnJvmShutdown().make
-  val docLastModified: DB = DBMaker.fileDB(s"$modifiedIndexPath/docLastModified.db").closeOnJvmShutdown().make
-  val lastModifiedFile: HTreeMap[String, lang.Long] = dbLastModified.hashMap("modFile", Serializer.STRING, Serializer.LONG).createOrOpen()
-  val lastModifiedDoc: HTreeMap[String, lang.Long] = dbLastModified.hashMap("modFile", Serializer.STRING, Serializer.LONG).createOrOpen()
+  val fileLastModified: MVStore = new MVStore.Builder().fileName(s"$modifiedIndexPath/fileLastModified.db")
+    .compress().open()
+  val docLastModified: MVStore = new MVStore.Builder().fileName(s"$modifiedIndexPath/docLastModified.db")
+    .compress().open()
+
+  val lastModifiedFile: MVMap[String, Long] = fileLastModified.openMap("modFile")
+  val lastModifiedDoc: MVMap[String, Long] = docLastModified.openMap("modDoc")
   if (fullIndexing) {
     lastModifiedFile.clear()
     lastModifiedDoc.clear()
@@ -112,7 +114,7 @@ class LuceneIndexMain(indexPath: String,
           if (matcher.matches) {
             val fileLastModified: Long = file.lastModified()
             Option(lastModifiedFile.get(fname)) match {
-              case Some(modified: lang.Long) =>
+              case Some(modified: Long) =>
                 if (fileLastModified > modified) {
                   indexFile(file.getPath, encoding)
                   lastModifiedFile.put(fname, fileLastModified)
@@ -132,7 +134,7 @@ class LuceneIndexMain(indexPath: String,
     indexWriter.close()
     directory.close()
     log.info("Optimizing index 'sdIndex - end'")
-    dbLastModified.close()
+    fileLastModified.close()
     docLastModified.close()
     context.system.terminate()
   }
@@ -193,7 +195,7 @@ class LuceneIndexActor(indexWriter: IndexWriter,
                        fldIdxNames: Set[String],
                        fldStrdNames: Set[String],
                        decsMap: Map[Int,Set[String]],
-                       lastModifiedDoc: HTreeMap[String, lang.Long]) extends Actor with ActorLogging {
+                       lastModifiedDoc: MVMap[String, Long]) extends Actor with ActorLogging {
   val regexp: Regex = """\^d\d+""".r
   val checkXml: CheckXml = new CheckXml()
   val fieldsIndexNames: Set[String] = if ((fldIdxNames == null) || fldIdxNames.isEmpty) Conf.idxFldNames
