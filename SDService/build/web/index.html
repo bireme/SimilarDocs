@@ -50,7 +50,7 @@ in a database, for example, LILACS+MEDLINE.</div>
         <h3>Get similar documents</h3>
         <div>Retrieve documents having most of words stored in a set of profiles</div>
         <br/>
-        <div>Syntax: <b>SDService?psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;lastDays=&lt;number_of_days&gt;]</b></div>
+        <div>Syntax: <b>SDService?psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;]</b></div>
         <br/>
         <div><b>psId:</b> personal service record identifier</div>
         <div><b>getSimDocs:</b> set of profile identifiers</div>
@@ -67,10 +67,11 @@ in a database, for example, LILACS+MEDLINE.</div>
         <h3>Adhoc similar documents</h3>
         <div>Retrieve documents having most of words present in an input string</div>
         <br/>
-        <div>Syntax: <b>SDService?adhocSimilarDocs=&lt;text&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;sources=&lt;src&gt;,...,&lt;src&gt;][&amp;lastDays=&lt;number_of_days&gt;][&amp;explain=&lt;bool&gt;]</b></div>
+        <div>Syntax: <b>SDService?adhocSimilarDocs=&lt;text&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;maxDocs=&lt;num&gt;][&amp;sources=&lt;src&gt;,...,&lt;src&gt;][&amp;lastDays=&lt;number_of_days&gt;][&amp;explain=&lt;bool&gt;]</b></div>
         <br/>
         <div><b>adhocSimilarDocs:</b> words to be used to look for similar documents</div>
         <div><b>outFields:</b> tags of similar doc field to be outputed. If no fields were specified all fields will be outputed. Optional parameter.</div>
+        <div><b>maxDocs:</b> if present, indicate the maximum number of outputed similar documents. Optional parameter.</div> 
         <div><b>sources:</b> if present, return only documents whose 'db' field are equal to some source specified in this parameter. If no source was specified, the retrieved documents will not be filtered by 'db' field. Optional parameter.</div>
         <div><b>lastDays:</b> if present, show only documents that are younger than 'number_of_days' days. Optional parameter.</div>
         <div><b>explain:</b> if present, show the origin document ngrams, the similar document ngrams and the common ngrams. Optional parameter.</div>

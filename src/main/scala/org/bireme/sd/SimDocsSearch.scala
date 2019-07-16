@@ -61,6 +61,7 @@ class SimDocsSearch(val sdIndexPath: String,
     *
     * @param text the text to be searched
     * @param outFields name of the fields that will be show in the output
+    * @param maxDocs maximum number of returned documents
     * @param sources filter the valid values of the document field 'db'
     * @param lastDays filter documents whose 'update_date' is younger or equal to lastDays days
     * @param explain if true add original, similar and common ngrams to the each outputed similar document
@@ -68,6 +69,7 @@ class SimDocsSearch(val sdIndexPath: String,
     */
   def search(text: String,
              outFields: Set[String],
+             maxDocs: Int,
              sources: Set[String],
              lastDays: Int,
              explain: Boolean): String = {
@@ -77,7 +79,7 @@ class SimDocsSearch(val sdIndexPath: String,
     val srcs: Option[Set[String]] = if ((sources == null) || sources.isEmpty) None else Some(sources)
 
     val docs: List[(Float, Map[String, List[String]])] =
-      search(text, outFields, service.Conf.maxDocs, service.Conf.minNGrams, srcs, days)
+      search(text, outFields, maxDocs, service.Conf.minNGrams, srcs, days)
     val docs2 = docs.map {
       doc =>
         val ngrams = if (explain) Some(getCommonNGrams(text, doc._2)) else None

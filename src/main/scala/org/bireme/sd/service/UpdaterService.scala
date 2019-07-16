@@ -24,7 +24,7 @@ class UpdaterService(topDocs: TopIndex) {
   private def updateAll(): Boolean = {
     if (stopping) false
     else {
-      topDocs.updateSimilarDocs() match {
+      topDocs.updateSimilarDocs(Conf.maxDocs, Conf.lastDays, Conf.sources) match {
         case Some(_) => updateAll() // has more documents to update
         case None    => true
       }

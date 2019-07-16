@@ -13,7 +13,11 @@ object Conf {
 
   val minNGrams = 2  // Minimum number of common ngrams retrieved to consider returning a document
 
-  val maxDocs: Int = 10
+  val maxDocs: Int = 10 // Maximum number of documents to be pre-processed or retrieved
+
+  val lastDays: Option[Int] = Some(7)  // Update only docs that are younger (entrance_date flag) than 'lastDays' days"
+
+  val sources: Option[Set[String]] = Some(Set("MEDLINE", "LILACS", "LIS", "colecionaSUS")) // Update only docs whose field 'db' belongs to sources"
 
   val idxFldNames = Set("id", "ti",
                         "ti_pt","ti_en","ti_es","ti_it","ti_fr","ti_de","ti_ru",

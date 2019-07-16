@@ -27,7 +27,7 @@ object TopIndexTestService extends App {
       "\n\t-addProfile=<name>=<sentence> : add user profile" +
       "\n\t-deleteProfile=<name>         : delete user profile" +
       "\n\t-getSimDocs=<prof>,<prof>,... : get similar documents from profiles" +
-      "\n\t--cleanSimDocs                : erase all similar documents fiels (sd_id) from profiles" +
+      "\n\t--cleanSimDocs                : erase all similar documents fields (sd_id) from profiles" +
       "\n\t--showProfiles                : show user profiles"
     )
     System.exit(1)
@@ -61,7 +61,7 @@ object TopIndexTestService extends App {
       case Some(profId) => topIndex.deleteProfile(psId,profId)
       case None => getSimDocs match {
         case Some(fields) => println(topIndex.getSimDocsXml(psId,
-                        fields.trim().split(" *\\, *").toSet, Set(), 10))
+                        fields.trim().split(" *\\, *").toSet, Set(), Conf.maxDocs, Conf.lastDays, Conf.sources))
         case None => if (showProfiles) println(topIndex.getProfilesXml(psId))
                      else if (cleanSimDocs) topIndex.resetAllTimes()
                      else usage()
