@@ -11,7 +11,7 @@ package org.bireme.sd
 import java.io.File
 import java.text.{DateFormat, SimpleDateFormat}
 import java.util
-import java.util.{Calendar, GregorianCalendar, TimeZone}
+import java.util.{Calendar, Date, GregorianCalendar, TimeZone}
 
 import org.apache.lucene.analysis.core.KeywordAnalyzer
 import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper
@@ -37,10 +37,13 @@ class SimDocsSearch(val sdIndexPath: String,
 
   val maxWords = 100 /*20*/   // limit the max number of words to be used as input text
 
-  val sdDirectory: FSDirectory = FSDirectory.open(new File(sdIndexPath).toPath)
   val decsDirectory: FSDirectory = FSDirectory.open(new File(decsIndexPath).toPath)
-  val decsReader: DirectoryReader = getReader
+  val decsReader: DirectoryReader = DirectoryReader.open(decsDirectory)
   val decsSearcher: IndexSearcher = new IndexSearcher(decsReader)
+
+  val sdDirectory: FSDirectory = FSDirectory.open(new File(sdIndexPath).toPath)
+  val sdReader: DirectoryReader = DirectoryReader.open(sdDirectory)
+  val sdSearcher: IndexSearcher = new IndexSearcher(sdReader)
 
   val now: GregorianCalendar = new GregorianCalendar(TimeZone.getDefault)
   val year: Int = now.get(Calendar.YEAR)
@@ -51,9 +54,10 @@ class SimDocsSearch(val sdIndexPath: String,
   val today: String = formatter.format(todayCal.getTime)
 
   def close(): Unit = {
-    sdDirectory.close()
     decsReader.close()
     decsDirectory.close()
+    sdReader.close()
+    sdDirectory.close()
   }
 
   /**
@@ -138,25 +142,28 @@ class SimDocsSearch(val sdIndexPath: String,
     require (minNGrams > 0)
 
     val textSeq: Seq[String] = uniformText(text)
-    val text2: String = textSeq.mkString(" ")
-    val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
-    val perFieldAnalyzer: Analyzer = {
-      val hash = new util.HashMap[String,Analyzer]()
-      hash.put("id", new KeywordAnalyzer())
-      hash.put("db", new KeywordAnalyzer())
-      hash.put("update_date", new KeywordAnalyzer())
-      new PerFieldAnalyzerWrapper(analyzer, hash)
+    val textSet: Set[String] = textSeq.toSet
+    val text2: String = textSet.mkString(" ")
+    val minNGrams2: Int = if (textSet.size >= 5) Math.max(3, minNGrams) else minNGrams
+
+    if (text2.isEmpty) List[(Int,Float)]()
+    else {
+      val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
+      val perFieldAnalyzer: Analyzer = {
+        val hash = new util.HashMap[String, Analyzer]()
+        hash.put("id", new KeywordAnalyzer())
+        hash.put("db", new KeywordAnalyzer())
+        hash.put("update_date", new KeywordAnalyzer())
+        new PerFieldAnalyzerWrapper(analyzer, hash)
+      }
+      val ngrams: Set[String] = getNGrams(text2, analyzer, maxWords)
+      val lst: List[(Int, Float)] = {
+        val orQuery = getQuery(text2, sources, lastDays, useDeCS = true)
+        //println(s"===> getIdScore docs=${searcher.search(orQuery, 10).totalHits} orQuery=$orQuery")
+        getIdScore(sdSearcher.search(orQuery, 10 * maxDocs).scoreDocs, ngrams, perFieldAnalyzer, maxDocs, minNGrams2)
+      }
+      lst
     }
-    val ngrams: Seq[String] = getNGrams(text2, analyzer, maxWords)
-    val dirReader: DirectoryReader = getReader
-    val searcher = new IndexSearcher(dirReader)
-    val lst: List[(Int,Float)] = {
-      val orQuery = getQuery(text2, sources, lastDays, useDeCS = true)
-//println(s"===> getIdScore docs=${searcher.search(orQuery, 10).totalHits} orQuery=$orQuery")
-      getIdScore(searcher.search(orQuery, 10 * maxDocs).scoreDocs, ngrams, perFieldAnalyzer, maxDocs, minNGrams)
-    }
-    dirReader.close()
-    lst
   }
 
   /**
@@ -231,7 +238,7 @@ class SimDocsSearch(val sdIndexPath: String,
     * @return a list of pairs with document id and document score
     */
   private def getIdScore(scoreDocs: Array[ScoreDoc],
-                         ngrams: Seq[String],
+                         ngrams: Set[String],
                          analyzer: Analyzer,
                          maxDocs: Int,
                          minNGrams: Int): List[(Int,Float)] = {
@@ -240,8 +247,8 @@ class SimDocsSearch(val sdIndexPath: String,
       scoreDoc =>
         val docStr: String = loadDoc(scoreDoc.doc, service.Conf.idxFldNames)
           .foldLeft("") { case (str, (_, lst)) => str + " " + lst.mkString(" ") }
-        val simNGrams: Seq[String] = getNGrams(docStr, analyzer, maxWords)
-        val commonNGrams: Seq[String] = simNGrams.intersect(ngrams)
+        val simNGrams: Set[String] = getNGrams(docStr, analyzer, maxWords)
+        val commonNGrams: Set[String] = simNGrams.intersect(ngrams)
         (commonNGrams.size, scoreDoc)
     }
     val min = Math.min(minNGrams, ngrams.size)
@@ -262,17 +269,13 @@ class SimDocsSearch(val sdIndexPath: String,
     require(id >= 0)
     require((fields != null) && fields.nonEmpty)
 
-    val dirReader: DirectoryReader = getReader
-    val map = asScalaBuffer[IndexableField](dirReader.document(id, fields.asJava).getFields()).
+    asScalaBuffer[IndexableField](sdReader.document(id, fields.asJava).getFields()).
       foldLeft[Map[String,List[String]]] (Map()) {
       case (map2,fld) =>
         val name = fld.name()
         val lst = map2.getOrElse(name, List())
         map2 + ((name, fld.stringValue() :: lst))
     }
-
-    dirReader.close()
-    map
   }
 
     /**
@@ -281,11 +284,11 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param text input text
     * @param analyzer Lucene analyzer class
     * @param maxTokens maximum number of tokens to be returned
-    * @return a sequence of ngrams
+    * @return a set of ngrams
     */
   private def getNGrams(text: String,
                         analyzer: Analyzer,
-                        maxTokens: Int): Seq[String] = {
+                        maxTokens: Int): Set[String] = {
     require(text != null)
     require(analyzer != null)
 
@@ -293,12 +296,12 @@ class SimDocsSearch(val sdIndexPath: String,
     val cattr: CharTermAttribute = tokenStream.addAttribute(classOf[CharTermAttribute])
 
     tokenStream.reset()
-    val seq = getTokens(tokenStream, cattr, Seq[String](), maxTokens)
+    val set: Set[String] = getTokens(tokenStream, cattr, Set[String](), maxTokens)
 
     tokenStream.end()
     tokenStream.close()
 
-    seq
+    set
   }
 
   /**
@@ -306,22 +309,23 @@ class SimDocsSearch(val sdIndexPath: String,
     *
     * @param tokenStream Lucene token stream object
     * @param cattr auxiliary object. See Lucene documentation
-    * @param auxSeq temporary working seq
+    * @param auxSet temporary working set
     * @param maxTokens maximum number of tokens to be returned
-    * @return a sequence of tokens
+    * @return a set of tokens
     */
   private def getTokens(tokenStream: TokenStream,
                         cattr: CharTermAttribute,
-                        auxSeq: Seq[String],
-                        maxTokens: Int): Seq[String] = {
+                        auxSet: Set[String],
+                        maxTokens: Int): Set[String] = {
     require(tokenStream != null)
     require(cattr != null)
-    require(auxSeq != null)
+    require(auxSet != null)
 
     if ((maxTokens > 0) && tokenStream.incrementToken()) {
       val tok = cattr.toString
-      getTokens(tokenStream, cattr, auxSeq :+ tok, maxTokens - 1)
-    } else auxSeq
+      if (auxSet.contains(tok)) getTokens(tokenStream, cattr, auxSet, maxTokens)
+      else getTokens(tokenStream, cattr, auxSet + tok, maxTokens - 1)
+    } else auxSet
   }
 
   /**
@@ -428,13 +432,6 @@ class SimDocsSearch(val sdIndexPath: String,
         str + "<document score=\"" + doc._1 + "\">" + jflds + "</document>"
     } + "</documents>"
   }
-
-  /**
-    * Open a new DirectoryReader if necessary, otherwise use the old one
-    *
-    * @return an DirectoryReader reflecting all changes made in the Lucene index
-    */
-  def getReader: DirectoryReader = DirectoryReader.open(sdDirectory)
 }
 
 object SimDocsSearch extends App {
@@ -453,6 +450,7 @@ object SimDocsSearch extends App {
 
   if (args.length < 3) usage()
 
+  val startTime: Long = new Date().getTime
   val parameters = args.drop(3).foldLeft[Map[String,String]](Map()) {
     case (map,par) =>
       val split = par.split(" *= *", 2)
@@ -494,4 +492,5 @@ object SimDocsSearch extends App {
   }
   search.close()
   //println(search.doc2json(docs))
+  println(s"Elapsed time2: ${new Date().getTime - startTime}")
 }

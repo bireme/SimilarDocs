@@ -8,6 +8,8 @@
 
 package org.bireme.sd.service
 
+import java.util.concurrent.TimeUnit
+
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.impl.client.HttpClientBuilder
 import org.apache.http.util.EntityUtils
@@ -41,7 +43,7 @@ object MaintenanceMode extends App {
   val get = new HttpGet(url)
   get.setHeader("Content-type", "text/plain;charset=utf-8")
 
-  val httpClient = HttpClientBuilder.create().build()
+  val httpClient = HttpClientBuilder.create().setConnectionTimeToLive(1, TimeUnit.HOURS).build()
   val response = httpClient.execute(get)
   val statusCode = response.getStatusLine.getStatusCode
   if (statusCode == 200) {

@@ -56,7 +56,7 @@ public class SDService extends HttpServlet {
 
         simSearch = new SimDocsSearch(sdIndexPath, decsIndexPath);
         topIndex = new TopIndex(simSearch, topIndexPath);
-        updaterService = new UpdaterService(topIndex);
+        //updaterService = new UpdaterService(topIndex);
 
         context.setAttribute("MAINTENANCE_MODE", Boolean.FALSE);
         //System.out.println("I will call 'updaterService.start()'");
@@ -68,7 +68,7 @@ public class SDService extends HttpServlet {
     public void destroy() {
         topIndex.close();
         simSearch.close();
-        updaterService.stop();
+        //updaterService.stop();
         super.destroy();
     }
 
@@ -115,19 +115,12 @@ public class SDService extends HttpServlet {
             final String maintenance = request.getParameter("maintenance");
             if (maintenance != null) {
                 final Boolean maint = Boolean.valueOf(maintenance);
-
+                
+                if (!maint) { // maintenance mode is off
+                    topIndex.updateAllSimilarDocs(Conf.maxDocs(), Conf.lastDays(), Conf.sources());      //updaterService.stop();
+                }
                 context.setAttribute("MAINTENANCE_MODE", maint);
-                final boolean ok;
-                if (maint) { // maintenance mode is on
-                    ok = updaterService.stop();
-                } else { // maintenance mode is off
-                    ok = updaterService.start();
-                }
-                if (ok) {
-                    out.println("<result>MAINTENANCE_MODE=" + maint + "</result>");
-                } else {
-                    out.println("<result>MAINTENANCE_MODE=FAILED</result>");
-                }
+                out.println("<result>MAINTENANCE_MODE=" + maint + "</result>");
                 return;
             }
             if (maintenanceMode) {
