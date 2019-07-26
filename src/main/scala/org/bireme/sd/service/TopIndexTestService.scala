@@ -54,14 +54,14 @@ object TopIndexTestService extends App {
   val topIndex = new TopIndex(simDocs, topIndexPath)
   addProfile match {
     case Some(profile) =>
-      val split = profile.trim().split(" *\\= *", 2)
+      val split = profile.trim().split(" *= *", 2)
       if (split.length != 2) usage()
       topIndex.addProfile(psId, split(0), split(1))
     case None => delProfile match {
       case Some(profId) => topIndex.deleteProfile(psId,profId)
       case None => getSimDocs match {
         case Some(fields) => println(topIndex.getSimDocsXml(psId,
-                        fields.trim().split(" *\\, *").toSet, Set(), Conf.maxDocs, Conf.lastDays, Conf.sources))
+                        fields.trim().split(" *, *").toSet, Set(), Conf.maxDocs, Conf.lastDays, Conf.sources))
         case None => if (showProfiles) println(topIndex.getProfilesXml(psId))
                      else if (cleanSimDocs) topIndex.resetAllTimes()
                      else usage()

@@ -20,8 +20,10 @@ class UpdaterService(topDocs: TopIndex) {
   private var stopping = false        // if the system wants to exit
 
   /** Update the similar docs of all documents that are outdated
+ *
     * @return true if the all updates were succeeded and false if it failed
     */
+  @scala.annotation.tailrec
   private def updateAll(): Boolean = {
     if (stopping) false
     else {

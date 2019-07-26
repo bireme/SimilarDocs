@@ -334,7 +334,8 @@ class TopIndex(simSearch: SimDocsSearch,
             val ndoc: Document = if (doc.getField(updateFldName).stringValue().equals("0")) {
                 updateSimilarDocs(doc, maxDocs, lastDays, sources)
             } else doc
-            val sdIds: mutable.Seq[IndexableField] = ndoc.getFields().asScala.filter(iFld => iFld.name().equals(sdIdFldName))
+            val sdIds: mutable.Seq[IndexableField] = ndoc.getFields().asScala
+                                                         .filter(iFld => iFld.name().equals(sdIdFldName))
             if (sdIds.isEmpty) lst
             else lst :+ sdIds.map( _.stringValue().toInt).toList
           case None => lst
@@ -367,6 +368,7 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param ids auxiliary id list
     * @return a list of similiar document ids
     */
+  @scala.annotation.tailrec
   private def limitDocs(docs: List[List[Int]],
                         maxDocs: Int,
                         ids: List[Int]): List[Int] = {
@@ -650,11 +652,11 @@ object TopIndex extends App {
                          maxDocs: Int,
                          lastDays: Option[Int],
                          sources: Option[Set[String]]): Unit = {
-    print("resetting all times ...")
+    print("Resetting all times ...")
     topIndex.resetAllTimes()
-    print(" OK.\nUpdating all similar docs ...")
+    print(" OK\nUpdating all similar docs ...")
     topIndex.updateAllSimilarDocs(maxDocs, lastDays, sources)
-    println(" OK.")
+    println(" OK")
   }
 
   if (args.length < 5) usage()
@@ -673,7 +675,7 @@ object TopIndex extends App {
   }
   val maxDocs: Int = parameters.getOrElse("maxDocs", "10").toInt
   val lastDays: Option[Int] = parameters.get("lastDays").map(_.toInt)
-  val sources: Option[Set[String]] = parameters.get("sources").map(_.split("*, *").toSet)
+  val sources: Option[Set[String]] = parameters.get("sources").map(_.split(" *, *").toSet)
   val preprocess: Boolean = parameters.contains("preprocess")
   val search: SimDocsSearch = new SimDocsSearch(args(0), args(1))
   val topIndex = new TopIndex(search, args(2))

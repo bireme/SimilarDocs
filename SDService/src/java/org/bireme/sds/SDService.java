@@ -117,6 +117,7 @@ public class SDService extends HttpServlet {
                 final Boolean maint = Boolean.valueOf(maintenance);
                 
                 if (!maint) { // maintenance mode is off
+                    topIndex.resetAllTimes();
                     topIndex.updateAllSimilarDocs(Conf.maxDocs(), Conf.lastDays(), Conf.sources());      //updaterService.stop();
                 }
                 context.setAttribute("MAINTENANCE_MODE", maint);

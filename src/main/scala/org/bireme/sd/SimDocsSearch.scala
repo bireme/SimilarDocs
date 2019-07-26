@@ -141,10 +141,8 @@ class SimDocsSearch(val sdIndexPath: String,
     require (maxDocs > 0)
     require (minNGrams > 0)
 
-    val textSeq: Seq[String] = uniformText(text)
-    val textSet: Set[String] = textSeq.toSet
+    val textSet: Set[String] = uniformText(text)
     val text2: String = textSet.mkString(" ")
-    val minNGrams2: Int = if (textSet.size >= 5) Math.max(3, minNGrams) else minNGrams
 
     if (text2.isEmpty) List[(Int,Float)]()
     else {
@@ -157,6 +155,7 @@ class SimDocsSearch(val sdIndexPath: String,
         new PerFieldAnalyzerWrapper(analyzer, hash)
       }
       val ngrams: Set[String] = getNGrams(text2, analyzer, maxWords)
+      val minNGrams2: Int = if (ngrams.size >= 5) Math.max(3, minNGrams) else minNGrams
       val lst: List[(Int, Float)] = {
         val orQuery = getQuery(text2, sources, lastDays, useDeCS = true)
         //println(s"===> getIdScore docs=${searcher.search(orQuery, 10).totalHits} orQuery=$orQuery")
@@ -169,15 +168,15 @@ class SimDocsSearch(val sdIndexPath: String,
   /**
     * Uniform the characters, delete the small words, removes stopwords and limit the number of output words
     * @param text input text
-    * @return sequence of words of the input text modified
+    * @return set of words of the input text modified
     */
-  private def uniformText(text: String): Seq[String] = {
+  private def uniformText(text: String): Set[String] = {
     Tools.strongUniformString(text)                            // uniform input string
       .split(" +")                                      // break the input string into tokens
       .filter(_.length >= Math.max(3, NGSize.ngram_min_size))  // delete tokens with small size
       .filter(tok => !Stopwords.All.contains(tok))             // delete tokens that are stopwords
+      .toSet                                                   // transform an array into a set
       .take(maxWords)                                          // limit the max number of words
-      .toSeq
   }
 
   /**
@@ -313,6 +312,7 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param maxTokens maximum number of tokens to be returned
     * @return a set of tokens
     */
+  @scala.annotation.tailrec
   private def getTokens(tokenStream: TokenStream,
                         cattr: CharTermAttribute,
                         auxSet: Set[String],
@@ -464,7 +464,7 @@ object SimDocsSearch extends App {
   }
   val maxDocs: Int = parameters.getOrElse("maxDocs", "10").toInt
   val minNGrams: Int = parameters.getOrElse("minNGrams", Conf.minNGrams.toString).toInt
-  val sources: Option[Set[String]] = parameters.get("sources").map(_.split(" *\\, *").toSet)
+  val sources: Option[Set[String]] = parameters.get("sources").map(_.split(" *, *").toSet)
   val lastDays: Option[Int] = parameters.get("lastDays").map(_.toInt)
   val search: SimDocsSearch = new SimDocsSearch(args(0), args(1))
   val maxWords: Int = search.maxWords

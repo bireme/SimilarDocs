@@ -66,10 +66,12 @@ object NGramText {
 
   /**
     * Given a TokenStream generates a map of (token -> frequency)
+ *
     * @param ts Lucene TokenStream object
     * @param aux auxiliary map
     * @return a map of (token -> frequency)
     */
+  @scala.annotation.tailrec
   private def getFreq(ts: TokenStream,
                       aux: Map[String, Int]): Map[String, Int] = {
     if (ts.incrementToken()) {

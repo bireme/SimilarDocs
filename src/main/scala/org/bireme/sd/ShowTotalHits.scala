@@ -61,6 +61,7 @@ object ShowTotalHits extends App {
     }
   }
 
+  @scala.annotation.tailrec
   private def getTermsCount(tum: TermsEnum,
                             aux: TreeMap[String, Long]): TreeMap[String, Long] = {
     val next: BytesRef = tum.next

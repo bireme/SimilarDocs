@@ -64,6 +64,7 @@ class WhitespaceFilter(input: TokenStream) extends TokenFilter(input) {
     * false otherwise
     */
   private def fillQueue(): Boolean = {
+    @scala.annotation.tailrec
     def fillQueue(size: Int): Boolean = {
       if (size == 0) true
       else {

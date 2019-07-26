@@ -68,10 +68,12 @@ class NGramFilter(input: TokenStream,
 
   /**
     * Fills the buffer with new tokens
+ *
     * @param maxqsize max number of tokens in the queue
     * @return true if there are tokens inside the buffer,
     * false otherwise
     */
+  @scala.annotation.tailrec
   private def fillQueue(maxqsize: Int = 1000): Boolean = {
     if ((queue.size < maxqsize) && input.incrementToken()) {
       putOneNgram(maxSize, termAtt.buffer(), termAtt.length())

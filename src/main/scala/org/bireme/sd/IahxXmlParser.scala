@@ -75,6 +75,7 @@ object IahxXmlParser {
     } else None
   }
 
+  @scala.annotation.tailrec
   private def getDocEncoding(lines: Iterator[String]): Option[String] = {
     if (lines.hasNext) {
       val line = lines.next().trim()
@@ -85,6 +86,7 @@ object IahxXmlParser {
     } else None
   }
 
+  @scala.annotation.tailrec
   private def gotoOpenDocTag(lines: Iterator[String]): Boolean = {
     if (lines.hasNext) {
       val line = lines.next().trim()
@@ -94,6 +96,7 @@ object IahxXmlParser {
     } else false
   }
 
+  @scala.annotation.tailrec
   private def getFields(fldNames: Set[String],
                         auxMap: mutable.Map[String,List[String]],
                         lines: Iterator[String]): mutable.Map[String,List[String]] = {
@@ -137,6 +140,7 @@ object IahxXmlParser {
     * @param lines current xml line and the next ones
     * @return the xml lines until there is a 'field' open tag or None if not
     */
+  @scala.annotation.tailrec
   private def getOpenFieldElem(lines: Iterator[String]): Option[String] = {
     if (!lines.hasNext)
       throw new IOException("<field> or </doc> element expected")
@@ -156,6 +160,7 @@ object IahxXmlParser {
     * @return the content of the current xml line until a line having the close
     *         tag of 'field' xml element
     */
+  @scala.annotation.tailrec
   private def getUntilCloseFldElem(aux: String,
                                    lines: Iterator[String]): String = {
     if (lines.hasNext) {  // new lines are eliminated

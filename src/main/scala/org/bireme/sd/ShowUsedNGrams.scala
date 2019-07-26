@@ -35,7 +35,7 @@ object ShowUsedNGrams extends App {
 
   if (args.length < 4) usage()
 
-  val fields = args(1).trim.split(" *\\, *").toSet
+  val fields = args(1).trim.split(" *, *").toSet
   val minSize = NGSize.ngram_min_size
   val maxSize = NGSize.ngram_max_size
 
@@ -132,6 +132,7 @@ object ShowUsedNGrams extends App {
     * @param auxMap auxiliary working map object
     * @return a map of tokens and its number of occurrences
     */
+  @scala.annotation.tailrec
   private def getTokens(tokenStream: TokenStream,
                         cattr: CharTermAttribute,
                         auxMap: Map[String,Int]): Map[String,Int] = {
