@@ -44,7 +44,7 @@ object UpdaterBatchService extends App {
              topIndexPath: String): Unit = {
     val topIndex = new TopIndex(sdSearcher, topIndexPath)
 
-    topIndex.updateSimilarDocs(Conf.maxDocs, Conf.lastDays, Conf.sources)
+    topIndex.updateSimilarDocs(Conf.maxDocs, Conf.lastDays, Conf.sources, Conf.instances)
 
     // Only to create the top index if it does not exist.
     topIndex.close()

@@ -57,7 +57,10 @@ public class SDService extends HttpServlet {
         simSearch = new SimDocsSearch(sdIndexPath, decsIndexPath);
         topIndex = new TopIndex(simSearch, topIndexPath);
         //updaterService = new UpdaterService(topIndex);
-
+        
+        topIndex.resetAllTimes();
+        topIndex.updateAllSimilarDocs(Conf.maxDocs(), Conf.lastDays(), 
+                            Conf.sources(), Conf.instances());      //updaterService.stop();
         context.setAttribute("MAINTENANCE_MODE", Boolean.FALSE);
         //System.out.println("I will call 'updaterService.start()'");
         //updaterService.start(); // Demora muita para finalizar, deixa para atualização do índice
@@ -118,7 +121,8 @@ public class SDService extends HttpServlet {
                 
                 if (!maint) { // maintenance mode is off
                     topIndex.resetAllTimes();
-                    topIndex.updateAllSimilarDocs(Conf.maxDocs(), Conf.lastDays(), Conf.sources());      //updaterService.stop();
+                    topIndex.updateAllSimilarDocs(Conf.maxDocs(), Conf.lastDays(), 
+                            Conf.sources(), Conf.instances());      //updaterService.stop();
                 }
                 context.setAttribute("MAINTENANCE_MODE", maint);
                 out.println("<result>MAINTENANCE_MODE=" + maint + "</result>");
@@ -152,7 +156,14 @@ public class SDService extends HttpServlet {
                     Set<String> srcSet = new HashSet<>();
                     for (String src: sources) {
                         srcSet.add(src);
-                    }                    
+                    }
+                    final String insts = request.getParameter("instances");
+                    final String[] instances = (insts == null)
+                                    ? new String[0]: insts.split(" *\\, *");
+                    Set<String> instSet = new HashSet<>();
+                    for (String inst: instances) {
+                        instSet.add(inst);
+                    }
                     final String lastDaysPar = request.getParameter("lastDays");
                     final int lastDays = (lastDaysPar == null) ? 0 :
                                            Integer.parseInt(lastDaysPar);
@@ -165,7 +176,7 @@ public class SDService extends HttpServlet {
                                             (explainPar.trim().isEmpty()) ? true :
                                              Boolean.parseBoolean(explainPar);
                     out.println(simSearch.search(adhocSimilarDocs, fields.toSet(),
-                                   maxDocs, srcSet.toSet(), lastDays, explain));
+                        maxDocs, srcSet.toSet(), instSet.toSet(), lastDays, explain));
                 }
                 return;
             }
@@ -231,7 +242,7 @@ public class SDService extends HttpServlet {
                     }
                     out.println(topIndex.getSimDocsXml(psId, profiles.toSet(),
                         fields.toSet(), Conf.maxDocs(), Conf.lastDays(), 
-                        Conf.sources()));
+                        Conf.sources(), Conf.instances()));
                 }
                 return;
             }            
@@ -255,7 +266,7 @@ public class SDService extends HttpServlet {
         out.println("psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;]");
         out.println("psId=&lt;id&gt;&amp;showUsers=true");
         out.println("psId=&lt;id&gt;&amp;showProfiles=true");
-        out.println("adhocSimilarDocs=&lt;sentence&gt;[outFields=&lt;field&gt;,...,&lt;field&gt;][maxDocs=&lt;num&gt;][sources=&lt;src&gt;,...,&lt;src&gt;][&amp;lastDays=&lt;num&gt;][&amp;explain=&lt;bool&gt;]");
+        out.println("adhocSimilarDocs=&lt;sentence&gt;[outFields=&lt;field&gt;,...,&lt;field&gt;][maxDocs=&lt;num&gt;][sources=&lt;src&gt;,...,&lt;src&gt;][instances=&lt;inst&gt;,...,&lt;inst&gt;][&amp;lastDays=&lt;num&gt;][&amp;explain=&lt;bool&gt;]");
         out.println("</SYNTAX>");
     }
 

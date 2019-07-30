@@ -146,7 +146,7 @@ class TopIndex(simSearch: SimDocsSearch,
     // Add similar documents ids
     if (getSdIds) {
       doc.removeFields(sdIdFldName)
-      simSearch.searchIds(newContent, None, maxDocs, Conf.minNGrams, None).foreach {
+      simSearch.searchIds(newContent, None, None, maxDocs, Conf.minNGrams, None).foreach {
         case (id,_) => doc.add(new StoredField(sdIdFldName, id))
       }
     }
@@ -263,6 +263,7 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param maxDocs the maximun number of similar documents to be retrieved
     * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
     * @param sources update only docs whose field 'db' belongs to sources"
+    * @param instances update only docs whose field 'instance' belongs to sources"
     * @return an XML document with each desired field and its respective
     *         occurrences, given that fields can have more than one occurrences
     */
@@ -271,13 +272,14 @@ class TopIndex(simSearch: SimDocsSearch,
                     outFields: Set[String],
                     maxDocs: Int = Conf.maxDocs,
                     lastDays: Option[Int] = Conf.lastDays,
-                    sources: Option[Set[String]] = Conf.sources): String = {
+                    sources: Option[Set[String]] = Conf.sources,
+                    instances: Option[Set[String]] = Conf.instances): String = {
     require((psId != null) && (!psId.trim.isEmpty))
     require(profiles != null)
     require(outFields != null)
 
     val head = """<?xml version="1.0" encoding="UTF-8"?><documents>"""
-    val simDocs = getSimDocs(psId, profiles, outFields, maxDocs, lastDays, sources)
+    val simDocs = getSimDocs(psId, profiles, outFields, maxDocs, lastDays, sources, instances)
     simDocs.foldLeft[String] (head) {
       case (str,map) =>
         s"$str<document>" + map.foldLeft[String]("") {
@@ -308,6 +310,7 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param maxDocs the maximun number of similar documents to be retrieved
     * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
     * @param sources update only docs whose field 'db' belongs to sources"
+    * @param instances update only docs whose field 'instance' belongs to instances"
     * @return a list of similar documents, where each similar document is a
     *         a collection of field names and its contents. Each fields can
     *         have more than one occurrence
@@ -317,7 +320,8 @@ class TopIndex(simSearch: SimDocsSearch,
                  outFlds: Set[String],
                  maxDocs: Int,
                  lastDays: Option[Int],
-                 sources: Option[Set[String]]): List[Map[String,List[String]]] = {
+                 sources: Option[Set[String]],
+                 instances: Option[Set[String]]): List[Map[String,List[String]]] = {
     require((user != null) && (!user.trim.isEmpty))
     require(names != null)
     require(outFlds != null)
@@ -332,7 +336,7 @@ class TopIndex(simSearch: SimDocsSearch,
           case Some(lst2) =>
             val doc: Document = lst2.head
             val ndoc: Document = if (doc.getField(updateFldName).stringValue().equals("0")) {
-                updateSimilarDocs(doc, maxDocs, lastDays, sources)
+                updateSimilarDocs(doc, maxDocs, lastDays, sources, instances)
             } else doc
             val sdIds: mutable.Seq[IndexableField] = ndoc.getFields().asScala
                                                          .filter(iFld => iFld.name().equals(sdIdFldName))
@@ -474,11 +478,13 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param maxDocs maximum number of similar documents to be retrieved
     * @param lastDays update only docs that are younger (entrance_date flag) than 'lastDays' days"
     * @param sources update only docs whose field 'db' belongs to sources"
+    * @param instances update only docs whose field 'instance' belongs to instances"
     * @return the number of updated documents
     */
   def updateAllSimilarDocs(maxDocs: Int,
                            lastDays: Option[Int],
-                           sources: Option[Set[String]]): Int = {
+                           sources: Option[Set[String]],
+                           instances: Option[Set[String]]): Int = {
     val updateTime: Long = new Date().getTime
     val query: Query = LongPoint.newRangeQuery(updateFldName, 0, updateTime  - deltaTime) // all documents updated before deltaTime from now
     val topReader: DirectoryReader = DirectoryReader.open(topWriter)
@@ -490,7 +496,7 @@ class TopIndex(simSearch: SimDocsSearch,
       pos =>
         val scoreDoc: ScoreDoc = topDocs.scoreDocs(pos)
         val doc: Document = topSearcher.doc(scoreDoc.doc)
-        updateSimilarDocs(doc, maxDocs, lastDays, sources, autoCommit = false)
+        updateSimilarDocs(doc, maxDocs, lastDays, sources, instances, autoCommit = false)
     }
 
     topReader.close()
@@ -505,11 +511,13 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param maxDocs maximum number of similar documents to be retrieved
     * @param lastDays update only docs that are younger (entrance_date flag) than 'lastDays' days"
     * @param sources update only docs whose field 'db' belongs to sources"
+    * @param instances update only docs whose field 'instance' belongs to instances"
     * @return Some(document) if there was an update otherwise None
     */
   def updateSimilarDocs(maxDocs: Int,
                         lastDays: Option[Int],
-                        sources: Option[Set[String]]): Option[Document] = {
+                        sources: Option[Set[String]],
+                        instances: Option[Set[String]]): Option[Document] = {
     val updateTime = new Date().getTime
     val query = LongPoint.newRangeQuery(updateFldName, 0, updateTime  - deltaTime) // all documents updated before deltaTime from now
     val topReader = DirectoryReader.open(topWriter)
@@ -521,7 +529,7 @@ class TopIndex(simSearch: SimDocsSearch,
     // val retSet = if (topDocs.totalHits.value == 0) None else { Lucene 8.0.0
     val retSet = if (topDocs.totalHits == 0) None else {
       val doc = topSearcher.doc(topDocs.scoreDocs(0).doc)
-      val ndoc = updateSimilarDocs(doc, maxDocs, lastDays, sources)
+      val ndoc = updateSimilarDocs(doc, maxDocs, lastDays, sources, instances)
       Some(ndoc)
     }
     topReader.close()
@@ -535,6 +543,7 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param maxDocs maximum number of similar documents to be retrieved
     * @param lastDays update only docs that are younger (entrance_date flag) than 'lastDays' days"
     * @param sources update only docs whose field 'db' belongs to sources"
+    * @param instances update only docs whose field 'instance' belongs to sources"
     * @param autoCommit do a commit after write
     * @return document with its similar doc fields updated
     */
@@ -542,6 +551,7 @@ class TopIndex(simSearch: SimDocsSearch,
                         maxDocs: Int,
                         lastDays: Option[Int],
                         sources: Option[Set[String]],
+                        instances: Option[Set[String]],
                         autoCommit: Boolean = true): Document = {
     val updateTime = new Date().getTime
     val ndoc = new Document()
@@ -571,7 +581,7 @@ class TopIndex(simSearch: SimDocsSearch,
     ndoc.add(new StoredField(contentFldName, content))
 
     // Include 'sd_id' (similar docs) fields
-    simSearch.searchIds(content, sources, maxDocs, Conf.minNGrams, lastDays).
+    simSearch.searchIds(content, sources, instances, maxDocs, Conf.minNGrams, lastDays).
       foreach { case (sdId,_) => ndoc.add(new StoredField(sdIdFldName, sdId)) }
 
     // Update document
@@ -634,15 +644,17 @@ class TopIndex(simSearch: SimDocsSearch,
 object TopIndex extends App {
   private def usage(): Unit = {
     Console.err.println("usage: TopIndex" +
-      "\n\t<sdIndexPath> - lucene Index where the similar document will be searched" +
-      "\n\t<decsIndexPath> - lucene Index where the one word decs synonyms document will be searched" +
-      "\n\t<topIndexPath> - lucene Index where the user profiles are stored" +
-      "\n\t<psId> - personal service identifier" +
-      "\n\t-profiles=<prof1>,<prof2>,...,<prof>] - user profiles used to search the documents" +
+      "\n\t-sdIndex=<sdIndexPath> - lucene Index where the similar document will be searched" +
+      "\n\t-decsIndex=<decsIndexPath> - lucene Index where the one word decs synonyms document will be searched" +
+      "\n\t(-text=<str> - text to search for similar documents  |" +
+      "\n\t-psId=<psId> - personal service identifier" +
+      "\n\t-profiles=<prof1>,<prof2>,...,<prof>] - user profiles used to search the documents )" +
+      "\n\t[-topIndex=<topIndexPath> - lucene Index where the user profiles are stored]" +
       "\n\t[<-outFields=<field>,<field>,...,<field>] - document fields used will be show in the output" +
       "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
       "\n\t[-lastDays=<num>] - return only docs that are younger (entrance_date flag) than 'lastDays' days" +
       "\n\t[-sources=<src1>,<src2>,...,<src>] - return only docs whose field 'db' is <srci>" +
+      "\n\t[-instances=<inst1>,<inst2>,...,<inst>] - return only docs whose field 'instance' is <insti>" +
       "\n\t[--preprocess] - pre process the similar documents to increase speed")
 
     System.exit(1)
@@ -651,24 +663,30 @@ object TopIndex extends App {
   private def preProcess(topIndex: TopIndex,
                          maxDocs: Int,
                          lastDays: Option[Int],
-                         sources: Option[Set[String]]): Unit = {
+                         sources: Option[Set[String]],
+                         instances: Option[Set[String]]): Unit = {
     print("Resetting all times ...")
     topIndex.resetAllTimes()
     print(" OK\nUpdating all similar docs ...")
-    topIndex.updateAllSimilarDocs(maxDocs, lastDays, sources)
+    topIndex.updateAllSimilarDocs(maxDocs, lastDays, sources, instances)
     println(" OK")
   }
 
-  if (args.length < 5) usage()
+  if (args.length < 3) usage()
 
-  val parameters = args.drop(5).foldLeft[Map[String,String]](Map()) {
+  val parameters = args.foldLeft[Map[String,String]](Map()) {
     case (map,par) =>
       val split = par.split(" *= *", 2)
       if (split.length == 1) map + ((split(0).substring(2), ""))
       else map + ((split(0).substring(1), split(1)))
   }
 
-  val profiles: Set[String] = args(4).drop(10).split(" *, *").toSet
+  val sdIndexPath: String = parameters("sdIndex")
+  val decsIndexPath: String = parameters("decsIndex")
+  val text: Option[String] = parameters.get("text")
+  val psId: Option[String] = parameters.get("psId")
+  val profiles: Option[Set[String]] = parameters.get("profiles").map(_.split(" *, *").toSet)
+  val topIndexPath: Option[String] = parameters.get("topIndex")
   val outFields: Set[String] = parameters.get("outFields") match {
     case Some(sFields) => sFields.split(" *, *").toSet
     case None => Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs", "update_date")//service.Conf.idxFldNames
@@ -676,14 +694,19 @@ object TopIndex extends App {
   val maxDocs: Int = parameters.getOrElse("maxDocs", "10").toInt
   val lastDays: Option[Int] = parameters.get("lastDays").map(_.toInt)
   val sources: Option[Set[String]] = parameters.get("sources").map(_.split(" *, *").toSet)
-  val preprocess: Boolean = parameters.contains("preprocess")
-  val search: SimDocsSearch = new SimDocsSearch(args(0), args(1))
-  val topIndex = new TopIndex(search, args(2))
-  if (preprocess) preProcess(topIndex, maxDocs, lastDays, sources)
+  val instances: Option[Set[String]] = parameters.get("instances").map(_.split(" *, *").toSet)
+  val search: SimDocsSearch = new SimDocsSearch(sdIndexPath, decsIndexPath)
 
-  val xml = topIndex.getSimDocsXml(args(3), profiles, outFields, maxDocs, lastDays, sources)
-
-  println(s"xml=$xml")
-
-  topIndex.close()
+  val result = text match {
+    case Some(txt) => search.search(txt, outFields, maxDocs, sources.getOrElse(Set()), instances.getOrElse(Set()),
+                                    lastDays.getOrElse(7), explain = true)
+    case None =>
+      val topIndex = new TopIndex(search, args(2))
+      if (parameters.contains("preprocess")) preProcess(topIndex, maxDocs, lastDays, sources, instances)
+      val xml = topIndex.getSimDocsXml(psId.getOrElse(""), profiles.getOrElse(Set()), outFields, maxDocs,
+                                       lastDays, sources, instances)
+      topIndex.close()
+      xml
+  }
+  println(s"result=$result")
 }

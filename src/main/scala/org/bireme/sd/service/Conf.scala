@@ -19,6 +19,8 @@ object Conf {
 
   val sources: Option[Set[String]] = Some(Set("MEDLINE", "LILACS", "LIS", "colecionaSUS")) // Update only docs whose field 'db' belongs to sources"
 
+  val instances: Option[Set[String]] = None // Update only docs whose field 'instance' belongs to instances"
+
   val idxFldNames: Set[String] = Set("id", "ti",
                                      "ti_pt","ti_en","ti_es","ti_it","ti_fr","ti_de","ti_ru",
                                      "ab",

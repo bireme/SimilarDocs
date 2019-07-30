@@ -309,6 +309,7 @@ class LuceneIndexActor(indexWriter: IndexWriter,
         }
         else if (tag.equals("id")) doc.add(new StringField("id", lst.head, Field.Store.YES))
         else if (tag.equals("db")) doc.add(new StringField("db", lst.head, Field.Store.YES))
+        else if (tag.equals("instance")) doc.add(new StringField("instance", lst.head, Field.Store.YES))
         else if (tag.equals("update_date")) doc.add(new StringField("update_date", lst.head, Field.Store.YES))
         else {
           if (fldIdxNames.contains(tag)) {  // Add indexed + stored fields as stored fields
