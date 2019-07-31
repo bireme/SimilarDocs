@@ -582,7 +582,8 @@ class TopIndex(simSearch: SimDocsSearch,
 
     // Include 'sd_id' (similar docs) fields
     simSearch.searchIds(content, sources, instances, maxDocs, Conf.minNGrams, lastDays).
-      foreach { case (sdId,_) => ndoc.add(new StoredField(sdIdFldName, sdId)) }
+      foreach { case (sdId,_) =>
+        ndoc.add(new StoredField(sdIdFldName, sdId)) }
 
     // Update document
     topWriter.updateDocument(new Term(idFldName, id), ndoc)
@@ -646,10 +647,9 @@ object TopIndex extends App {
     Console.err.println("usage: TopIndex" +
       "\n\t-sdIndex=<sdIndexPath> - lucene Index where the similar document will be searched" +
       "\n\t-decsIndex=<decsIndexPath> - lucene Index where the one word decs synonyms document will be searched" +
-      "\n\t(-text=<str> - text to search for similar documents  |" +
+      "\n\t-topIndex=<topIndexPath> - lucene Index where the user profiles are stored" +
       "\n\t-psId=<psId> - personal service identifier" +
-      "\n\t-profiles=<prof1>,<prof2>,...,<prof>] - user profiles used to search the documents )" +
-      "\n\t[-topIndex=<topIndexPath> - lucene Index where the user profiles are stored]" +
+      "\n\t-profiles=<prof1>,<prof2>,...,<prof> - user profiles used to search the documents" +
       "\n\t[<-outFields=<field>,<field>,...,<field>] - document fields used will be show in the output" +
       "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
       "\n\t[-lastDays=<num>] - return only docs that are younger (entrance_date flag) than 'lastDays' days" +
@@ -672,7 +672,7 @@ object TopIndex extends App {
     println(" OK")
   }
 
-  if (args.length < 3) usage()
+  if (args.length < 5) usage()
 
   val parameters = args.foldLeft[Map[String,String]](Map()) {
     case (map,par) =>
@@ -683,10 +683,9 @@ object TopIndex extends App {
 
   val sdIndexPath: String = parameters("sdIndex")
   val decsIndexPath: String = parameters("decsIndex")
-  val text: Option[String] = parameters.get("text")
-  val psId: Option[String] = parameters.get("psId")
-  val profiles: Option[Set[String]] = parameters.get("profiles").map(_.split(" *, *").toSet)
-  val topIndexPath: Option[String] = parameters.get("topIndex")
+  val topIndexPath: String = parameters("topIndex")
+  val psId: String = parameters("psId")
+  val profiles: Set[String] = parameters("profiles").split(" *, *").toSet
   val outFields: Set[String] = parameters.get("outFields") match {
     case Some(sFields) => sFields.split(" *, *").toSet
     case None => Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs", "update_date")//service.Conf.idxFldNames
@@ -696,17 +695,10 @@ object TopIndex extends App {
   val sources: Option[Set[String]] = parameters.get("sources").map(_.split(" *, *").toSet)
   val instances: Option[Set[String]] = parameters.get("instances").map(_.split(" *, *").toSet)
   val search: SimDocsSearch = new SimDocsSearch(sdIndexPath, decsIndexPath)
+  val topIndex: TopIndex = new TopIndex(search, topIndexPath)
+  if (parameters.contains("preprocess")) preProcess(topIndex, maxDocs, lastDays, sources, instances)
+  val result = topIndex.getSimDocsXml(psId, profiles, outFields, maxDocs, lastDays, sources, instances)
+  topIndex.close()
 
-  val result = text match {
-    case Some(txt) => search.search(txt, outFields, maxDocs, sources.getOrElse(Set()), instances.getOrElse(Set()),
-                                    lastDays.getOrElse(7), explain = true)
-    case None =>
-      val topIndex = new TopIndex(search, args(2))
-      if (parameters.contains("preprocess")) preProcess(topIndex, maxDocs, lastDays, sources, instances)
-      val xml = topIndex.getSimDocsXml(psId.getOrElse(""), profiles.getOrElse(Set()), outFields, maxDocs,
-                                       lastDays, sources, instances)
-      topIndex.close()
-      xml
-  }
   println(s"result=$result")
 }

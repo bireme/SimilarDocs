@@ -118,14 +118,20 @@ public class SDService extends HttpServlet {
             final String maintenance = request.getParameter("maintenance");
             if (maintenance != null) {
                 final Boolean maint = Boolean.valueOf(maintenance);
+                int updated = -1;
                 
-                if (!maint) { // maintenance mode is off
+                if (!maint) { // requiring that maintenance mode be off                    
                     topIndex.resetAllTimes();
-                    topIndex.updateAllSimilarDocs(Conf.maxDocs(), Conf.lastDays(), 
-                            Conf.sources(), Conf.instances());      //updaterService.stop();
+                    updated = topIndex.updateAllSimilarDocs(Conf.maxDocs(), 
+                        Conf.lastDays(), Conf.sources(), Conf.instances());      //updaterService.stop();
                 }
                 context.setAttribute("MAINTENANCE_MODE", maint);
-                out.println("<result>MAINTENANCE_MODE=" + maint + "</result>");
+                if (updated == -1) {
+                    out.println("<result>MAINTENANCE_MODE=" + maint + "</result>");
+                } else {
+                    out.println("<result>MAINTENANCE_MODE=" + maint + 
+                            " updated_docs=" + updated + "</result>");
+                }                
                 return;
             }
             if (maintenanceMode) {

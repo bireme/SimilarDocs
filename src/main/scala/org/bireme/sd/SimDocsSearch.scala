@@ -147,7 +147,7 @@ class SimDocsSearch(val sdIndexPath: String,
     require ((text != null) && text.nonEmpty)
     require (maxDocs > 0)
     require (minNGrams > 0)
-
+//println(s"text=$text maxDocs=$maxDocs minNGrams=$minNGrams lastDays=${lastDays.getOrElse(-1)}")
     val textSet: Set[String] = uniformText(text)
     val text2: String = textSet.mkString(" ")
 
@@ -156,8 +156,8 @@ class SimDocsSearch(val sdIndexPath: String,
       val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
       val perFieldAnalyzer: Analyzer = {
         val hash = new util.HashMap[String, Analyzer]()
-        hash.put("id", new KeywordAnalyzer())
-        hash.put("db", new KeywordAnalyzer())
+        //hash.put("id", new KeywordAnalyzer())
+        //hash.put("db", new KeywordAnalyzer())
         hash.put("update_date", new KeywordAnalyzer())
         new PerFieldAnalyzerWrapper(analyzer, hash)
       }
@@ -165,7 +165,7 @@ class SimDocsSearch(val sdIndexPath: String,
       val minNGrams2: Int = if (ngrams.size >= 5) Math.max(3, minNGrams) else minNGrams
       val lst: List[(Int, Float)] = {
         val orQuery = getQuery(text2, sources, instances, lastDays, useDeCS = true)
-        //println(s"===> getIdScore docs=${searcher.search(orQuery, 10).totalHits} orQuery=$orQuery")
+        //println(s"===> getIdScore docs=${sdSearcher.search(orQuery, 10).totalHits} orQuery=$orQuery ngrams=$ngrams")
         getIdScore(sdSearcher.search(orQuery, 10 * maxDocs).scoreDocs, ngrams, perFieldAnalyzer, maxDocs, minNGrams2)
       }
       lst
@@ -256,7 +256,6 @@ class SimDocsSearch(val sdIndexPath: String,
                          analyzer: Analyzer,
                          maxDocs: Int,
                          minNGrams: Int): List[(Int,Float)] = {
-
     val aux: Array[(Int, ScoreDoc)] = scoreDocs.map {
       scoreDoc =>
         val docStr: String = loadDoc(scoreDoc.doc, service.Conf.idxFldNames)
@@ -266,6 +265,7 @@ class SimDocsSearch(val sdIndexPath: String,
         (commonNGrams.size, scoreDoc)
     }
     val min = Math.min(minNGrams, ngrams.size)
+    //println(s"getIdScore ==> scoreDocs=${scoreDocs.size} ngrams=$ngrams analyzer=$analyzer maxDocs=$maxDocs minNGrams=$minNGrams min=$min aux=${aux.map(_._1).toList}")
     val aux2 = aux.filter(t => t._1 >= min).sortWith((t1, t2) => t1._1 < t2._1).reverse.take(maxDocs)
 
     aux2.map(t => (t._2.doc, t._2.score)).toList
@@ -452,9 +452,9 @@ class SimDocsSearch(val sdIndexPath: String,
 object SimDocsSearch extends App {
   private def usage(): Unit = {
     Console.err.println("usage: SimDocsSearch" +
-    "\n\t<sdIndexPath> - lucene Index where the similar document will be searched" +
-    "\n\t<decsIndexPath> - lucene Index where the one word decs synonyms document will be searched" +
-    "\n\t<text> - text used to look for similar documents" +
+    "\n\t-sdIndex=<sdIndexPath> - lucene Index where the similar document will be searched" +
+    "\n\t-decsIndex=<decsIndexPath> - lucene Index where the one word decs synonyms document will be searched" +
+    "\n\t-text=<str> - text used to look for similar documents" +
     "\n\t[<-outFields=<field>,<field>,...,<field>] - document fields used will be show in the output" +
     "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
     "\n\t[-minNGrams=<num>] - minimum number of common ngrams retrieved to consider returning a document field text" +
@@ -467,13 +467,16 @@ object SimDocsSearch extends App {
   if (args.length < 3) usage()
 
   val startTime: Long = new Date().getTime
-  val parameters = args.drop(3).foldLeft[Map[String,String]](Map()) {
+  val parameters = args.foldLeft[Map[String,String]](Map()) {
     case (map,par) =>
       val split = par.split(" *= *", 2)
       if (split.length == 1) map + ((split(0).substring(2), ""))
       else map + ((split(0).substring(1), split(1)))
   }
 
+  val sdIndex: String = parameters("sdIndex")
+  val decsIndex: String = parameters("decsIndex")
+  val text: String = parameters("text")
   val outFields: Set[String] = parameters.get("outFields") match {
     case Some(sFields) => sFields.split(" *, *").toSet
     case None => Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs", "id", "db", "update_date")//service.Conf.idxFldNames
@@ -483,9 +486,9 @@ object SimDocsSearch extends App {
   val sources: Option[Set[String]] = parameters.get("sources").map(_.split(" *, *").toSet)
   val instances: Option[Set[String]] = parameters.get("instances").map(_.split(" *, *").toSet)
   val lastDays: Option[Int] = parameters.get("lastDays").map(_.toInt)
-  val search: SimDocsSearch = new SimDocsSearch(args(0), args(1))
+  val search: SimDocsSearch = new SimDocsSearch(sdIndex, decsIndex)
   val maxWords: Int = search.maxWords
-  val docs: List[(Float,Map[String,List[String]])] = search.search(args(2), outFields, maxDocs, minNGrams, sources,
+  val docs: List[(Float,Map[String,List[String]])] = search.search(text, outFields, maxDocs, minNGrams, sources,
                                                                    instances, lastDays)
 
   docs.foreach {
