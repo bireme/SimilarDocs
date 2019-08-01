@@ -147,7 +147,7 @@ class SimDocsSearch(val sdIndexPath: String,
     require ((text != null) && text.nonEmpty)
     require (maxDocs > 0)
     require (minNGrams > 0)
-//println(s"text=$text maxDocs=$maxDocs minNGrams=$minNGrams lastDays=${lastDays.getOrElse(-1)}")
+
     val textSet: Set[String] = uniformText(text)
     val text2: String = textSet.mkString(" ")
 
@@ -168,6 +168,8 @@ class SimDocsSearch(val sdIndexPath: String,
         //println(s"===> getIdScore docs=${sdSearcher.search(orQuery, 10).totalHits} orQuery=$orQuery ngrams=$ngrams")
         getIdScore(sdSearcher.search(orQuery, 10 * maxDocs).scoreDocs, ngrams, perFieldAnalyzer, maxDocs, minNGrams2)
       }
+      //println(s"text=$text maxDocs=$maxDocs minNGrams=$minNGrams lastDays=${lastDays.getOrElse(-1)} ids=${lst.map(x => x._1)}")
+      //println("============================================================")
       lst
     }
   }

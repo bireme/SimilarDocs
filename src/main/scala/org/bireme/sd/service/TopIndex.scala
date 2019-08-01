@@ -132,23 +132,18 @@ class TopIndex(simSearch: SimDocsSearch,
     val oldContent: String = doc.get(contentFldName)
 
     // Add profile field
-    val getSdIds = if (oldContent == null) { // new profile
+    if (oldContent == null) { // new profile
       doc.add(new StoredField(contentFldName, newContent))
-      true
     } else { // there was already a profile with the same name
-      if (oldContent.equals(newContent)) false
-      else {  // same profile but with different sentence
+      if (!oldContent.equals(newContent)) {  // same profile but with different sentence
         doc.removeField(contentFldName)  // only one occurrence for profile
         doc.add(new StoredField(contentFldName, newContent))
-        true
       }
     }
     // Add similar documents ids
-    if (getSdIds) {
-      doc.removeFields(sdIdFldName)
-      simSearch.searchIds(newContent, None, None, maxDocs, Conf.minNGrams, None).foreach {
-        case (id,_) => doc.add(new StoredField(sdIdFldName, id))
-      }
+    doc.removeFields(sdIdFldName)
+    simSearch.searchIds(newContent, Conf.sources, Conf.instances, maxDocs, Conf.minNGrams, Conf.lastDays).foreach {
+      case (id,_) => doc.add(new StoredField(sdIdFldName, id))
     }
   }
 
