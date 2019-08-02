@@ -64,12 +64,12 @@ class SimilarDocsServiceTest extends FlatSpec {
     val word2 = word.trim
 
     split.foldLeft[Int](0) {
-      case(tot1,w) => if (word2.equals(w)) tot1 + 1 else tot1
+      case(tot1, wrd) => if (wrd.contains(word2)) tot1 + 1 else tot1
     }
   }
 
-  //val service = "http://basalto01.bireme.br:8180/SDService"
-  val service = "http://serverofi5.bireme.br:8180/SDService"
+  val service = "http://basalto01.bireme.br:8180/SDService"
+  //val service = "http://serverofi5.bireme.br:8180/SDService"
   //val service = "http://localhost:8084"
 
   val id = "Téster!@paho.org"
@@ -267,7 +267,7 @@ class SimilarDocsServiceTest extends FlatSpec {
       val url: String = s"$service/SDService?psId=$id_Renato&getSimDocs=$prof"
       val content: String = pageContent(url).toLowerCase
       val profWords: Set[String] = profiles_Renato(prof).toLowerCase.replaceAll("\\[-,:_]", " ").
-        split("[\\s+.]").filter(_.size > 3).toSet
+        split("[\\s+.]").filter(_.length > 3).toSet
       val common: Int = profWords.foldLeft[Int](0) {
         case (tot, word) =>
           val add = if (getOccurrences(content, word) > 0) 1 else 0
