@@ -30,7 +30,7 @@ object OneWordDecs {
     val config = new IndexWriterConfig(analyzer)
     config.setOpenMode(IndexWriterConfig.OpenMode.CREATE)
     val indexWriter = new IndexWriter(directory, config)
-    val mst = MasterFactory.getInstance(decsDir).open()
+    val mst = MasterFactory.getInstance(decsDir).setEncoding("IBM850").open()
 
     mst.iterator().asScala.foreach(rec => createDoc(rec).foreach(indexWriter.addDocument(_)))
     indexWriter.forceMerge(1)
