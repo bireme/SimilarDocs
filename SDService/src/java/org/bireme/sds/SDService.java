@@ -9,6 +9,8 @@ package org.bireme.sds;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
@@ -113,25 +115,34 @@ public class SDService extends HttpServlet {
         final ServletContext context = request.getServletContext();
         final boolean maintenanceMode =
                               (Boolean)context.getAttribute("MAINTENANCE_MODE");
+        final String maintenance = request.getParameter("maintenance");
+        final Boolean maint = (maintenance != null) ? Boolean.valueOf(maintenance)
+                                                    : null;        
 
         try (PrintWriter out = response.getWriter()) {
-            final String maintenance = request.getParameter("maintenance");
-            if (maintenance != null) {
-                final Boolean maint = Boolean.valueOf(maintenance);
-                int updated = -1;
-                
-                if (!maint) { // requiring that maintenance mode be off                    
-                    topIndex.resetAllTimes();
-                    updated = topIndex.updateAllSimilarDocs(Conf.maxDocs(), 
-                        Conf.lastDays(), Conf.sources(), Conf.instances());      //updaterService.stop();
-                }
-                context.setAttribute("MAINTENANCE_MODE", maint);
-                if (updated == -1) {
-                    out.println("<result>MAINTENANCE_MODE=" + maint + "</result>");
+            if (maint != null) {
+                if (maint) { // requiring that maintenance mode be on
+                    context.setAttribute("MAINTENANCE_MODE", true);
+                    out.println("<result><maintenance_mode>true</maintenance_mode></result>");
                 } else {
-                    out.println("<result>MAINTENANCE_MODE=" + maint + 
-                            " updated_docs=" + updated + "</result>");
-                }                
+                    try {
+                        topIndex.resetAllTimes();
+                        final int updated = topIndex.updateAllSimilarDocs(
+                            Conf.maxDocs(), Conf.lastDays(), 
+                            Conf.sources(), Conf.instances());
+                        context.setAttribute("MAINTENANCE_MODE", false);
+                        final SimpleDateFormat sdf = 
+                            new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+                        final String date = sdf.format(new Date());
+                        out.println("<result><maintenance_mode>" + maint + 
+                            "</maintenance_mode><updated_docs>" + 
+                            updated + "</updated_docs><update_date>" + date +
+                            "</update_date></result>");
+                    } catch(Exception ex) {
+                        out.println("<result><status>ERROR</error><message>" +
+                                ex.toString() + "</message></result>");
+                    }
+                }
                 return;
             }
             if (maintenanceMode) {
