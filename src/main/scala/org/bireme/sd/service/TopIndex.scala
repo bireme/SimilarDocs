@@ -495,6 +495,7 @@ class TopIndex(simSearch: SimDocsSearch,
     }
 
     topReader.close()
+    topWriter.commit()
     topWriter.forceMerge(1)
 
     totalHits
