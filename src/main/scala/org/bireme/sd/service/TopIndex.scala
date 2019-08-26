@@ -8,7 +8,8 @@
 package org.bireme.sd.service
 
 import java.nio.file.Paths
-import java.util.Date
+import java.text.{DateFormat, SimpleDateFormat}
+import java.util.{Calendar, Date, GregorianCalendar, TimeZone}
 
 import org.apache.lucene.document._
 import org.apache.lucene.index._
@@ -46,6 +47,7 @@ class TopIndex(simSearch: SimDocsSearch,
   val sdIdFldName = "sd_id"             // Similar document Lucene doc id
 
   val deltaTime: Long =  1000 * 60 * 60 * 2 // 2 hours // 8 hours
+  val formatter: DateFormat = new SimpleDateFormat("yyyyMMdd")
 
   val lcAnalyzer: LowerCaseAnalyzer = new LowerCaseAnalyzer(true)
   val topDirectory: FSDirectory = FSDirectory.open(Paths.get(topIndexPath))
@@ -266,7 +268,7 @@ class TopIndex(simSearch: SimDocsSearch,
                     profiles: Set[String],
                     outFields: Set[String],
                     maxDocs: Int = Conf.maxDocs,
-                    lastDays: Option[Int] = Conf.lastDays,
+                    lastDays: Option[Int],
                     sources: Option[Set[String]] = Conf.sources,
                     instances: Option[Set[String]] = Conf.instances): String = {
     require((psId != null) && (!psId.trim.isEmpty))
@@ -322,35 +324,73 @@ class TopIndex(simSearch: SimDocsSearch,
     require(outFlds != null)
     require(maxDocs > 0)
 
-    val tuser: String = user.trim()
     val docIds: List[List[Int]] = names.foldLeft[List[List[Int]]](List()) {
       case (lst, name) =>
-        val tname = name.trim()
-        val id = s"${tuser}_$tname"
+        val id: String = s"${user.trim}_${name.trim}"
         getDocuments(idFldName, id) match {
           case Some(lst2) =>
             val doc: Document = lst2.head
             val ndoc: Document = if (doc.getField(updateFldName).stringValue().equals("0")) {
-                updateSimilarDocs(doc, maxDocs, lastDays, sources, instances)
+                updateSimilarDocs(doc, maxDocs, sources, instances)
             } else doc
             val sdIds: mutable.Seq[IndexableField] = ndoc.getFields().asScala
                                                          .filter(iFld => iFld.name().equals(sdIdFldName))
             if (sdIds.isEmpty) lst
-            else lst :+ sdIds.map( _.stringValue().toInt).toList
+            else lst :+ sdIds.map(_.stringValue().toInt).toList
           case None => lst
         }
     }
+    getSimDocs(docIds, outFlds, maxDocs, lastDays)
+  }
+
+  /**
+    * Given a id of a personal service document, profiles names and
+    * similar documents fields where the profiles will be compared, returns
+    * a list of similar documents
+    *
+    * @param docIds document id list for each profile
+    * @param outFlds fields of similar documents to be retrieved
+    * @param maxDocs the maximun number of similar documents to be retrieved
+    * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
+    * @return a list of similar documents, where each similar document is a
+    *         a collection of field names and its contents. Each fields can
+    *         have more than one occurrence
+    */
+  private def getSimDocs(docIds: List[List[Int]],
+                         outFlds: Set[String],
+                         maxDocs: Int,
+                         lastDays: Option[Int]): List[Map[String,List[String]]] = {
     if (docIds.isEmpty) List()
     else {
       val sdDirectory = FSDirectory.open(Paths.get(simSearch.sdIndexPath))
       val sdReader = DirectoryReader.open(sdDirectory)
       val sdSearcher = new IndexSearcher(sdReader)
+
       val list: List[Map[String, List[String]]] = limitDocs(docIds, maxDocs, List()).
-                          foldLeft[List[Map[String,List[String]]]](List()) {
-        case (lst, id) =>
-          val fields: Map[String, List[String]] = getDocFields(id, sdSearcher, outFlds)
-          if (fields.isEmpty) lst else lst :+ fields
-      }
+        foldLeft[List[Map[String, List[String]]]](List()) {
+          case (lst, id) =>
+            val fields: Map[String, List[String]] = getDocFields(id, sdSearcher, outFlds)
+            if (fields.isEmpty) lst else {
+              lastDays match {
+                case Some(ldays) =>
+                  val now: GregorianCalendar = new GregorianCalendar(TimeZone.getDefault)
+                  val year: Int = now.get(Calendar.YEAR)
+                  val month: Int = now.get(Calendar.MONTH)
+                  val day: Int = now.get(Calendar.DAY_OF_MONTH)
+                  val todayCal: GregorianCalendar = new GregorianCalendar(year, month, day, 0, 0) // begin of today
+                  todayCal.add(Calendar.DAY_OF_MONTH, -ldays + 1) // begin of x days ago
+                  val daysAgo: String = formatter.format(todayCal.getTime)
+
+                  fields.get("update_date") match {
+                    case Some(lst2) =>
+                      if (lst2.head.compareTo(daysAgo) >= 0) lst :+ fields
+                      else lst
+                    case None => lst
+                  }
+                case None => lst :+ fields
+              }
+            }
+        }
       sdReader.close()
       sdDirectory.close()
       list
@@ -359,7 +399,7 @@ class TopIndex(simSearch: SimDocsSearch,
 
   /**
     * Given a set of similar document identifiers for each profile, it
-    * takes on id for each profile each time until the desired number of
+    * takes one id for each profile each time until the desired number of
     * ids has been reached.
     *
     * @param docs list of ids for each profile
@@ -471,13 +511,11 @@ class TopIndex(simSearch: SimDocsSearch,
     * Update sdIdFldName fields of all documents whose update time is outdated
     *
     * @param maxDocs maximum number of similar documents to be retrieved
-    * @param lastDays update only docs that are younger (entrance_date flag) than 'lastDays' days"
     * @param sources update only docs whose field 'db' belongs to sources"
     * @param instances update only docs whose field 'instance' belongs to instances"
     * @return the number of updated documents
     */
   def updateAllSimilarDocs(maxDocs: Int,
-                           lastDays: Option[Int],
                            sources: Option[Set[String]],
                            instances: Option[Set[String]]): Int = {
     val updateTime: Long = new Date().getTime
@@ -491,7 +529,7 @@ class TopIndex(simSearch: SimDocsSearch,
       pos =>
         val scoreDoc: ScoreDoc = topDocs.scoreDocs(pos)
         val doc: Document = topSearcher.doc(scoreDoc.doc)
-        updateSimilarDocs(doc, maxDocs, lastDays, sources, instances, autoCommit = false)
+        updateSimilarDocs(doc, maxDocs, sources, instances, autoCommit = false)
     }
 
     topReader.close()
@@ -505,13 +543,11 @@ class TopIndex(simSearch: SimDocsSearch,
     * Update sdIdFldName fields of one document whose update time is outdated
     *
     * @param maxDocs maximum number of similar documents to be retrieved
-    * @param lastDays update only docs that are younger (entrance_date flag) than 'lastDays' days"
     * @param sources update only docs whose field 'db' belongs to sources"
     * @param instances update only docs whose field 'instance' belongs to instances"
     * @return Some(document) if there was an update otherwise None
     */
   def updateSimilarDocs(maxDocs: Int,
-                        lastDays: Option[Int],
                         sources: Option[Set[String]],
                         instances: Option[Set[String]]): Option[Document] = {
     val updateTime = new Date().getTime
@@ -525,7 +561,7 @@ class TopIndex(simSearch: SimDocsSearch,
     // val retSet = if (topDocs.totalHits.value == 0) None else { Lucene 8.0.0
     val retSet = if (topDocs.totalHits == 0) None else {
       val doc = topSearcher.doc(topDocs.scoreDocs(0).doc)
-      val ndoc = updateSimilarDocs(doc, maxDocs, lastDays, sources, instances)
+      val ndoc = updateSimilarDocs(doc, maxDocs, sources, instances)
       Some(ndoc)
     }
     topReader.close()
@@ -537,18 +573,16 @@ class TopIndex(simSearch: SimDocsSearch,
     *
     * @param doc     document to be updated
     * @param maxDocs maximum number of similar documents to be retrieved
-    * @param lastDays update only docs that are younger (entrance_date flag) than 'lastDays' days"
     * @param sources update only docs whose field 'db' belongs to sources"
     * @param instances update only docs whose field 'instance' belongs to sources"
     * @param autoCommit do a commit after write
     * @return document with its similar doc fields updated
     */
-  def updateSimilarDocs(doc: Document,
-                        maxDocs: Int,
-                        lastDays: Option[Int],
-                        sources: Option[Set[String]],
-                        instances: Option[Set[String]],
-                        autoCommit: Boolean = true): Document = {
+  private def updateSimilarDocs(doc: Document,
+                                maxDocs: Int,
+                                sources: Option[Set[String]],
+                                instances: Option[Set[String]],
+                                autoCommit: Boolean = true): Document = {
     val updateTime = new Date().getTime
     val ndoc = new Document()
 
@@ -577,9 +611,16 @@ class TopIndex(simSearch: SimDocsSearch,
     ndoc.add(new StoredField(contentFldName, content))
 
     // Include 'sd_id' (similar docs) fields
-    simSearch.searchIds(content, sources, instances, maxDocs, Conf.minNGrams, lastDays).
-      foreach { case (sdId,_) =>
-        ndoc.add(new StoredField(sdIdFldName, sdId)) }
+    val lastDays: Int = Math.max(1500, Conf.lastDays.getOrElse(0))  // 1500 = ~4 years
+    val docIds: List[(Int,Float)] = simSearch.searchIds(content, sources, instances, maxDocs, Conf.minNGrams, Some(lastDays))
+    val rem: Int = maxDocs - docIds.size
+    val docIds2: List[(Int,Float)] = {
+      if (rem > 0) docIds ++ simSearch.searchIds(content, sources, instances, rem, Conf.minNGrams, None)
+      else docIds
+    }
+    docIds2.foreach {
+      case (sdId: Int,_) => ndoc.add(new StoredField(sdIdFldName, sdId))
+    }
 
     // Update document
     topWriter.updateDocument(new Term(idFldName, id), ndoc)
@@ -591,14 +632,16 @@ class TopIndex(simSearch: SimDocsSearch,
   /**
     * Reset the update time field of all documents
     *
+    * @return the number of documents whose field "update_time" was set to zero
     */
-  def resetAllTimes(): Unit = {
+  def resetAllTimes(): Int = {
     val updateTime = 0
     val query = new MatchAllDocsQuery()
 
     val topReader = DirectoryReader.open(topWriter)
     val topSearcher = new IndexSearcher(topReader)
     val topDocs = topSearcher.search(query, Integer.MAX_VALUE)
+    val total = topDocs.scoreDocs.length
 
     // Update 'update time' field
     topDocs.scoreDocs.foreach {
@@ -635,6 +678,8 @@ class TopIndex(simSearch: SimDocsSearch,
     }
     topWriter.commit()
     topReader.close()
+
+    total
   }
 }
 
@@ -658,14 +703,16 @@ object TopIndex extends App {
 
   private def preProcess(topIndex: TopIndex,
                          maxDocs: Int,
-                         lastDays: Option[Int],
                          sources: Option[Set[String]],
                          instances: Option[Set[String]]): Unit = {
+    val init = Calendar.getInstance.getTimeInMillis
     print("Resetting all times ...")
     topIndex.resetAllTimes()
     print(" OK\nUpdating all similar docs ...")
-    topIndex.updateAllSimilarDocs(maxDocs, lastDays, sources, instances)
+    topIndex.updateAllSimilarDocs(maxDocs, sources, instances)
+    val end = Calendar.getInstance.getTimeInMillis
     println(" OK")
+    println(s"Elapsed time: ${end - init}ms")
   }
 
   if (args.length < 5) usage()
@@ -692,7 +739,7 @@ object TopIndex extends App {
   val instances: Option[Set[String]] = parameters.get("instances").map(_.split(" *, *").toSet)
   val search: SimDocsSearch = new SimDocsSearch(sdIndexPath, decsIndexPath)
   val topIndex: TopIndex = new TopIndex(search, topIndexPath)
-  if (parameters.contains("preprocess")) preProcess(topIndex, maxDocs, lastDays, sources, instances)
+  if (parameters.contains("preprocess")) preProcess(topIndex, maxDocs, sources, instances)
   val result = topIndex.getSimDocsXml(psId, profiles, outFields, maxDocs, lastDays, sources, instances)
   topIndex.close()
 

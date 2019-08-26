@@ -10,11 +10,8 @@ package org.bireme.sd
 
 import java.io.File
 import java.text.{DateFormat, SimpleDateFormat}
-import java.util
 import java.util.{Calendar, Date, GregorianCalendar, TimeZone}
 
-import org.apache.lucene.analysis.core.KeywordAnalyzer
-import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import org.apache.lucene.analysis.{Analyzer, TokenStream}
 import org.apache.lucene.index.{DirectoryReader, IndexableField, Term}
@@ -138,6 +135,7 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param lastDays filter documents whose 'update_date' is younger or equal to lastDays days
     * @return a list of pairs with document id and document score
     */
+  /*
   def searchIds(text: String,
                 sources: Option[Set[String]],
                 instances: Option[Set[String]],
@@ -165,11 +163,34 @@ class SimDocsSearch(val sdIndexPath: String,
       val minNGrams2: Int = if (ngrams.size >= 5) Math.max(3, minNGrams) else minNGrams
       val lst: List[(Int, Float)] = {
         val orQuery = getQuery(text2, sources, instances, lastDays, useDeCS = true)
-        //println(s"===> getIdScore docs=${sdSearcher.search(orQuery, 10).totalHits} orQuery=$orQuery ngrams=$ngrams")
-        getIdScore(sdSearcher.search(orQuery, 10 * maxDocs).scoreDocs, ngrams, perFieldAnalyzer, maxDocs, minNGrams2)
+        val multi: Int = 100 //if (lastDays.isDefined) 10 else 100
+        getIdScore(sdSearcher.search(orQuery, maxDocs * multi).scoreDocs, ngrams, perFieldAnalyzer, maxDocs, minNGrams2)
       }
-      //println(s"text=$text maxDocs=$maxDocs minNGrams=$minNGrams lastDays=${lastDays.getOrElse(-1)} ids=${lst.map(x => x._1)}")
-      //println("============================================================")
+      lst
+    }
+  }
+  */
+
+  def searchIds(text: String,
+                sources: Option[Set[String]],
+                instances: Option[Set[String]],
+                maxDocs: Int,
+                minNGrams: Int,
+                lastDays: Option[Int]): List[(Int,Float)] = {
+    require ((text != null) && text.nonEmpty)
+    require (maxDocs > 0)
+    require (minNGrams > 0)
+
+    val textSet: Set[String] = uniformText(text)
+    val text2: String = textSet.mkString(" ")
+
+    if (text2.isEmpty) List[(Int,Float)]()
+    else {
+      val lst: List[(Int, Float)] = {
+        val orQuery = getQuery(text2, sources, instances, lastDays, useDeCS = true)
+        val multi: Int = 100 //if (lastDays.isDefined) 10 else 100
+        getIdScore(sdSearcher.search(orQuery, maxDocs * multi).scoreDocs, maxDocs)
+      }
       lst
     }
   }
@@ -244,34 +265,52 @@ class SimDocsSearch(val sdIndexPath: String,
   }
 
   /**
-    * Get retrieved document's ids and scores filtering by 
+    * Get retrieved document's ids and scores filtering by number of common ngrams and then by update_date
     *
     * @param scoreDocs result of the Lucene search function
-    * @param ngrams sequence of ngrams of the original text
-    * @param analyzer Lucene analyzer class
     * @param maxDocs maximum number of returned documents
-    * @param minNGrams minimum number of common ngrams retrieved to consider returning a document field text
     * @return a list of pairs with document id and document score
     */
   private def getIdScore(scoreDocs: Array[ScoreDoc],
-                         ngrams: Set[String],
-                         analyzer: Analyzer,
-                         maxDocs: Int,
-                         minNGrams: Int): List[(Int,Float)] = {
-    val aux: Array[(Int, ScoreDoc)] = scoreDocs.map {
+                         maxDocs: Int): List[(Int, Float)] = {
+    val ud: Set[String] = Set("update_date")
+
+    scoreDocs.map {
       scoreDoc =>
-        val docStr: String = loadDoc(scoreDoc.doc, service.Conf.idxFldNames)
-          .foldLeft("") { case (str, (_, lst)) => str + " " + lst.mkString(" ") }
+        val doc: Map[String, List[String]] = loadDoc(scoreDoc.doc, ud)
+        (doc, scoreDoc, doc.getOrElse("update_date", List("~")).headOption.getOrElse("~"))  // (doc, scoreDoc, update_date)
+    }.sortWith((t1, t2) => t1._3.compareTo(t2._3) > 0)
+      .take(maxDocs)
+      .map(t => (t._2.doc, t._2.score))
+      .toList
+  }
+
+  /*
+  private def getIdScore0(scoreDocs: Array[ScoreDoc],
+                          ngrams: Set[String],
+                          analyzer: Analyzer,
+                          maxDocs: Int,
+                          minNGrams: Int): List[(Int, Float)] = {
+    val aux: Array[(Int, ScoreDoc, String)] = scoreDocs.map {   // (num of common ngrams, ScoreDoc, update_date)
+      scoreDoc =>
+        val doc: Map[String, List[String]] = loadDoc(scoreDoc.doc, service.Conf.idxFldNames + "update_date")
+        val docStr: String = doc.foldLeft("") { case (str, (_, lst)) => str + " " + lst.mkString(" ") }
         val simNGrams: Set[String] = getNGrams(docStr, analyzer, maxWords)
         val commonNGrams: Set[String] = simNGrams.intersect(ngrams)
-        (commonNGrams.size, scoreDoc)
+        (commonNGrams.size, scoreDoc, doc.getOrElse("update_date", List("~")).headOption.getOrElse("~"))
     }
     val min = Math.min(minNGrams, ngrams.size)
-    //println(s"getIdScore ==> scoreDocs=${scoreDocs.size} ngrams=$ngrams analyzer=$analyzer maxDocs=$maxDocs minNGrams=$minNGrams min=$min aux=${aux.map(_._1).toList}")
-    val aux2 = aux.filter(t => t._1 >= min).sortWith((t1, t2) => t1._1 < t2._1).reverse.take(maxDocs)
 
-    aux2.map(t => (t._2.doc, t._2.score)).toList
+    // Filter by min common ngrams and then order by date and after order by number of common ngrams
+    val lst: List[(Int, Float)] = aux.filter(t => t._1 >= min)
+      .sortWith((t1, t2) => (t1._3 > t2._3) || ((t1._3 == t2._3) && (t1._1 > t2._1)))
+      .take(maxDocs)
+      .map(t => (t._2.doc, t._2.score))
+      .toList
+
+    lst
   }
+  */
 
   /**
     * Loads the document content given its id and desired fields
@@ -308,7 +347,7 @@ class SimDocsSearch(val sdIndexPath: String,
     require(text != null)
     require(analyzer != null)
 
-    val tokenStream = analyzer.tokenStream(null, text)
+    val tokenStream: TokenStream = analyzer.tokenStream(null, text)
     val cattr: CharTermAttribute = tokenStream.addAttribute(classOf[CharTermAttribute])
 
     tokenStream.reset()

@@ -50,14 +50,14 @@ in a database, for example, LILACS+MEDLINE.</div>
         <h3>Get similar documents</h3>
         <div>Retrieve documents having most of words stored in a set of profiles</div>
         <br/>
-        <div>Syntax: <b>SDService?psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;]</b></div>
+        <div>Syntax: <b>SDService?psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;considerDate=]</b></div>
         <br/>
         <div><b>psId:</b> personal service record identifier</div>
         <div><b>getSimDocs:</b> set of profile identifiers</div>
         <div><b>outFields:</b> tags of similar doc field to be outputed. If no fields were specified all fields will be outputed. Optional parameter.</div>
-        <div><b>lastDays:</b> if present, show only documents that are younger than 'number_of_days' days. Optional parameter.</div>
+        <div><b>considerDate:</b> if present, will only return documents that are younger than default number of days. Optional parameter.</div>
         <br/>
-        <div>Example: SDService?psId=Joao Doria&amp;getSimDocs=books,cars,hobbies&amp;outFields=id,date,name</div>
+        <div>Example: SDService?psId=Joao Doria&amp;getSimDocs=books,cars,hobbies&amp;outFields=id,date,name&amp;considerDate=</div>
         <br/>
         <div>Possible return values:<br/>
         &nbsp;&nbsp;&lt;documents&gt;...&lt;/documents&gt;<br/>

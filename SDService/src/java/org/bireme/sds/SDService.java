@@ -22,6 +22,7 @@ import org.bireme.sd.SimDocsSearch;
 import org.bireme.sd.service.Conf;
 import org.bireme.sd.service.UpdaterService;
 import org.bireme.sd.service.TopIndex;
+import scala.Option;
 
 import scala.collection.mutable.HashSet;
 import scala.collection.mutable.Set;
@@ -35,6 +36,10 @@ public class SDService extends HttpServlet {
     private TopIndex topIndex;
     private UpdaterService updaterService;
     private SimDocsSearch simSearch;
+    
+    private String sdIndexPath;
+    private String topIndexPath;
+    private String decsIndexPath;
 
     @Override
     public void init(final ServletConfig config) throws ServletException {
@@ -42,13 +47,13 @@ public class SDService extends HttpServlet {
 
         final ServletContext context = config.getServletContext();
 
-        final String sdIndexPath = context.getInitParameter("SD_INDEX_PATH");
+        sdIndexPath = context.getInitParameter("SD_INDEX_PATH");
         if (sdIndexPath == null) throw new ServletException(
                                               "empty 'SD_INDEX_PATH' config");
-        final String topIndexPath = context.getInitParameter("TOP_INDEX_PATH");
+        topIndexPath = context.getInitParameter("TOP_INDEX_PATH");
         if (topIndexPath == null) throw new ServletException(
                                               "empty 'TOP_INDEX_PATH' config");
-        final String decsIndexPath = context.getInitParameter("DECS_INDEX_PATH");
+        decsIndexPath = context.getInitParameter("DECS_INDEX_PATH");
         if (decsIndexPath == null) throw new ServletException(
                                               "empty 'DECS_INDEX_PATH' config");
 
@@ -58,22 +63,17 @@ public class SDService extends HttpServlet {
 
         simSearch = new SimDocsSearch(sdIndexPath, decsIndexPath);
         topIndex = new TopIndex(simSearch, topIndexPath);
-        //updaterService = new UpdaterService(topIndex);
         
         topIndex.resetAllTimes();
-        topIndex.updateAllSimilarDocs(Conf.maxDocs(), Conf.lastDays(), 
-                            Conf.sources(), Conf.instances());      //updaterService.stop();
+        topIndex.updateAllSimilarDocs(Conf.maxDocs(), Conf.sources(), 
+                                      Conf.instances());//updaterService.stop();
         context.setAttribute("MAINTENANCE_MODE", Boolean.FALSE);
-        //System.out.println("I will call 'updaterService.start()'");
-        //updaterService.start(); // Demora muita para finalizar, deixa para atualização do índice
-        //System.out.println("After call of 'updaterService.start()'");
     }
 
     @Override
     public void destroy() {
         topIndex.close();
         simSearch.close();
-        //updaterService.stop();
         super.destroy();
     }
 
@@ -90,26 +90,6 @@ public class SDService extends HttpServlet {
                                   final HttpServletResponse response)
                                                         throws ServletException,
                                                                    IOException {
-
-        /*
-        System.out.println("=========== HEADER =============================");
-        final java.util.Enumeration<String> names = request.getHeaderNames();
-        while(names.hasMoreElements()) {
-            final String name = names.nextElement();
-            System.out.println("[" + name + "]: [" + request.getHeader(name) + "]");
-        }
-        final Map<String,String[]> paramMap = request.getParameterMap();
-        for (Map.Entry<String,String[]> elem : paramMap.entrySet()) {
-
-          System.out.println("\n------------------------------------------------");
-          System.out.println("param=[[" + elem.getKey() + "]]");
-          for (String value: elem.getValue()) {
-            System.out.println("value=[[" + value + "]]");
-          }
-          System.out.println();
-        }
-        */
-
         response.setContentType("text/xml;charset=UTF-8");
 
         final ServletContext context = request.getServletContext();
@@ -126,18 +106,28 @@ public class SDService extends HttpServlet {
                     out.println("<result><maintenance_mode>true</maintenance_mode></result>");
                 } else {
                     try {
-                        topIndex.resetAllTimes();
+                        topIndex.close();
+                        simSearch.close();
+                        simSearch = new SimDocsSearch(sdIndexPath, decsIndexPath);
+                        topIndex = new TopIndex(simSearch, topIndexPath);
+        
+                        final int reseted = topIndex.resetAllTimes();
                         final int updated = topIndex.updateAllSimilarDocs(
-                            Conf.maxDocs(), Conf.lastDays(), 
-                            Conf.sources(), Conf.instances());
-                        context.setAttribute("MAINTENANCE_MODE", false);
-                        final SimpleDateFormat sdf = 
-                            new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
-                        final String date = sdf.format(new Date());
-                        out.println("<result><maintenance_mode>" + maint + 
-                            "</maintenance_mode><updated_docs>" + 
-                            updated + "</updated_docs><update_date>" + date +
-                            "</update_date></result>");
+                            Conf.maxDocs(), Conf.sources(), Conf.instances());
+                        if (reseted == updated) {
+                            context.setAttribute("MAINTENANCE_MODE", false);
+                            final SimpleDateFormat sdf = 
+                                new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+                            final String date = sdf.format(new Date());
+                            out.println("<result><maintenance_mode>" + maint + 
+                                "</maintenance_mode><updated_docs>" + 
+                                updated + "</updated_docs><update_date>" + date +
+                                "</update_date></result>");
+                        } else {
+                            out.println("<result><status>ERROR</error><message>" +
+                            "reseted(" + reseted + ") != updated(" + updated + 
+                            ")</message></result>");
+                        }
                     } catch(Exception ex) {
                         out.println("<result><status>ERROR</error><message>" +
                                 ex.toString() + "</message></result>");
@@ -253,12 +243,15 @@ public class SDService extends HttpServlet {
                     final String outFields = request.getParameter("outFields");
                     final String[] oFields = (outFields == null)
                                     ? new String[0]: outFields.split(" *\\, *");
+                    final Option<Object> lastDays = 
+                            (request.getParameter("considerDate") != null)
+                            ? Conf.lastDays() : scala.Option.apply(null);
                     Set<String> fields = new HashSet<>();
                     for (String fld: oFields) {
                         fields.add(fld);
                     }
                     out.println(topIndex.getSimDocsXml(psId, profiles.toSet(),
-                        fields.toSet(), Conf.maxDocs(), Conf.lastDays(), 
+                        fields.toSet(), Conf.maxDocs(), lastDays, 
                         Conf.sources(), Conf.instances()));
                 }
                 return;
