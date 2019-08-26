@@ -188,7 +188,7 @@ class SimDocsSearch(val sdIndexPath: String,
     else {
       val lst: List[(Int, Float)] = {
         val orQuery = getQuery(text2, sources, instances, lastDays, useDeCS = true)
-        val multi: Int = 100 //if (lastDays.isDefined) 10 else 100
+        val multi: Int = if (lastDays.isDefined) 100 else 150
         getIdScore(sdSearcher.search(orQuery, maxDocs * multi).scoreDocs, maxDocs)
       }
       lst
