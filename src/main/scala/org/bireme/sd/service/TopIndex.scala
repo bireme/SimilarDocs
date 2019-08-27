@@ -19,6 +19,10 @@ import org.bireme.sd.{DocumentIterator, SimDocsSearch, Tools}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
+import scala.concurrent.Future
+
+import scala.concurrent.ExecutionContext.Implicits.global
+
 
 /** This class represents a personal service document that indexed by Lucene
   * engine. Each document has two kinds of fields:
@@ -57,10 +61,15 @@ class TopIndex(simSearch: SimDocsSearch,
                                                               CREATE_OR_APPEND))
   topWriter.commit()
 
+  var finishing: Boolean = false  // Flag to stop asynchronous update
+  var updating: Boolean = false   // Flag to indicate if there is an executing asynchronous update
+
   /**
     * Closes all open resources
     */
   def close(): Unit = {
+    finishing = true
+    updating = false
     topWriter.close()
     topDirectory.close()
   }
@@ -540,18 +549,35 @@ class TopIndex(simSearch: SimDocsSearch,
   }
 
   /**
-    * Update sdIdFldName fields of one document whose update time is outdated
+  * Do an asynchronous update of the sdIdFldName fields of all document whose update time is outdated
+    * @param maxDocs maximum number of similar documents to be retrieved
+    * @param sources update only docs whose field 'db' belongs to sources
+    * @param instances update only docs whose field 'instance' belongs to instances
+    */
+  def asyncUpdSimilarDocs(maxDocs: Int,
+                          sources: Option[Set[String]],
+                          instances: Option[Set[String]]): Unit = {
+    if (!updating) {
+      Future {
+        updating = true;
+        while (!finishing && updateSimilarDocs(maxDocs, sources, instances).isDefined) {}
+        updating = false;
+      }
+    }
+  }
+
+  /**
+    * Update sdIdFldName fields of one document whose update time is zero
     *
     * @param maxDocs maximum number of similar documents to be retrieved
-    * @param sources update only docs whose field 'db' belongs to sources"
-    * @param instances update only docs whose field 'instance' belongs to instances"
+    * @param sources update only docs whose field 'db' belongs to sources
+    * @param instances update only docs whose field 'instance' belongs to instances
     * @return Some(document) if there was an update otherwise None
     */
   def updateSimilarDocs(maxDocs: Int,
                         sources: Option[Set[String]],
                         instances: Option[Set[String]]): Option[Document] = {
-    val updateTime = new Date().getTime
-    val query = LongPoint.newRangeQuery(updateFldName, 0, updateTime  - deltaTime) // all documents updated before deltaTime from now
+    val query = LongPoint.newExactQuery(updateFldName, 0L) // all documents whose update_date is zero
     val topReader = DirectoryReader.open(topWriter)
     val topSearcher = new IndexSearcher(topReader)
     val topDocs = topSearcher.search(query, 1)
@@ -571,7 +597,7 @@ class TopIndex(simSearch: SimDocsSearch,
   /**
     * Update sdIdFldName fields of one document whose update time is outdated
     *
-    * @param doc     document to be updated
+    * @param doc document to be updated
     * @param maxDocs maximum number of similar documents to be retrieved
     * @param sources update only docs whose field 'db' belongs to sources"
     * @param instances update only docs whose field 'instance' belongs to sources"

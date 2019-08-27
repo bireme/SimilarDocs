@@ -9,8 +9,6 @@ package org.bireme.sds;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
@@ -63,10 +61,15 @@ public class SDService extends HttpServlet {
 
         simSearch = new SimDocsSearch(sdIndexPath, decsIndexPath);
         topIndex = new TopIndex(simSearch, topIndexPath);
-        
+                
         topIndex.resetAllTimes();
+        topIndex.asyncUpdSimilarDocs(Conf.maxDocs(), Conf.sources(), 
+                                     Conf.instances());
+        /*
         topIndex.updateAllSimilarDocs(Conf.maxDocs(), Conf.sources(), 
                                       Conf.instances());//updaterService.stop();
+        */
+      
         context.setAttribute("MAINTENANCE_MODE", Boolean.FALSE);
     }
 
@@ -111,23 +114,11 @@ public class SDService extends HttpServlet {
                         simSearch = new SimDocsSearch(sdIndexPath, decsIndexPath);
                         topIndex = new TopIndex(simSearch, topIndexPath);
         
-                        final int reseted = topIndex.resetAllTimes();
-                        final int updated = topIndex.updateAllSimilarDocs(
-                            Conf.maxDocs(), Conf.sources(), Conf.instances());
-                        if (reseted == updated) {
-                            context.setAttribute("MAINTENANCE_MODE", false);
-                            final SimpleDateFormat sdf = 
-                                new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
-                            final String date = sdf.format(new Date());
-                            out.println("<result><maintenance_mode>" + maint + 
-                                "</maintenance_mode><updated_docs>" + 
-                                updated + "</updated_docs><update_date>" + date +
-                                "</update_date></result>");
-                        } else {
-                            out.println("<result><status>ERROR</error><message>" +
-                            "reseted(" + reseted + ") != updated(" + updated + 
-                            ")</message></result>");
-                        }
+                        topIndex.resetAllTimes();
+                        topIndex.asyncUpdSimilarDocs(Conf.maxDocs(), 
+                                Conf.sources(), Conf.instances());
+                        context.setAttribute("MAINTENANCE_MODE", false);
+                        out.println("<result><maintenance_mode>false</maintenance_mode></result>");
                     } catch(Exception ex) {
                         out.println("<result><status>ERROR</error><message>" +
                                 ex.toString() + "</message></result>");
