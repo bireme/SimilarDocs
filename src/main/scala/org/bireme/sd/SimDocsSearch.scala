@@ -134,6 +134,7 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param sources filter the valid values of the document field 'db'
     * @param instances filter the valid values of the document field 'instance'
     * @param maxDocs maximum number of returned documents
+    * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
     * @param lastDays filter documents whose 'update_date' is younger or equal to lastDays days
     * @return a list of pairs with document id and document score
     */
@@ -164,11 +165,8 @@ class SimDocsSearch(val sdIndexPath: String,
       val minNGrams2: Int = if (ngrams.size >= 5) Math.max(3, minNGrams) else minNGrams
       val lst: List[(Int, Float)] = {
         lastDays match {
-          case Some(_) =>
-            val orQuery: Query = getQuery(text2, sources, instances, lastDays, useDeCS = true)
-            val multi: Int = 100
-            getIdScore(sdSearcher.search(orQuery, maxDocs * multi).scoreDocs, ngrams, perFieldAnalyzer, maxDocs,
-              minNGrams2)
+          case Some(ldays) => searchIdsNoLD(text2, sources, instances, maxDocs, ngrams, minNGrams2, perFieldAnalyzer,
+                                            List(ldays, 10 * ldays, 100 * ldays), List())
           case None => searchIdsNoLD(text2, sources, instances, maxDocs, ngrams, minNGrams2, perFieldAnalyzer,
                                      List(7, 30, 365, 1000), List())
         }
@@ -177,6 +175,19 @@ class SimDocsSearch(val sdIndexPath: String,
     }
   }
 
+  /**
+  * Search ids from a list of increasing period of time (in number of days) until the maxDocs document ids is returned
+    * @param text the text to be searched
+    * @param sources filter the valid values of the document field 'db'
+    * @param instances filter the valid values of the document field 'instance'
+    * @param maxDocs maximum number of returned documents
+    * @param ngrams set of generated ngrams from input text
+    * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
+    * @param analyzer Lucene document analyzer
+    * @param lastDays filter documents whose 'update_date' is younger or equal to lastDays days
+    * @param auxIds temporary list of (document id, document score)
+    * @return a list of pairs with document id and document score
+    */
   @scala.annotation.tailrec
   private def searchIdsNoLD(text: String,
                             sources: Option[Set[String]],
@@ -189,13 +200,14 @@ class SimDocsSearch(val sdIndexPath: String,
                             auxIds: List[(Int,Float)]): List[(Int,Float)] = {
     if (maxDocs <= 0) auxIds
     else {
-      val multi: Int = 150
       if (lastDays.isEmpty) {
+        val multi: Int = 200
         val orQuery: Query = getQuery(text, sources, instances, None, useDeCS = true)
         val ids: List[(Int, Float)] = getIdScore(
           sdSearcher.search(orQuery, maxDocs * multi).scoreDocs, ngrams, analyzer, maxDocs, minNGrams)
         (auxIds ++ ids).distinct
       } else {
+        val multi: Int = 100
         val orQuery: Query = getQuery(text, sources, instances, Some(lastDays.head), useDeCS = true)
         val ids: List[(Int, Float)] = getIdScore(
           sdSearcher.search(orQuery, maxDocs * multi).scoreDocs, ngrams, analyzer, maxDocs, minNGrams)
