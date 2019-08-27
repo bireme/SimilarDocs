@@ -131,11 +131,9 @@ class TopIndex(simSearch: SimDocsSearch,
     *
     * @param doc personal services document
     * @param content profile content
-    * @param maxDocs maximum number of similar documents to be retrieved
     */
   private def addProfile(doc: Document,
-                         content: String,
-                         maxDocs: Int = Conf.maxDocs): Unit = {
+                         content: String): Unit = {
     require(doc != null)
     require((content != null) && (!content.trim.isEmpty))
 
@@ -153,9 +151,6 @@ class TopIndex(simSearch: SimDocsSearch,
     }
     // Add similar documents ids
     doc.removeFields(sdIdFldName)
-    simSearch.searchIds(newContent, Conf.sources, Conf.instances, maxDocs, Conf.minNGrams, Conf.lastDays).foreach {
-      case (id,_) => doc.add(new StoredField(sdIdFldName, id))
-    }
   }
 
   /**
@@ -559,9 +554,9 @@ class TopIndex(simSearch: SimDocsSearch,
                           instances: Option[Set[String]]): Unit = {
     if (!updating) {
       Future {
-        updating = true;
+        updating = true
         while (!finishing && updateSimilarDocs(maxDocs, sources, instances).isDefined) {}
-        updating = false;
+        updating = false
       }
     }
   }
@@ -637,16 +632,16 @@ class TopIndex(simSearch: SimDocsSearch,
     ndoc.add(new StoredField(contentFldName, content))
 
     // Include 'sd_id' (similar docs) fields
-    val lastDays: Int = Math.max(1500, Conf.lastDays.getOrElse(0))  // 1500 = ~4 years
-    val docIds: List[(Int,Float)] = simSearch.searchIds(content, sources, instances, maxDocs, Conf.minNGrams, Some(lastDays))
+    val docIds: List[Int] = simSearch.searchIds(content, sources, instances, maxDocs, Conf.minNGrams, Conf.lastDays).map(_._1)
     val rem: Int = maxDocs - docIds.size
-    val docIds2: List[(Int,Float)] = {
-      if (rem > 0) docIds ++ simSearch.searchIds(content, sources, instances, rem, Conf.minNGrams, None)
-      else docIds
+
+    val docIds2: List[Int] = {
+      if (rem > 0) {
+        val ids = Some(docIds.toSet)
+        docIds ++ simSearch.searchIds(content, sources, instances, rem, Conf.minNGrams, None, ids).map(_._1)
+      } else docIds
     }
-    docIds2.foreach {
-      case (sdId: Int,_) => ndoc.add(new StoredField(sdIdFldName, sdId))
-    }
+    docIds2.foreach(sdId => ndoc.add(new StoredField(sdIdFldName, sdId)))
 
     // Update document
     topWriter.updateDocument(new Term(idFldName, id), ndoc)

@@ -10,11 +10,8 @@ package org.bireme.sd
 
 import java.io.File
 import java.text.{DateFormat, SimpleDateFormat}
-import java.util
 import java.util.{Calendar, Date, GregorianCalendar, TimeZone}
 
-import org.apache.lucene.analysis.core.KeywordAnalyzer
-import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import org.apache.lucene.analysis.{Analyzer, TokenStream}
 import org.apache.lucene.index.{DirectoryReader, IndexableField, Term}
@@ -136,6 +133,7 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param maxDocs maximum number of returned documents
     * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
     * @param lastDays filter documents whose 'update_date' is younger or equal to lastDays days
+    * @param excludeIds a set of document identifiers to exclude from output list
     * @return a list of pairs with document id and document score
     */
   def searchIds(text: String,
@@ -143,7 +141,8 @@ class SimDocsSearch(val sdIndexPath: String,
                 instances: Option[Set[String]],
                 maxDocs: Int,
                 minNGrams: Int,
-                lastDays: Option[Int]): List[(Int,Float)] = {
+                lastDays: Option[Int],
+                excludeIds: Option[Set[Int]] = None): List[(Int,Float)] = {
     require ((text != null) && text.nonEmpty)
     require (maxDocs > 0)
     require (minNGrams > 0)
@@ -154,70 +153,19 @@ class SimDocsSearch(val sdIndexPath: String,
     if (text2.isEmpty) List[(Int,Float)]()
     else {
       val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
-      val perFieldAnalyzer: Analyzer = {
-        val hash = new util.HashMap[String, Analyzer]()
-        //hash.put("id", new KeywordAnalyzer())
-        //hash.put("db", new KeywordAnalyzer())
-        hash.put("update_date", new KeywordAnalyzer())
-        new PerFieldAnalyzerWrapper(analyzer, hash)
-      }
       val ngrams: Set[String] = getNGrams(text2, analyzer, maxWords)
-      val minNGrams2: Int = if (ngrams.size >= 5) Math.max(3, minNGrams) else minNGrams
-      val lst: List[(Int, Float)] = {
-        lastDays match {
-          case Some(ldays) => searchIdsNoLD(text2, sources, instances, maxDocs, ngrams, minNGrams2, perFieldAnalyzer,
-                                            List(ldays, 10 * ldays, 100 * ldays), List())
-          case None => searchIdsNoLD(text2, sources, instances, maxDocs, ngrams, minNGrams2, perFieldAnalyzer,
-                                     List(7, 30, 365, 1000), List())
-        }
+      val nsize: Int = ngrams.size
+      val minNGrams2: Int =
+        if (nsize < 5) Math.min(nsize, minNGrams)
+        else Math.min(nsize, Math.max(3, minNGrams))
+      val multi: Int = 200
+      val orQuery: Query = getQuery(text, sources, instances, lastDays, useDeCS = true)
+      val scoreDocs: Array[ScoreDoc] = sdSearcher.search(orQuery, maxDocs * multi).scoreDocs
+      val scoreDocs2: Array[ScoreDoc] = excludeIds match {
+        case Some(eids) => scoreDocs.filterNot(sd => eids.contains(sd.doc))
+        case None => scoreDocs
       }
-      lst
-    }
-  }
-
-  /**
-  * Search ids from a list of increasing period of time (in number of days) until the maxDocs document ids is returned
-    * @param text the text to be searched
-    * @param sources filter the valid values of the document field 'db'
-    * @param instances filter the valid values of the document field 'instance'
-    * @param maxDocs maximum number of returned documents
-    * @param ngrams set of generated ngrams from input text
-    * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
-    * @param analyzer Lucene document analyzer
-    * @param lastDays filter documents whose 'update_date' is younger or equal to lastDays days
-    * @param auxIds temporary list of (document id, document score)
-    * @return a list of pairs with document id and document score
-    */
-  @scala.annotation.tailrec
-  private def searchIdsNoLD(text: String,
-                            sources: Option[Set[String]],
-                            instances: Option[Set[String]],
-                            maxDocs: Int,
-                            ngrams: Set[String],
-                            minNGrams: Int,
-                            analyzer: Analyzer,
-                            lastDays: List[Int],
-                            auxIds: List[(Int,Float)]): List[(Int,Float)] = {
-    if (maxDocs <= 0) auxIds
-    else {
-      if (lastDays.isEmpty) {
-        val multi: Int = 200
-        val orQuery: Query = getQuery(text, sources, instances, None, useDeCS = true)
-        val ids: List[(Int, Float)] = getIdScore(
-          sdSearcher.search(orQuery, maxDocs * multi).scoreDocs, ngrams, analyzer, maxDocs, minNGrams)
-        (auxIds ++ ids).distinct
-      } else {
-        val multi: Int = 100
-        val orQuery: Query = getQuery(text, sources, instances, Some(lastDays.head), useDeCS = true)
-        val ids: List[(Int, Float)] = getIdScore(
-          sdSearcher.search(orQuery, maxDocs * multi).scoreDocs, ngrams, analyzer, maxDocs, minNGrams)
-        val (nids: List[(Int, Float)], added: Int) = ids.foldLeft[(List[(Int, Float)], Int)]((auxIds, 0)) {
-          case (res, (id, score)) =>
-            if (res._1.contains((id, score))) res
-            else (res._1 :+ ((id, score)), res._2 + 1)
-        }
-        searchIdsNoLD(text, sources, instances, maxDocs - added, ngrams, minNGrams, analyzer, lastDays.tail, nids)
-      }
+      getIdScore(scoreDocs2, ngrams, analyzer, maxDocs, minNGrams2)
     }
   }
 
@@ -315,12 +263,13 @@ class SimDocsSearch(val sdIndexPath: String,
     .sortWith((t1, t2) => t1._3.compareTo(t2._3) > 0)
     .foldLeft[List[(Int, Float)]](List()) {
       case (lst, tuple) =>
-        if (lst.size <= maxDocs) {
-          val docStr: String = tuple._1.foldLeft("") {
-            case (str, kv) =>
-              if (kv._1.equals("update_date")) str
-              else str + " " + kv._2.mkString(" ")
+        if (lst.size < maxDocs) {
+          val docSet: Set[String] = tuple._1.foldLeft(Set[String]()) {
+            case (set, kv) =>
+              if (kv._1.equals("update_date")) set
+              else set ++ kv._2
           }
+          val docStr: String = docSet.mkString(" ")
           val simNGrams: Set[String] = getNGrams(docStr, analyzer, maxWords)
           val commonNGrams: Set[String] = ngrams.intersect(simNGrams)
           if (commonNGrams.size >= minNGrams) lst :+ (tuple._2.doc -> tuple._2.score)
