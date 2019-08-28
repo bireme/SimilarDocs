@@ -68,8 +68,9 @@ class SimilarDocsServiceTest extends FlatSpec {
     }
   }
 
-  val service = "http://basalto01.bireme.br:8180/SDService"
-  //val service = "http://serverofi5.bireme.br:8180/SDService"
+  //val service = "http://similardocs.bireme.org"
+  //val service = "http://basalto01.bireme.br:8180/SDService"
+  val service = "http://serverofi5.bireme.br:8180/SDService"
   //val service = "http://localhost:8084"
 
   val id = "Téster!@paho.org"
@@ -169,7 +170,7 @@ class SimilarDocsServiceTest extends FlatSpec {
   val doc1: Regex = "<document>".r
   profiles.foreach {
     prof =>
-      val url: String = s"$service/SDService?psId=$id&getSimDocs=${prof._1}"
+      val url: String = s"$service/SDService?psId=$id&getSimDocs=${prof._1}&considerDate="
       val content: String = pageContent(url).toLowerCase
       val found = doc1.findAllMatchIn(content).size
       val total = profTotal.getOrElse(prof._1, -1)
@@ -184,10 +185,10 @@ class SimilarDocsServiceTest extends FlatSpec {
 
   found.foreach {
     prof =>
-      val url: String = s"$service/SDService?psId=$id&getSimDocs=$prof"
+      val url: String = s"$service/SDService?psId=$id&getSimDocs=$prof&considerDate="
       val content: String = pageContent(url).toLowerCase
       val profWords: Set[String] = profiles(prof).toLowerCase.replaceAll("\\[-,:_]", " ").
-        split("[\\s+.]").filter(_.size > 3).toSet
+        split("[\\s+.]").filter(arr => arr.length > 3).toSet
       val common: Int = profWords.foldLeft[Int](0) {
         case (tot, word) =>
           val add = if (getOccurrences(content, word) > 0) 1 else 0
@@ -222,7 +223,7 @@ class SimilarDocsServiceTest extends FlatSpec {
     val profs = "<name>([^<]+)</name>\\s*<content>([^<]+)</content>".r
     val url = s"$service/SDService?psId=$id_Renato&showProfiles="
     val content = pageContent(url)
-    profs.findAllMatchIn(content).size should be >= (profiles_Renato.size)
+    profs.findAllMatchIn(content).size should be >= profiles_Renato.size
   }
 
   // === Check the "Get Similar Documents" service (number of retrieved docs) disregarding 'lastDays' parameter ===
@@ -243,13 +244,13 @@ class SimilarDocsServiceTest extends FlatSpec {
       map + (prof._1 -> doc.findAllMatchIn(content).size)
   }
 
-  s"Renato" should "have at least 01 similar document" in {
+  "Renato" should "have at least 01 similar document" in {
     profTotal2.values.sum should be > 0
   }
 
   profiles_Renato.foreach {
     prof =>
-      val url: String = s"$service/SDService?psId=$id_Renato&getSimDocs=${prof._1}"
+      val url: String = s"$service/SDService?psId=$id_Renato&getSimDocs=${prof._1}&considerDate="
       val content: String = pageContent(url).toLowerCase
       val found = doc1.findAllMatchIn(content).size
       val total = profTotal2.getOrElse(prof._1, -1)
@@ -264,7 +265,7 @@ class SimilarDocsServiceTest extends FlatSpec {
 
   found2.foreach {
     prof =>
-      val url: String = s"$service/SDService?psId=$id_Renato&getSimDocs=$prof"
+      val url: String = s"$service/SDService?psId=$id_Renato&getSimDocs=$prof&considerDate="
       val content: String = pageContent(url).toLowerCase
       val profWords: Set[String] = profiles_Renato(prof).toLowerCase.replaceAll("\\[-,:_]", " ").
         split("[\\s+.]").filter(_.length > 3).toSet

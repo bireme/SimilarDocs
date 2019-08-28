@@ -91,7 +91,7 @@ class TopIndex(simSearch: SimDocsSearch,
     val tuser = user.trim()
     val tname = name.trim()
     val id = s"${tuser}_$tname"
-    val updateTime: Long = new Date().getTime
+    val updateTime: Long = 0L //new Date().getTime
 
     // Retrieves or creates the personal service document
     val (doc, isNew) = getDocuments(idFldName, id) match {
@@ -224,8 +224,12 @@ class TopIndex(simSearch: SimDocsSearch,
     val head = """<?xml version="1.0" encoding="UTF-8"?><profiles>"""
 
     getProfiles(user).foldLeft[String](head) {
-      case(str,(name,content)) =>
-        s"""$str<profile><name>$name</name><content>$content</content></profile>"""
+      case(str,kv) =>
+        val ids: String = kv._2._3.foldLeft("") {
+          case (str, id) => s"$str<lucene_id>$id</lucene_id>"
+        }
+        s"$str<profile><name>${kv._1}</name><content>${kv._2._1}</content><update_date>" +
+        s"${kv._2._2}</update_date>$ids</profile>"
     } + "</profiles>"
   }
 
@@ -234,20 +238,22 @@ class TopIndex(simSearch: SimDocsSearch,
     * (some fields of that document)
     *
     * @param user personal services document unique id
-    * @return a collection of profiles names and its contents. Profiles can not
+    * @return a collection of profiles (name, content, update date, ids). Profiles can not
     *         have more than one occurrence
     */
-  def getProfiles(user: String): Map[String,String] = {
+  def getProfiles(user: String): Map[String, (String, String, List[String])] = {
     require((user != null) && (!user.trim.isEmpty))
 
     val tUser = user.trim()
 
     getDocuments(userFldName, tUser) match {
-      case Some(lst) => lst.foldLeft[Map[String,String]] (Map()) {
+      case Some(lst) => lst.foldLeft[Map[String,(String,String,List[String])]] (Map()) {
         case (map, doc) =>
-          val name = doc.getField(nameFldName).stringValue()
-          val content = doc.getField(contentFldName).stringValue()
-          map + ((name, content))
+          val name: String = doc.getField(nameFldName).stringValue()
+          val content: String = doc.getField(contentFldName).stringValue()
+          val updDate: String = doc.getField(updateFldName).stringValue()
+          val ids: List[String] = doc.getFields(sdIdFldName).map(_.stringValue()).toList
+          map + ((name, (content, updDate, ids)))
       }
       case None => Map()
     }
@@ -500,7 +506,7 @@ class TopIndex(simSearch: SimDocsSearch,
     val docs = topSearcher.search(query, Integer.MAX_VALUE)
 //println(s"totalHits=${docs.totalHits} query=[$query]")
     // val result = docs.totalHits.value match { Lucene 8.0.0
-    val result = docs.totalHits match {
+    val result: Option[List[Document]] = docs.totalHits match {
       case 0 => None
       case _ => docs.scoreDocs.foldLeft[Option[List[Document]]] (Some(List[Document]())) {
         case (slst, sdoc) => slst.map(_ :+ topSearcher.doc(sdoc.doc))
