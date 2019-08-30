@@ -35,8 +35,8 @@ object Tools {
   def uniformString(in: String): String = {
     require (in != null)
 
-    val s1 = Normalizer.normalize(in.trim().toLowerCase(), Form.NFD)
-    val s2 = s1.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
+    val s1: String = Normalizer.normalize(in.trim().toLowerCase(), Form.NFD)
+    val s2: String = s1.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
 
     //s2.replaceAll("\\W", " ")
     s2.replaceAll("[^\\w\\-]", " ")  // Hifen

@@ -1,7 +1,7 @@
 lazy val commonSettings = Seq(
   organization := "br.bireme",
   version := "0.1.0",
-  scalaVersion := /* "2.13.0," */ "2.12.8",
+  scalaVersion := /* "2.13.0," */ "2.12.9",
   scalacOptions ++= Seq(
     "-encoding", "utf8",
     "-deprecation",

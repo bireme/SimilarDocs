@@ -32,7 +32,7 @@ class SimDocsSearch(val sdIndexPath: String,
   require(sdIndexPath != null)
   require(decsIndexPath != null)
 
-  val maxWords = 100 /*20*/   // limit the max number of words to be used as input text
+  val maxWords: Int = 100 /*20*/   // limit the max number of words to be used as input text
 
   val decsDirectory: FSDirectory = FSDirectory.open(new File(decsIndexPath).toPath)
   val decsReader: DirectoryReader = DirectoryReader.open(decsDirectory)
@@ -84,11 +84,12 @@ class SimDocsSearch(val sdIndexPath: String,
 
     val docs: List[(Float, Map[String, List[String]])] =
       search(text, outFields, maxDocs, service.Conf.minNGrams, srcs, insts, days)
-    val docs2 = docs.map {
-      doc =>
-        val ngrams = if (explain) Some(getCommonNGrams(text, doc._2)) else None
-        (doc._1, doc._2, ngrams)
-    }
+    val docs2: List[(Float, Map[String, List[String]], Option[(List[String], List[String], List[String])])] =
+      docs.map {
+        doc =>
+          val ngrams = if (explain) Some(getCommonNGrams(text, doc._2)) else None
+          (doc._1, doc._2, ngrams)
+      }
     doc2xml(docs2)
   }
 
@@ -116,7 +117,7 @@ class SimDocsSearch(val sdIndexPath: String,
     require(maxDocs > 0)
     require(minNGrams > 0)
 
-    val oFields = if ((outFields == null) || outFields.isEmpty) Conf.idxFldNames + "id"
+    val oFields: Set[String] = if ((outFields == null) || outFields.isEmpty) Conf.idxFldNames + "id"
                else outFields
 
     searchIds(text, sources, instances, maxDocs, minNGrams, lastDays).map {
@@ -155,9 +156,11 @@ class SimDocsSearch(val sdIndexPath: String,
       val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
       val ngrams: Set[String] = getNGrams(text2, analyzer, maxWords)
       val nsize: Int = ngrams.size
-      val minNGrams2: Int =
-        if (nsize < 5) Math.min(nsize, minNGrams)
-        else Math.min(nsize, Math.max(3, minNGrams))
+      val minNGrams2: Int =   // Choose the number of ngrams according to the number of ngrams of the input text
+        if (nsize <= 2) Math.max(1, Math.min(nsize, minNGrams))
+        else if (nsize <= 6) Math.max(2, Math.min(nsize, minNGrams))
+        else if (nsize <= 19) Math.max(3, Math.min(nsize, minNGrams))
+        else Math.max(4, Math.min(nsize, minNGrams))
       val multi: Int = 200
       val orQuery: Query = getQuery(text, sources, instances, lastDays, useDeCS = true)
       val scoreDocs: Array[ScoreDoc] = sdSearcher.search(orQuery, maxDocs * multi).scoreDocs
@@ -255,13 +258,16 @@ class SimDocsSearch(val sdIndexPath: String,
                          minNGrams: Int): List[(Int, Float)] = {
     val ud: Set[String] = service.Conf.idxFldNames + "update_date"
 
-    scoreDocs.map {
+    val tuple: Array[(Map[String, List[String]], ScoreDoc, String)] = scoreDocs.map {
       scoreDoc =>
         val doc: Map[String, List[String]] = loadDoc(scoreDoc.doc, ud)
         (doc, scoreDoc, doc.getOrElse("update_date", List("~")).headOption.getOrElse("~"))  // (doc, scoreDoc, update_date)
     }
-    .sortWith((t1, t2) => t1._3.compareTo(t2._3) > 0)
-    .foldLeft[List[(Int, Float)]](List()) {
+
+    val timeSorted: Array[(Map[String, List[String]], ScoreDoc, String)] =
+      tuple.sortWith((t1, t2) => t1._3.compareTo(t2._3) > 0)
+
+    val idScore: List[(Int, Float)] = timeSorted.foldLeft[List[(Int, Float)]](List()) {
       case (lst, tuple) =>
         if (lst.size < maxDocs) {
           val docSet: Set[String] = tuple._1.foldLeft(Set[String]()) {
@@ -272,11 +278,16 @@ class SimDocsSearch(val sdIndexPath: String,
           val docStr: String = docSet.mkString(" ")
           val simNGrams: Set[String] = getNGrams(docStr, analyzer, maxWords)
           val commonNGrams: Set[String] = ngrams.intersect(simNGrams)
-          if (commonNGrams.size >= minNGrams) lst :+ (tuple._2.doc -> tuple._2.score)
+          if (commonNGrams.size >= minNGrams) {
+            //println(s"###>simNGrams=$simNGrams")
+            //println(s"===> commonNGrams.size=${commonNGrams.size} commonNGrams=$commonNGrams")
+            lst :+ (tuple._2.doc -> tuple._2.score)
+          } // Filter by number of common ngrams
           else lst
         }
         else lst
     }
+    idScore
   }
 
   /*
@@ -321,8 +332,8 @@ class SimDocsSearch(val sdIndexPath: String,
     asScalaBuffer[IndexableField](sdReader.document(id, fields.asJava).getFields()).
       foldLeft[Map[String,List[String]]] (Map()) {
       case (map2,fld) =>
-        val name = fld.name()
-        val lst = map2.getOrElse(name, List())
+        val name: String = fld.name()
+        val lst: List[String] = map2.getOrElse(name, List())
         map2 + ((name, fld.stringValue() :: lst))
     }
   }
@@ -387,32 +398,19 @@ class SimDocsSearch(val sdIndexPath: String,
   def getCommonNGrams(original: String,
                       doc: Map[String,List[String]]): (List[String], List[String], List[String]) = {
     val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
-    val sim = getDocumentText(doc, service.Conf.idxFldNames)
-    val set_original = getNGrams(Tools.strongUniformString(original), analyzer, maxWords)
-    val set_similar = getNGrams(Tools.strongUniformString(sim), analyzer, maxWords)
-    val set_common = set_original.intersect(set_similar)
+    val docSet: Set[String] = doc.foldLeft(Set[String]()) {
+      case (set, kv) =>
+        if (kv._1.equals("update_date")) set
+        else set ++ kv._2
+    }
+    val sim: String = docSet.mkString(" ")
+    val set_original: Set[String] = getNGrams(Tools.uniformString(original), analyzer, maxWords)
+    //val set_original: Set[String] = getNGrams(Tools.strongUniformString(original), analyzer, maxWords)
+    val set_similar: Set[String] = getNGrams(Tools.uniformString(sim), analyzer, maxWords)
+    //val set_similar: Set[String] = getNGrams(Tools.strongUniformString(sim), analyzer, maxWords)
+    val set_common: Set[String] = set_original.intersect(set_similar)
 
     (set_original.toList, set_similar.toList, set_common.toList)
-  }
-
-  /**
-    * Given a document represented by a map (field->content) and the desired fields, return a string representation of
-    * the document
-    * @param doc the input document represented as a map
-    * @param fNames the desired fields used to create the output
-    * @return the string representation of the document.
-    */
-  private def getDocumentText(doc: Map[String,List[String]],
-                              fNames: Set[String]): String = {
-    require(doc != null)
-    require(fNames != null)
-
-    fNames.foldLeft[String]("") {
-      case (str, name) => doc.get(name) match {
-        case Some(contentList) => str + " " + contentList.mkString(" ")
-        case None => str
-      }
-    }
   }
 
   /**
@@ -427,11 +425,11 @@ class SimDocsSearch(val sdIndexPath: String,
 
     docs.zipWithIndex.foldLeft[String]("{\"documents\":[") {
       case (str, (doc,idx)) =>
-        val fields = doc._2.toList.zipWithIndex
-        val jflds = fields.foldLeft[String]("") {
+        val fields: List[((String, List[String]), Int)] = doc._2.toList.zipWithIndex
+        val jflds: String = fields.foldLeft[String]("") {
           case (str2, (fld,idx2)) =>
             val lst: Seq[(String, Int)] = fld._2.zipWithIndex
-            val lstStr = lst.size match {
+            val lstStr: String = lst.size match {
               case 0 => ""
               case 1 => "\"" + lst.head + "\""
               case _ => "[" + lst.foldLeft[String]("") {
@@ -463,14 +461,14 @@ class SimDocsSearch(val sdIndexPath: String,
     docs.foldLeft[String]("<?xml version=\"1.0\" encoding=\"UTF-8\"?><documents>") {
       case (str, doc) =>
         val fields: List[(String, List[String])] = doc._2.toList
-        val fields2 = doc._3 match {
+        val fields2: List[(String, List[String])] = doc._3 match {
           case Some((original, similar, common)) =>
             fields :+ ("original_ngrams" -> List(original.mkString(", "))) :+
                       ("similar_ngrams" -> List(similar.mkString(", "))) :+
                       ("common_ngrams" -> List(common.mkString(", ")))
           case None => fields
         }
-        val jflds = fields2.foldLeft[String]("") {
+        val jflds: String = fields2.foldLeft[String]("") {
           case (str2, fld) => fld._2.foldLeft[String](str2) {       // fld = (String,List[String])
             case (str3, content) =>
               val content2 =

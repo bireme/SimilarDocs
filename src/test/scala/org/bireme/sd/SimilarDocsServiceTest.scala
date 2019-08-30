@@ -219,7 +219,7 @@ class SimilarDocsServiceTest extends FlatSpec {
     "enfermedades intestinales" -> "chron colitis enfermedades infecciosas intestinales ulcerativa")
 
   // === Check the number of profiles ===
-  s"Renato" should s"retrieve all of his profiles [${profiles_Renato.size}]" in {
+  "Renato" should s"retrieve all of his profiles [${profiles_Renato.size}]" in {
     val profs = "<name>([^<]+)</name>\\s*<content>([^<]+)</content>".r
     val url = s"$service/SDService?psId=$id_Renato&showProfiles="
     val content = pageContent(url)

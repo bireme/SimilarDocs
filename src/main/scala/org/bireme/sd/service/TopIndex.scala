@@ -88,21 +88,21 @@ class TopIndex(simSearch: SimDocsSearch,
     require((name != null) && (!name.trim.isEmpty))
     require((content != null) && (!content.trim.isEmpty))
 
-    val tuser = user.trim()
-    val tname = name.trim()
-    val id = s"${tuser}_$tname"
+    val tuser: String = user.trim()
+    val tname: String = name.trim()
+    val id: String = s"${tuser}_$tname"
     val updateTime: Long = 0L //new Date().getTime
 
     // Retrieves or creates the personal service document
     val (doc, isNew) = getDocuments(idFldName, id) match {
       case Some(lst) =>
-        val doc2 = lst.head
+        val doc2: Document = lst.head
         doc2.removeField(idFldName)   // Avoid Lucene makes id tokenized (workarround)
         doc2.removeField(userFldName) // Avoid Lucene makes id tokenized (workarround)
         doc2.removeField(updateFldName)
         (doc2, false)
       case None =>
-        val doc2 = new Document()
+        val doc2: Document = new Document()
         doc2.add(new StoredField(nameFldName, tname))
         doc2.add(new StoredField(creationFldName, updateTime))
         (doc2, true)
@@ -176,9 +176,9 @@ class TopIndex(simSearch: SimDocsSearch,
     require((user != null) && (!user.trim.isEmpty))
     require((name != null) && (!name.trim.isEmpty))
 
-    val tuser = user.trim()
-    val tname = name.trim()
-    val id = s"${tuser}_$tname"
+    val tuser: String = user.trim()
+    val tname: String = name.trim()
+    val id : String= s"${tuser}_$tname"
 
     topWriter.deleteDocuments(new Term(idFldName, id))
     topWriter.commit()
@@ -188,7 +188,7 @@ class TopIndex(simSearch: SimDocsSearch,
     * @return a xml document with the users from all personal services documents
     */
   def getUsersXml: String = {
-    val head = """<?xml version="1.0" encoding="UTF-8"?><users>"""
+    val head: String = """<?xml version="1.0" encoding="UTF-8"?><users>"""
 
     getUsers.foldLeft[String](head) {
       case(str, user) => str + s"<user>$user</user>"
@@ -221,7 +221,7 @@ class TopIndex(simSearch: SimDocsSearch,
   def getProfilesXml(user: String): String = {
     require((user != null) && (!user.trim.isEmpty))
 
-    val head = """<?xml version="1.0" encoding="UTF-8"?><profiles>"""
+    val head: String = """<?xml version="1.0" encoding="UTF-8"?><profiles>"""
 
     getProfiles(user).foldLeft[String](head) {
       case(str,kv) =>
@@ -244,7 +244,7 @@ class TopIndex(simSearch: SimDocsSearch,
   def getProfiles(user: String): Map[String, (String, String, List[String])] = {
     require((user != null) && (!user.trim.isEmpty))
 
-    val tUser = user.trim()
+    val tUser: String = user.trim()
 
     getDocuments(userFldName, tUser) match {
       case Some(lst) => lst.foldLeft[Map[String,(String,String,List[String])]] (Map()) {
@@ -285,8 +285,9 @@ class TopIndex(simSearch: SimDocsSearch,
     require(profiles != null)
     require(outFields != null)
 
-    val head = """<?xml version="1.0" encoding="UTF-8"?><documents>"""
-    val simDocs = getSimDocs(psId, profiles, outFields, maxDocs, lastDays, sources, instances)
+    val head: String = """<?xml version="1.0" encoding="UTF-8"?><documents>"""
+    val simDocs: List[Map[String, List[String]]] =
+      getSimDocs(psId, profiles, outFields, maxDocs, lastDays, sources, instances)
     simDocs.foldLeft[String] (head) {
       case (str,map) =>
         s"$str<document>" + map.foldLeft[String]("") {
@@ -372,9 +373,9 @@ class TopIndex(simSearch: SimDocsSearch,
                          lastDays: Option[Int]): List[Map[String,List[String]]] = {
     if (docIds.isEmpty) List()
     else {
-      val sdDirectory = FSDirectory.open(Paths.get(simSearch.sdIndexPath))
-      val sdReader = DirectoryReader.open(sdDirectory)
-      val sdSearcher = new IndexSearcher(sdReader)
+      val sdDirectory: FSDirectory = FSDirectory.open(Paths.get(simSearch.sdIndexPath))
+      val sdReader: DirectoryReader = DirectoryReader.open(sdDirectory)
+      val sdSearcher: IndexSearcher = new IndexSearcher(sdReader)
 
       val list: List[Map[String, List[String]]] = limitDocs(docIds, maxDocs, List()).
         foldLeft[List[Map[String, List[String]]]](List()) {
@@ -427,9 +428,9 @@ class TopIndex(simSearch: SimDocsSearch,
 
     if (docs.isEmpty) ids.take(maxDocs)
     else {
-      val num = maxDocs - ids.size
+      val num: Int = maxDocs - ids.size
       if (num > 0) {
-        val newIds = docs.foldLeft[List[Int]](List()) {
+        val newIds: List[Int] = docs.foldLeft[List[Int]](List()) {
           case (outLst,lstD) => if (lstD.isEmpty) outLst
                                 else outLst :+ lstD.head
         }
@@ -471,7 +472,7 @@ class TopIndex(simSearch: SimDocsSearch,
           }
       }
     } else {
-      val doc = searcher.doc(id, fields.asJava)
+      val doc: Document = searcher.doc(id, fields.asJava)
 
       fields.foldLeft[Map[String,List[String]]] (Map()) {
         case  (map, field) =>
@@ -498,13 +499,11 @@ class TopIndex(simSearch: SimDocsSearch,
     require(field != null)
     require(content != null)
 
-    val topReader = DirectoryReader.open(topWriter)
-    val topSearcher = new IndexSearcher(topReader)
-    val query = new TermQuery(new Term(field, content))
+    val topReader: DirectoryReader = DirectoryReader.open(topWriter)
+    val topSearcher: IndexSearcher = new IndexSearcher(topReader)
+    val query: TermQuery = new TermQuery(new Term(field, content))
 
-//println(s"query=$query")
-    val docs = topSearcher.search(query, Integer.MAX_VALUE)
-//println(s"totalHits=${docs.totalHits} query=[$query]")
+    val docs: TopDocs = topSearcher.search(query, Integer.MAX_VALUE)
     // val result = docs.totalHits.value match { Lucene 8.0.0
     val result: Option[List[Document]] = docs.totalHits match {
       case 0 => None
@@ -578,17 +577,17 @@ class TopIndex(simSearch: SimDocsSearch,
   def updateSimilarDocs(maxDocs: Int,
                         sources: Option[Set[String]],
                         instances: Option[Set[String]]): Option[Document] = {
-    val query = LongPoint.newExactQuery(updateFldName, 0L) // all documents whose update_date is zero
-    val topReader = DirectoryReader.open(topWriter)
-    val topSearcher = new IndexSearcher(topReader)
-    val topDocs = topSearcher.search(query, 1)
+    val query: Query = LongPoint.newExactQuery(updateFldName, 0L) // all documents whose update_date is zero
+    val topReader: DirectoryReader = DirectoryReader.open(topWriter)
+    val topSearcher: IndexSearcher = new IndexSearcher(topReader)
+    val topDocs: TopDocs = topSearcher.search(query, 1)
 //println(s"###documentos a serem atualizados:${topDocs.totalHits} 0<=x<=${updateTime  - deltaTime}")
 
     // Update 'update time' field
     // val retSet = if (topDocs.totalHits.value == 0) None else { Lucene 8.0.0
-    val retSet = if (topDocs.totalHits == 0) None else {
-      val doc = topSearcher.doc(topDocs.scoreDocs(0).doc)
-      val ndoc = updateSimilarDocs(doc, maxDocs, sources, instances)
+    val retSet: Option[Document] = if (topDocs.totalHits == 0) None else {
+      val doc: Document = topSearcher.doc(topDocs.scoreDocs(0).doc)
+      val ndoc: Document = updateSimilarDocs(doc, maxDocs, sources, instances)
       Some(ndoc)
     }
     topReader.close()
@@ -610,15 +609,15 @@ class TopIndex(simSearch: SimDocsSearch,
                                 sources: Option[Set[String]],
                                 instances: Option[Set[String]],
                                 autoCommit: Boolean = true): Document = {
-    val updateTime = new Date().getTime
-    val ndoc = new Document()
+    val updateTime: Long = new Date().getTime
+    val ndoc: Document = new Document()
 
     // Include 'id' field
-    val id = doc.getField(idFldName).stringValue()
+    val id: String = doc.getField(idFldName).stringValue()
     ndoc.add(new StringField(idFldName, id, Field.Store.YES))
 
     // Include 'creation time' field
-    val ctime = doc.getField(creationFldName).stringValue().toLong
+    val ctime: Long = doc.getField(creationFldName).stringValue().toLong
     ndoc.add(new StoredField(creationFldName, ctime))
 
     // Include 'update time' field
@@ -626,15 +625,15 @@ class TopIndex(simSearch: SimDocsSearch,
     ndoc.add(new StoredField(updateFldName, updateTime))
 
     // Include 'user' field
-    val user = doc.getField(userFldName).stringValue()
+    val user: String = doc.getField(userFldName).stringValue()
     ndoc.add(new StringField(userFldName, user, Field.Store.YES))
 
     // Include 'prof_name' field
-    val pname = doc.getField(nameFldName).stringValue()
+    val pname: String = doc.getField(nameFldName).stringValue()
     ndoc.add(new StoredField(nameFldName, pname))
 
     // Include 'prof_content' field
-    val content = doc.getField(contentFldName).stringValue()
+    val content: String = doc.getField(contentFldName).stringValue()
     ndoc.add(new StoredField(contentFldName, content))
 
     // Include 'sd_id' (similar docs) fields
@@ -643,7 +642,7 @@ class TopIndex(simSearch: SimDocsSearch,
 
     val docIds2: List[Int] = {
       if (rem > 0) {
-        val ids = Some(docIds.toSet)
+        val ids: Option[Set[Int]] = Some(docIds.toSet)
         docIds ++ simSearch.searchIds(content, sources, instances, rem, Conf.minNGrams, None, ids).map(_._1)
       } else docIds
     }
@@ -657,6 +656,51 @@ class TopIndex(simSearch: SimDocsSearch,
   }
 
   /**
+  * Reset the update_time field from a user's profiles
+    * @param user personal services document id
+    * @param names name of profiles used to find similar documents
+    */
+  def resetUpdateTime(user: String,
+                      names: Set[String]): Unit = {
+    names foreach {
+      pname =>
+        val id: String = s"${user.trim}_${pname.trim}"
+        getDocuments(idFldName, id) foreach {
+          docs =>
+            val doc: Document = docs.head
+            val ndoc: Document = new Document()
+            val updateTime: Long = 0L
+
+            // Include 'id' field
+            ndoc.add(new StringField(idFldName, id, Field.Store.YES))
+
+            // Include 'creation time' field
+            val ctime: Long = doc.getField(creationFldName).stringValue().toLong
+            ndoc.add(new StoredField(creationFldName, ctime))
+
+            // Include 'update time' field
+            ndoc.add(new LongPoint(updateFldName, updateTime))
+            ndoc.add(new StoredField(updateFldName, updateTime))
+
+            // Include 'user' field
+            ndoc.add(new StringField(userFldName, user.trim, Field.Store.YES))
+
+            // Include 'prof_name' field
+            ndoc.add(new StoredField(nameFldName, pname))
+
+            // Include 'prof_content' field
+            val content: String = doc.getField(contentFldName).stringValue()
+            ndoc.add(new StoredField(contentFldName, content))
+
+            // Update document
+            topWriter.deleteDocuments(new Term(idFldName, id))
+            topWriter.addDocument(ndoc)
+            topWriter.commit()
+        }
+    }
+  }
+
+  /**
     * Reset the update time field of all documents
     *
     * @return the number of documents whose field "update_time" was set to zero
@@ -665,23 +709,23 @@ class TopIndex(simSearch: SimDocsSearch,
     val updateTime = 0
     val query = new MatchAllDocsQuery()
 
-    val topReader = DirectoryReader.open(topWriter)
-    val topSearcher = new IndexSearcher(topReader)
-    val topDocs = topSearcher.search(query, Integer.MAX_VALUE)
-    val total = topDocs.scoreDocs.length
+    val topReader: DirectoryReader = DirectoryReader.open(topWriter)
+    val topSearcher: IndexSearcher = new IndexSearcher(topReader)
+    val topDocs: TopDocs = topSearcher.search(query, Integer.MAX_VALUE)
+    val total: Int = topDocs.scoreDocs.length
 
     // Update 'update time' field
     topDocs.scoreDocs.foreach {
       scoreDoc =>
-        val doc = topSearcher.doc(scoreDoc.doc)
-        val ndoc = new Document()
+        val doc: Document = topSearcher.doc(scoreDoc.doc)
+        val ndoc: Document = new Document()
 
         // Include 'id' field
-        val id = doc.getField(idFldName).stringValue()
+        val id: String = doc.getField(idFldName).stringValue()
         ndoc.add(new StringField(idFldName, id, Field.Store.YES))
 
         // Include 'creation time' field
-        val ctime = doc.getField(creationFldName).stringValue().toLong
+        val ctime: Long = doc.getField(creationFldName).stringValue().toLong
         ndoc.add(new StoredField(creationFldName, ctime))
 
         // Include 'update time' field
@@ -689,15 +733,15 @@ class TopIndex(simSearch: SimDocsSearch,
         ndoc.add(new StoredField(updateFldName, updateTime))
 
         // Include 'user' field
-        val user = doc.getField(userFldName).stringValue()
+        val user: String = doc.getField(userFldName).stringValue()
         ndoc.add(new StringField(userFldName, user, Field.Store.YES))
 
         // Include 'prof_name' field
-        val pname = doc.getField(nameFldName).stringValue()
+        val pname: String = doc.getField(nameFldName).stringValue()
         ndoc.add(new StoredField(nameFldName, pname))
 
         // Include 'prof_content' field
-        val content = doc.getField(contentFldName).stringValue()
+        val content: String = doc.getField(contentFldName).stringValue()
         ndoc.add(new StoredField(contentFldName, content))
 
         // Update document
@@ -719,10 +763,7 @@ object TopIndex extends App {
       "\n\t-psId=<psId> - personal service identifier" +
       "\n\t-profiles=<prof1>,<prof2>,...,<prof> - user profiles used to search the documents" +
       "\n\t[<-outFields=<field>,<field>,...,<field>] - document fields used will be show in the output" +
-      "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
-      "\n\t[-lastDays=<num>] - return only docs that are younger (entrance_date flag) than 'lastDays' days" +
-      "\n\t[-sources=<src1>,<src2>,...,<src>] - return only docs whose field 'db' is <srci>" +
-      "\n\t[-instances=<inst1>,<inst2>,...,<inst>] - return only docs whose field 'instance' is <insti>" +
+      "\n\t[--considerDate] - if present only will return documents newer than x days" +
       "\n\t[--preprocess] - pre process the similar documents to increase speed")
 
     System.exit(1)
@@ -732,12 +773,12 @@ object TopIndex extends App {
                          maxDocs: Int,
                          sources: Option[Set[String]],
                          instances: Option[Set[String]]): Unit = {
-    val init = Calendar.getInstance.getTimeInMillis
+    val init: Long = Calendar.getInstance.getTimeInMillis
     print("Resetting all times ...")
     topIndex.resetAllTimes()
     print(" OK\nUpdating all similar docs ...")
     topIndex.updateAllSimilarDocs(maxDocs, sources, instances)
-    val end = Calendar.getInstance.getTimeInMillis
+    val end: Long = Calendar.getInstance.getTimeInMillis
     println(" OK")
     println(s"Elapsed time: ${end - init}ms")
   }
@@ -760,14 +801,16 @@ object TopIndex extends App {
     case Some(sFields) => sFields.split(" *, *").toSet
     case None => Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs", "update_date")//service.Conf.idxFldNames
   }
-  val maxDocs: Int = parameters.getOrElse("maxDocs", "10").toInt
-  val lastDays: Option[Int] = parameters.get("lastDays").map(_.toInt)
-  val sources: Option[Set[String]] = parameters.get("sources").map(_.split(" *, *").toSet)
-  val instances: Option[Set[String]] = parameters.get("instances").map(_.split(" *, *").toSet)
+  val maxDocs: Int = Conf.maxDocs
+  val sources: Option[Set[String]] = Conf.sources
+  val instances: Option[Set[String]] = Conf.instances
+  val considerDate = parameters.contains("considerDate")
+  val lastDays: Option[Int] = if (considerDate) Conf.lastDays else None
   val search: SimDocsSearch = new SimDocsSearch(sdIndexPath, decsIndexPath)
   val topIndex: TopIndex = new TopIndex(search, topIndexPath)
   if (parameters.contains("preprocess")) preProcess(topIndex, maxDocs, sources, instances)
-  val result = topIndex.getSimDocsXml(psId, profiles, outFields, maxDocs, lastDays, sources, instances)
+  else topIndex.resetUpdateTime(psId, profiles)
+  val result: String = topIndex.getSimDocsXml(psId, profiles, outFields, maxDocs, lastDays, sources, instances)
   topIndex.close()
 
   println(s"result=$result")
