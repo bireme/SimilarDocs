@@ -13,15 +13,14 @@ import java.util.{Calendar, Date, GregorianCalendar, TimeZone}
 
 import org.apache.lucene.document._
 import org.apache.lucene.index._
-import org.apache.lucene.search.{IndexSearcher, MatchAllDocsQuery, Query, ScoreDoc, TermQuery, TopDocs}
+import org.apache.lucene.search._
 import org.apache.lucene.store.FSDirectory
 import org.bireme.sd.{DocumentIterator, SimDocsSearch, Tools}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
-import scala.concurrent.Future
-
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 
 /** This class represents a personal service document that indexed by Lucene
@@ -285,9 +284,9 @@ class TopIndex(simSearch: SimDocsSearch,
     require(profiles != null)
     require(outFields != null)
 
-    val head: String = """<?xml version="1.0" encoding="UTF-8"?><documents>"""
     val simDocs: List[Map[String, List[String]]] =
       getSimDocs(psId, profiles, outFields, maxDocs, lastDays, sources, instances)
+    val head: String = s"""<?xml version="1.0" encoding="UTF-8"?><documents total="${simDocs.size}">"""
     simDocs.foldLeft[String] (head) {
       case (str,map) =>
         s"$str<document>" + map.foldLeft[String]("") {

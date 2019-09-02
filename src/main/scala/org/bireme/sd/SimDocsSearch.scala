@@ -135,7 +135,7 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
     * @param lastDays filter documents whose 'update_date' is younger or equal to lastDays days
     * @param excludeIds a set of document identifiers to exclude from output list
-    * @return a list of pairs with document id and document score
+    * @return a list of pairs with Lucene document id and document score
     */
   def searchIds(text: String,
                 sources: Option[Set[String]],
@@ -158,17 +158,31 @@ class SimDocsSearch(val sdIndexPath: String,
       val nsize: Int = ngrams.size
       val minNGrams2: Int =   // Choose the number of ngrams according to the number of ngrams of the input text
         if (nsize <= 2) Math.max(1, Math.min(nsize, minNGrams))
-        else if (nsize <= 6) Math.max(2, Math.min(nsize, minNGrams))
+        else if (nsize <= 5) Math.max(2, Math.min(nsize, minNGrams))
         else if (nsize <= 19) Math.max(3, Math.min(nsize, minNGrams))
         else Math.max(4, Math.min(nsize, minNGrams))
       val multi: Int = 200
+
+      // Try the first 1000 days (improve recent document retrieval)
+      val (scoreDocs: Array[ScoreDoc], scoreSet: Set[Int]) =
+        if (lastDays.isEmpty || lastDays.get > 500) {
+          val orQuery: Query = getQuery(text, sources, instances, Some(500), useDeCS = true)
+          val sd: Array[ScoreDoc] = sdSearcher.search(orQuery, maxDocs * multi).scoreDocs
+          val ss: Set[Int] = sd.map(_.doc).toSet
+          (sd, ss)
+        } else (Array.empty[ScoreDoc], Set[Int]())
+
+      // Complete with remaining documents
       val orQuery: Query = getQuery(text, sources, instances, lastDays, useDeCS = true)
-      val scoreDocs: Array[ScoreDoc] = sdSearcher.search(orQuery, maxDocs * multi).scoreDocs
-      val scoreDocs2: Array[ScoreDoc] = excludeIds match {
-        case Some(eids) => scoreDocs.filterNot(sd => eids.contains(sd.doc))
-        case None => scoreDocs
+      val scoreDocs1: Array[ScoreDoc] = sdSearcher.search(orQuery, maxDocs * multi).scoreDocs
+      val scoreDocs2: Array[ScoreDoc] = scoreDocs ++ scoreDocs1.filterNot(sd1 => scoreSet.contains(sd1.doc))
+
+      // Exclude documents described in excludeIds
+      val scoreDocs3: Array[ScoreDoc] = excludeIds match {
+        case Some(eids) => scoreDocs2.filterNot(sd => eids.contains(sd.doc))
+        case None => scoreDocs2
       }
-      getIdScore(scoreDocs2, ngrams, analyzer, maxDocs, minNGrams2)
+      getIdScore(scoreDocs3, ngrams, analyzer, maxDocs, minNGrams2)
     }
   }
 
@@ -249,7 +263,7 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param analyzer Lucene analyzer
     * @param maxDocs maximum number of returned documents
     * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
-    * @return a list of pairs with document id and document score
+    * @return a list of pairs with Lucene document id and document score
     */
   private def getIdScore(scoreDocs: Array[ScoreDoc],
                          ngrams: Set[String],
