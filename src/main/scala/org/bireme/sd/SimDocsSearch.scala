@@ -162,7 +162,7 @@ class SimDocsSearch(val sdIndexPath: String,
       val multi: Int = 200
 
       // Initial date
-      val lastDays2: Int = lastDays.getOrElse(36500) // if no lastDays then use 10 years
+      val lastDays2: Int = lastDays.getOrElse(7300) // if no lastDays then use 20 years
       val daysAgoCal: GregorianCalendar = todayCal.clone().asInstanceOf[GregorianCalendar]
       if (lastDays2 < 500) daysAgoCal.add(Calendar.DAY_OF_MONTH, -lastDays2 + 1) // from lastDays2 days ago
       else daysAgoCal.add(Calendar.DAY_OF_MONTH, -500 + 1)               // from 500 days ago (improve recent document retrieval)
@@ -179,18 +179,22 @@ class SimDocsSearch(val sdIndexPath: String,
         case None => scoreDocs
       }
       // Complete with remaining documents from Max(1000, lastDays2) until Min(500, lastDays2)
-      val daysAgoCal2: GregorianCalendar = todayCal.clone().asInstanceOf[GregorianCalendar]
-      val scoreDocs3: Array[ScoreDoc] = {
-        if (scoreDocs2.length >= maxDocs) scoreDocs2
-        else {
-          if (lastDays2 < 500) daysAgoCal2.add(Calendar.DAY_OF_MONTH, -1000 + 1) // from 1000 days ago
-          else daysAgoCal2.add(Calendar.DAY_OF_MONTH, -lastDays2 + 1) // from lastDays2 days ago
-          val orQuery: Query = getQuery(text2, sources, instances, Some(daysAgoCal2), Some(daysAgoCal),
-            useDeCS = true, includeLowerDate = true)
-          sdSearcher.search(orQuery, maxDocs * multi).scoreDocs
+      if (lastDays2 < 500) {
+        getIdScore(scoreDocs2, ngrams, analyzer, maxDocs, minNGrams2)
+      } else {
+        val daysAgoCal2: GregorianCalendar = todayCal.clone().asInstanceOf[GregorianCalendar]
+        val scoreDocs3: Array[ScoreDoc] = {
+          if (scoreDocs2.length >= maxDocs) scoreDocs2
+          else {
+            if (lastDays2 < 500) daysAgoCal2.add(Calendar.DAY_OF_MONTH, -1000 + 1) // from 1000 days ago
+            else daysAgoCal2.add(Calendar.DAY_OF_MONTH, -lastDays2 + 1) // from lastDays2 days ago
+            val orQuery: Query = getQuery(text2, sources, instances, Some(daysAgoCal2), Some(daysAgoCal),
+              useDeCS = true, includeLowerDate = true)
+            scoreDocs2 ++ sdSearcher.search(orQuery, maxDocs * multi).scoreDocs
+          }
         }
+        getIdScore(scoreDocs3, ngrams, analyzer, maxDocs, minNGrams2)
       }
-      getIdScore(scoreDocs3, ngrams, analyzer, maxDocs, minNGrams2)
     }
   }
 
