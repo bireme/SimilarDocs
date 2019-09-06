@@ -273,7 +273,7 @@ class SimDocsSearch(val sdIndexPath: String,
     * Get retrieved document's ids and scores filtering by number of common ngrams and then by update_date
     *
     * @param scoreDocs result of the Lucene search function
-    * @param ngrams a set of ngrams generated from the input sreach text
+    * @param ngrams a set of ngrams generated from the input search text
     * @param analyzer Lucene analyzer
     * @param maxDocs maximum number of returned documents
     * @param minNGrams minimum number of common ngrams retrieved to consider returning a document

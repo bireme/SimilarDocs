@@ -23,8 +23,8 @@ object Conf {
 
   val idxFldNames: Set[String] = Set("id", "ti",
                                      "ti_pt","ti_en","ti_es","ti_it","ti_fr","ti_de","ti_ru",
-                                     "ab",
-                                     "ab_pt","ab_en","ab_es","ab_it","ab_fr","ab_de","ab_ru",
+                                     /*"ab",
+                                     "ab_pt","ab_en","ab_es","ab_it","ab_fr","ab_de","ab_ru",*/
                                      "ti_eng","ab_french","decs", "db", "update_date")
 
   val indexedField: String = "_indexed_" // Unique field which contains all document and that will be indexed
