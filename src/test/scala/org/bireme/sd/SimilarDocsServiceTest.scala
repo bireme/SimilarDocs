@@ -244,9 +244,9 @@ class SimilarDocsServiceTest extends FlatSpec {
       map + (prof._1 -> doc.findAllMatchIn(content).size)
   }
 
-  /*"Renato" should "have at least 01 similar document" in {
+  "Renato" should "have at least 01 similar document" in {
     profTotal2.values.sum should be > 0
-  }*/
+  }
 
   profiles_Renato.foreach {
     prof =>
