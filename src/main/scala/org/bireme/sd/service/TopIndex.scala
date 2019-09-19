@@ -379,7 +379,8 @@ class TopIndex(simSearch: SimDocsSearch,
       val list: List[Map[String, List[String]]] = limitDocs(docIds, maxDocs, List()).
         foldLeft[List[Map[String, List[String]]]](List()) {
           case (lst, id) =>
-            val fields: Map[String, List[String]] = getDocFields(id, sdSearcher, outFlds)
+            val oFields: Set[String] = if (outFlds.isEmpty) Conf.idxFldNames else outFlds
+            val fields: Map[String, List[String]] = getDocFields(id, sdSearcher, oFields)
             if (fields.isEmpty) lst else {
               lastDays match {
                 case Some(ldays) =>

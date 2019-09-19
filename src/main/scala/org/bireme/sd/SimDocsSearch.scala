@@ -170,7 +170,7 @@ class SimDocsSearch(val sdIndexPath: String,
       // Retrieve documents from Min(500, lastDays2) days until today
       val scoreDocs: Array[ScoreDoc] = {
         val orQuery: Query = getQuery(text2, sources, instances, Some(daysAgoCal), Some(todayCal),
-                                      useDeCS = true, includeLowerDate = false)
+                                      useDeCS = true, includeLowerDate = (lastDays2 < 500))
         sdSearcher.search(orQuery, maxDocs * multi).scoreDocs
       }
       // Exclude documents present in excludeIds
@@ -178,10 +178,10 @@ class SimDocsSearch(val sdIndexPath: String,
         case Some(eids) => scoreDocs.filterNot(sd => eids.contains(sd.doc))
         case None => scoreDocs
       }
-      // Complete with remaining documents from Max(1000, lastDays2) until Min(500, lastDays2)
+
       if (lastDays2 < 500) {
         getIdScore(scoreDocs2, ngrams, analyzer, maxDocs, minNGrams2)
-      } else {
+      } else { // Complete with remaining documents from Max(1000, lastDays2) until Min(500, lastDays2)
         val daysAgoCal2: GregorianCalendar = todayCal.clone().asInstanceOf[GregorianCalendar]
         val scoreDocs3: Array[ScoreDoc] = {
           if (scoreDocs2.length >= maxDocs) scoreDocs2
