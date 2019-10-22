@@ -10,12 +10,16 @@ package org.bireme.sd
 import java.io.File
 import java.nio.file.Path
 import java.text.{DateFormat, SimpleDateFormat}
+import java.util.Date
 import java.util.regex.{Matcher, Pattern}
 
-import akka.actor.{Actor, ActorLogging, ActorSystem, PoisonPill, Props, Terminated}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, PoisonPill, Props, Terminated}
 import akka.event.Logging
 import akka.routing.{ActorRefRoutee, Broadcast, RoundRobinRoutingLogic, Router}
 import bruma.master._
+import org.apache.http.client.methods.{CloseableHttpResponse, HttpGet}
+import org.apache.http.impl.client.{CloseableHttpClient, HttpClients}
+import org.apache.http.util.EntityUtils
 import org.apache.lucene.analysis.Analyzer
 import org.apache.lucene.document.{Document, Field, StoredField, StringField, TextField}
 import org.apache.lucene.index._
@@ -30,6 +34,9 @@ import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
+
+// http://basalto02.bireme.br:8986/solr5/admin/cores?action=STATUS
+// grep -Po "(?<=lastModified\">[^<]+"
 
 case class Finishing()
 
@@ -76,6 +83,10 @@ class LuceneIndexMain(indexPath: String,
     lastModifiedDoc.clear()
   }
 
+  val excludeDays: Int = 2 // Number of days to remove from the last iahx update day
+  val excludeTime: Long = excludeDays * 24 * 60 * 60 * 1000  // excludeDays in miliseconds
+  val lastIahxModification: Long = getIahxModification.getOrElse(new Date().getTime - excludeTime)
+
   val routerIdx: Router = createActors()
   var activeIdx: Int = idxWorkers
 
@@ -89,13 +100,42 @@ class LuceneIndexMain(indexPath: String,
   // finishing Actors
   routerIdx.route(Broadcast(Finishing()), self)
 
+  /**
+    * Take the iahx index modification date and remove excludeDays from it
+    * @return the time to allow the inclusion of documents (only older than that time)
+    */
+  private def getIahxModification: Option[Long] = {
+    val iahx: String = "http://basalto02.bireme.br:8986/solr5/admin/cores?action=STATUS"
+    val regex: Regex = "(?<=lastModified\">)([^<]+)".r
+    val df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")   // 2019-10-06T19:09:52.79Z
+
+    Try {
+      val httpclient: CloseableHttpClient = HttpClients.createDefault()
+      val httpget: HttpGet = new HttpGet(iahx)
+      val response: CloseableHttpResponse = httpclient.execute(httpget)
+
+      response.getStatusLine.getStatusCode match {
+        case 200 => Option(EntityUtils.toString(response.getEntity)).flatMap {
+            line =>
+              regex.findFirstMatchIn(line).map {
+                mat => df.parse(mat.group(1)).getTime - excludeTime
+              }
+          }
+        case _ => None
+      }
+    }
+  } match {
+    case Success(value) => value
+    case Failure(_) => None
+  }
+
   private def createActors(): Router = {
     val decsMap: Map[Int, Set[String]] = if (decsDir.isEmpty) Map[Int,Set[String]]()
                                          else decx2Map(decsDir)
 
-    val routees = Vector.fill(idxWorkers) {
-      val r = context.actorOf(Props(classOf[LuceneIndexActor], indexWriter,
-        fldIdxNames, fldStrdNames, decsMap, lastModifiedDoc))
+    val routees: Vector[ActorRefRoutee] = Vector.fill(idxWorkers) {
+      val r: ActorRef = context.actorOf(Props(classOf[LuceneIndexActor], indexWriter,
+        fldIdxNames, fldStrdNames, decsMap, lastModifiedDoc, lastIahxModification))
       context watch r
       ActorRefRoutee(r)
     }
@@ -195,7 +235,8 @@ class LuceneIndexActor(indexWriter: IndexWriter,
                        fldIdxNames: Set[String],
                        fldStrdNames: Set[String],
                        decsMap: Map[Int,Set[String]],
-                       lastModifiedDoc: MVMap[String, Long]) extends Actor with ActorLogging {
+                       lastModifiedDoc: MVMap[String, Long],
+                       lastIahxModification: Long) extends Actor with ActorLogging {
   val regexp: Regex = """\^d\d+""".r
   val checkXml: CheckXml = new CheckXml()
   val fieldsIndexNames: Set[String] = if ((fldIdxNames == null) || fldIdxNames.isEmpty) Conf.idxFldNames
@@ -256,15 +297,17 @@ class LuceneIndexActor(indexWriter: IndexWriter,
                 upd =>
                   if (upd.nonEmpty) {
                     val updTimeNew: Long = formatter.parse(upd).getTime
-                    Option(lastModifiedDoc.get(sid)) match {
-                      case Some(mdate) =>
-                        if (updTimeNew > mdate) {
-                          indexWriter.updateDocument(new Term("id", sid), map2docExt(doc)) // update the document in the index
+                    if (updTimeNew <= lastIahxModification) {  // include if document is already present in the iahx index
+                      Option(lastModifiedDoc.get(sid)) match {
+                        case Some(mdate) =>
+                          if (updTimeNew > mdate) {
+                            indexWriter.updateDocument(new Term("id", sid), map2docExt(doc)) // update the document in the index
+                            lastModifiedDoc.put(sid, updTimeNew)
+                          }
+                        case None =>
+                          indexWriter.addDocument(map2docExt(doc)) // insert the document into the index
                           lastModifiedDoc.put(sid, updTimeNew)
-                        }
-                      case None =>
-                        indexWriter.addDocument(map2docExt(doc)) // insert the document into the index
-                        lastModifiedDoc.put(sid, updTimeNew)
+                      }
                     }
                   }
               }
@@ -384,9 +427,9 @@ object LuceneIndexAkka extends App {
   val encoding = parameters.getOrElse("encoding", "ISO-8859-1")
   val fullIndexing = parameters.contains("fullIndexing")
 
-  val system = ActorSystem("Main")
+  val system: ActorSystem = ActorSystem("Main")
   try {
-    val props = Props(classOf[LuceneIndexMain], indexPath, decsIndexPath, idIndexPath,
+    val props: Props = Props(classOf[LuceneIndexMain], indexPath, decsIndexPath, idIndexPath,
                       xmlDir, xmlFileFilter, fldIdxNames, fldStrdNames, decsDir, encoding,
                       fullIndexing)
     system.actorOf(props, "app")

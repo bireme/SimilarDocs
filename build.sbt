@@ -1,7 +1,7 @@
 lazy val commonSettings = Seq(
   organization := "br.bireme",
   version := "0.1.0",
-  scalaVersion := /* "2.13.0," */ "2.12.9",
+  scalaVersion := /*"2.13.1",*/ "2.12.9",  // casbah congelado
   scalacOptions ++= Seq(
     "-encoding", "utf8",
     "-deprecation",
@@ -26,9 +26,9 @@ lazy val SDService = (project in file("./SDService")).
 
 
 val luceneVersion = "7.5.0" //"8.0.0"
-val akkaVersion =  "2.5.23" //"2.5.21"
-val httpClientVersion = "4.5.9" //"4.5.7"
-val scalaTestVersion = "3.0.8" // "3.0.7"
+val akkaVersion =  "2.5.25" //"2.5.23"
+val httpClientVersion = "4.5.10" //"4.5.9"
+val scalaTestVersion = /*"3.2.0-M1"*/ "3.0.8"
 val casbahVersion = "3.1.1"
 val playVersion = "2.7.4" //"2.7.2"
 val hairyfotrVersion = "0.1.17"
