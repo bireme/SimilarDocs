@@ -41,7 +41,7 @@ class UpdaterService(topDocs: TopIndex) {
     print("Reseting all times ...")
     topDocs.resetAllTimes()
     print(" OK.\nUpdating all similar documents ...")
-    val result = updateAll()
+    val result: Boolean = updateAll()
     stopping = result
     println(" OK")
     result
@@ -75,13 +75,13 @@ object UpdaterService extends App {
   val decsIndex: String = parameters("decsIndex")
   val topIndex: String = parameters("topIndex")
 
-  val op = if (parameters.contains("start")) "start"
-           else if (parameters.contains("stop")) "stop"
-           else ""
+  val op: String = if (parameters.contains("start")) "start"
+                   else if (parameters.contains("stop")) "stop"
+                   else ""
 
-  val sim = new SimDocsSearch(sdIndex, decsIndex)
-  val top = new TopIndex(sim, topIndex)
-  val upds = new UpdaterService(top)
+  val sim: SimDocsSearch = new SimDocsSearch(sdIndex, decsIndex)
+  val top: TopIndex = new TopIndex(sim, topIndex)
+  val upds: UpdaterService = new UpdaterService(top)
 
   op match {
     case "start" => upds.start()

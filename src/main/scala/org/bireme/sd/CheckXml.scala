@@ -7,10 +7,10 @@
 
 package org.bireme.sd
 
-import javax.xml.parsers.SAXParserFactory
-import org.xml.sax.{ErrorHandler,InputSource,SAXParseException}
+import javax.xml.parsers.{SAXParser, SAXParserFactory}
+import org.xml.sax.{ErrorHandler, InputSource, SAXParseException, XMLReader}
 
-import scala.util.{Failure,Success,Try}
+import scala.util.{Failure, Success, Try}
 
 class SimpleErrorHandler extends ErrorHandler {
   var errMsg = ""
@@ -35,13 +35,13 @@ class CheckXml {
     require (xml != null)
 
     Try {
-      val factory = SAXParserFactory.newInstance()
+      val factory: SAXParserFactory = SAXParserFactory.newInstance()
       factory.setValidating(false)
       factory.setNamespaceAware(true)
 
-      val parser = factory.newSAXParser()
-      val reader = parser.getXMLReader
-      val handler = new SimpleErrorHandler()
+      val parser: SAXParser = factory.newSAXParser()
+      val reader: XMLReader = parser.getXMLReader
+      val handler: SimpleErrorHandler = new SimpleErrorHandler()
 
       reader.setErrorHandler(handler)
       reader.parse(new InputSource(xml))

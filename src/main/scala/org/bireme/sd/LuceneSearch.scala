@@ -8,7 +8,7 @@ import org.apache.lucene.search.{IndexSearcher, Query}
 import org.apache.lucene.store.FSDirectory
 import org.bireme.sd.service.Conf
 
-object LuceneSearch extends App{
+object LuceneSearch extends App {
   private def usage(): Unit = {
     System.err.println("usage: LuceneSearch <indexPath> <bool>")
     System.exit(1)

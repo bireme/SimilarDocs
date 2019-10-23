@@ -12,10 +12,9 @@ import java.io.File
 
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.queryparser.classic.MultiFieldQueryParser
-import org.apache.lucene.search.IndexSearcher
+import org.apache.lucene.search.{IndexSearcher, Query}
 import org.apache.lucene.store.FSDirectory
-
-import org.apache.lucene.analysis.{Analyzer,TokenStream}
+import org.apache.lucene.analysis.{Analyzer, TokenStream}
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 
 import scala.collection.immutable.TreeMap
@@ -47,13 +46,13 @@ object ShowUsedNGrams extends App {
            index: String,
            minSize: Int,
            maxSize: Int): Unit = {
-    val directory = FSDirectory.open(new File(index).toPath)
-    val reader = DirectoryReader.open(directory)
-    val searcher = new IndexSearcher(reader)
-    val analyzer = new NGramAnalyzer(minSize, maxSize)
-    val map1 = getIndexNGrams(similar, fields, searcher, analyzer)
-    val map2 = getNGrams(text, analyzer)
-    val map3 = getIndexNGrams(text, fields, searcher, analyzer)
+    val directory: FSDirectory = FSDirectory.open(new File(index).toPath)
+    val reader: DirectoryReader = DirectoryReader.open(directory)
+    val searcher: IndexSearcher = new IndexSearcher(reader)
+    val analyzer: NGramAnalyzer = new NGramAnalyzer(minSize, maxSize)
+    val map1: Map[String, Int] = getIndexNGrams(similar, fields, searcher, analyzer)
+    val map2: Map[String, Int] = getNGrams(text, analyzer)
+    val map3: Map[String, Int] = getIndexNGrams(text, fields, searcher, analyzer)
 
     // All ngrams of similar text that are in the fields of the index
     println(s"\n\n$similar")
@@ -112,11 +111,11 @@ object ShowUsedNGrams extends App {
     */
   private def getNGrams(text: String,
                         analyzer: Analyzer): Map[String,Int] = {
-    val tokenStream = analyzer.tokenStream(null, text)
-    val cattr = tokenStream.addAttribute(classOf[CharTermAttribute])
+    val tokenStream: TokenStream = analyzer.tokenStream(null, text)
+    val cattr: CharTermAttribute = tokenStream.addAttribute(classOf[CharTermAttribute])
 
     tokenStream.reset()
-    val map = getTokens(tokenStream, cattr, TreeMap[String,Int]())
+    val map: Map[String, Int] = getTokens(tokenStream, cattr, TreeMap[String,Int]())
 //println(s"\ntext=$text  map=$map\n")
     tokenStream.end()
     tokenStream.close()
@@ -137,8 +136,8 @@ object ShowUsedNGrams extends App {
                         cattr: CharTermAttribute,
                         auxMap: Map[String,Int]): Map[String,Int] = {
     if (tokenStream.incrementToken()) {
-      val tok = cattr.toString
-      val occ = auxMap.getOrElse(tok, 0)
+      val tok: String = cattr.toString
+      val occ: Int = auxMap.getOrElse(tok, 0)
       getTokens(tokenStream, cattr, auxMap + ((tok,occ+1)))
     } else auxMap
   }
@@ -157,11 +156,11 @@ object ShowUsedNGrams extends App {
                        fields: Set[String],
                        searcher: IndexSearcher,
                        analyzer: Analyzer): Boolean = {
-    val mqParser = new MultiFieldQueryParser(fields.toArray, analyzer)
+    val mqParser: MultiFieldQueryParser = new MultiFieldQueryParser(fields.toArray, analyzer)
 //println(s"tok=$tok")
     if (tok.contains("(") || tok.contains(")") || tok.contains(":")) false
     else {
-      val query =  mqParser.parse(tok)
+      val query: Query =  mqParser.parse(tok)
 
       // searcher.search(query, 1).totalHits.value > 0 Lucene 8.0.0
       searcher.search(query, 1).totalHits > 0

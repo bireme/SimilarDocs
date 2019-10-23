@@ -11,7 +11,7 @@ object Conf {
   val minSim = 0.5f
   //val minSim = 0.0000001f
 
-  val minNGrams = 2  // Minimum number of common ngrams retrieved to consider returning a document
+  val minNGrams: Int = 2  // Minimum number of common ngrams retrieved to consider returning a document
 
   val maxDocs: Int = 10 // Maximum number of documents to be pre-processed or retrieved
 

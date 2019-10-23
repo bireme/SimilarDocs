@@ -9,11 +9,11 @@
 package org.bireme.sd
 
 import java.io.File
-import java.util.{Calendar,GregorianCalendar,TimeZone}
+import java.util.{Calendar, GregorianCalendar, TimeZone}
 
-import org.apache.lucene.document.DateTools
+import org.apache.lucene.document.{DateTools, Document}
 import org.apache.lucene.index.DirectoryReader
-import org.apache.lucene.search.{IndexSearcher,TermRangeQuery}
+import org.apache.lucene.search.{IndexSearcher, TermRangeQuery}
 import org.apache.lucene.store.FSDirectory
 
 import scala.collection.JavaConverters._
@@ -51,25 +51,25 @@ object ShowNewDocIds extends App {
     require (days > 0)
     require (maxDocs > 0)
 
-    val directory = FSDirectory.open(new File(indexName).toPath)
-    val reader = DirectoryReader.open(directory)
-    val searcher = new IndexSearcher(reader)
+    val directory: FSDirectory = FSDirectory.open(new File(indexName).toPath)
+    val reader: DirectoryReader = DirectoryReader.open(directory)
+    val searcher: IndexSearcher = new IndexSearcher(reader)
 
-    val nowCal = new GregorianCalendar(TimeZone.getDefault)
-    val today = DateTools.dateToString(DateTools.round(
+    val nowCal: GregorianCalendar = new GregorianCalendar(TimeZone.getDefault)
+    val today: String = DateTools.dateToString(DateTools.round(
       nowCal.getTime, DateTools.Resolution.DAY), DateTools.Resolution.DAY)
-    val daysAgoCal = nowCal.clone().asInstanceOf[GregorianCalendar]
+    val daysAgoCal: GregorianCalendar = nowCal.clone().asInstanceOf[GregorianCalendar]
     daysAgoCal.add(Calendar.DAY_OF_MONTH, -days)  // begin of x days ago
-    val daysAgo = DateTools.dateToString(daysAgoCal.getTime,
+    val daysAgo: String = DateTools.dateToString(daysAgoCal.getTime,
                                          DateTools.Resolution.DAY)
-    val query = TermRangeQuery.newStringRange("entrance_date", daysAgo,
+    val query: TermRangeQuery = TermRangeQuery.newStringRange("entrance_date", daysAgo,
                                               today, true, true)
-    val ids = searcher.search(query, maxDocs).scoreDocs.
+    val ids: Seq[(String, String)] = searcher.search(query, maxDocs).scoreDocs.
                                          foldLeft[Seq[(String,String)]](Seq()) {
       case (seq,sd) =>
-        val doc = reader.document(sd.doc, Set("id", "entrance_date").asJava)
-        val id = doc.get("id")
-        val entrance_date = doc.get("entrance_date")
+        val doc: Document = reader.document(sd.doc, Set("id", "entrance_date").asJava)
+        val id: String = doc.get("id")
+        val entrance_date: String = doc.get("entrance_date")
         if (id == null) seq else seq :+ ((id, entrance_date))
     }
     reader.close()

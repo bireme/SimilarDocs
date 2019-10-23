@@ -101,8 +101,8 @@ class LuceneIndexMain(indexPath: String,
   routerIdx.route(Broadcast(Finishing()), self)
 
   /**
-    * Take the iahx index modification date and remove excludeDays from it
-    * @return the time to allow the inclusion of documents (only older than that time)
+    *
+    * @return the iahx index document modification date in miliseconds
     */
   private def getIahxModification: Option[Long] = {
     val iahx: String = "http://basalto02.bireme.br:8986/solr5/admin/cores?action=STATUS"

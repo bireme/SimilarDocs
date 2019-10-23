@@ -42,7 +42,7 @@ object UpdaterBatchService extends App {
 
   def update(sdSearcher: SimDocsSearch,
              topIndexPath: String): Unit = {
-    val topIndex = new TopIndex(sdSearcher, topIndexPath)
+    val topIndex: TopIndex = new TopIndex(sdSearcher, topIndexPath)
 
     topIndex.updateSimilarDocs(Conf.maxDocs, Conf.sources, Conf.instances)
 

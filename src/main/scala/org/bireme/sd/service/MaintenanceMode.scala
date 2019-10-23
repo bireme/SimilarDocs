@@ -10,8 +10,8 @@ package org.bireme.sd.service
 
 import java.util.concurrent.TimeUnit
 
-import org.apache.http.client.methods.HttpGet
-import org.apache.http.impl.client.HttpClientBuilder
+import org.apache.http.client.methods.{CloseableHttpResponse, HttpGet}
+import org.apache.http.impl.client.{CloseableHttpClient, HttpClientBuilder}
 import org.apache.http.util.EntityUtils
 
 /** Application to set or reset the SDService maintenance mode flag
@@ -39,13 +39,13 @@ object MaintenanceMode extends App {
   val url1 = args(0).trim
   val url2 = if (url1.endsWith("/")) url1.substring(0,url1.lastIndexOf('/'))
              else url1
-  val url = s"$url2?maintenance=$mode"
-  val get = new HttpGet(url)
+  val url: String = s"$url2?maintenance=$mode"
+  val get: HttpGet = new HttpGet(url)
   get.setHeader("Content-type", "text/plain;charset=utf-8")
 
-  val httpClient = HttpClientBuilder.create().setConnectionTimeToLive(1, TimeUnit.HOURS).build()
-  val response = httpClient.execute(get)
-  val statusCode = response.getStatusLine.getStatusCode
+  val httpClient: CloseableHttpClient = HttpClientBuilder.create().setConnectionTimeToLive(1, TimeUnit.HOURS).build()
+  val response: CloseableHttpResponse = httpClient.execute(get)
+  val statusCode: Int = response.getStatusLine.getStatusCode
   if (statusCode == 200) {
     val result = EntityUtils.toString(response.getEntity)
 

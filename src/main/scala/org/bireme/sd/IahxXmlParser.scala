@@ -26,10 +26,10 @@ object IahxXmlParser {
   def getElements(xmlFile: String,
                   encoding: String,
                   fldNames: Set[String]): Stream[mutable.Map[String,List[String]]] = {
-    val map = mutable.Map.empty[String,List[String]]
+    val map: mutable.Map[String, List[String]] = mutable.Map.empty
 
-    val source = Source.fromFile(xmlFile, encoding)
-    val lines = source.getLines()
+    val source: BufferedSource = Source.fromFile(xmlFile, encoding)
+    val lines: Iterator[String] = source.getLines()
 
     val (source2,lines2) = getDocEncoding(lines) match {
       case Some(enc) =>
@@ -78,7 +78,7 @@ object IahxXmlParser {
   @scala.annotation.tailrec
   private def getDocEncoding(lines: Iterator[String]): Option[String] = {
     if (lines.hasNext) {
-      val line = lines.next().trim()
+      val line: String = lines.next().trim()
       if (line.startsWith("<?xml "))
         """encoding="([^"]+)""".r.findFirstMatchIn(line).map(_.group(1))
       else if (line.startsWith("<add>")) None
@@ -89,7 +89,7 @@ object IahxXmlParser {
   @scala.annotation.tailrec
   private def gotoOpenDocTag(lines: Iterator[String]): Boolean = {
     if (lines.hasNext) {
-      val line = lines.next().trim()
+      val line: String = lines.next().trim()
       if (line.startsWith("<doc")) true
       else if (line.startsWith("</add>")) false
       else gotoOpenDocTag(lines)
@@ -102,8 +102,8 @@ object IahxXmlParser {
                         lines: Iterator[String]): mutable.Map[String,List[String]] = {
     getField(fldNames, lines) match {
       case Some((name,content)) =>
-        val map = if (name == null) auxMap else {
-          val lst = auxMap.getOrElse(name, List()) :+ content
+        val map: mutable.Map[String, List[String]] = if (name == null) auxMap else {
+          val lst: List[String] = auxMap.getOrElse(name, List()) :+ content
           auxMap.put(name, lst)
           auxMap
         }
@@ -145,7 +145,7 @@ object IahxXmlParser {
     if (!lines.hasNext)
       throw new IOException("<field> or </doc> element expected")
 
-    val line = lines.next()
+    val line: String = lines.next()
     if (line.contains("<field")) Some(line)
     else if (line.contains("</doc>")) None
     else getOpenFieldElem(lines)
@@ -164,7 +164,7 @@ object IahxXmlParser {
   private def getUntilCloseFldElem(aux: String,
                                    lines: Iterator[String]): String = {
     if (lines.hasNext) {  // new lines are eliminated
-      val line = lines.next()
+      val line: String = lines.next()
       if (line.contains("</field>")) aux + " " + line
       else getUntilCloseFldElem(aux + " " + line, lines)
     } else throw new IOException("</field> element expected")
@@ -193,21 +193,21 @@ object IahxXmlParser {
     * @return name and content of a xml element 'field'
     */
   private def parseField1(str: String): (String, String) = {
-    val openPos = str.indexOf("<field name=\"")
+    val openPos: Int = str.indexOf("<field name=\"")
     if (openPos == -1) throw new IOException(s"parseField [$str]")
 
-    val endQuotPos = str.indexOf("\"", openPos + 13)
+    val endQuotPos: Int = str.indexOf("\"", openPos + 13)
     if (endQuotPos == -1) throw new IOException(s"parseField [$str]")
 
-    val closePos = str.indexOf(">", endQuotPos + 1)
+    val closePos: Int = str.indexOf(">", endQuotPos + 1)
     if (closePos == -1) throw new IOException(s"parseField [$str]")
 
-    val tag = str.substring(openPos + 13, endQuotPos)
+    val tag: String = str.substring(openPos + 13, endQuotPos)
 
     if (str.charAt(closePos - 1) == '/')  // <tag/>
       (tag, "")
     else {                                // <tag>  </tag>
-      val closeTagPos = str.indexOf("</field>", closePos + 1)
+      val closeTagPos: Int = str.indexOf("</field>", closePos + 1)
       if (closeTagPos == -1) throw new IOException(s"parseField [$str]")
 
       (tag, str.substring(closePos + 1, closeTagPos))

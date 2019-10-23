@@ -30,8 +30,8 @@ object ShowTotalHits extends App {
 
   private def showTotalHits(index: String): Unit = {
     Try {
-      val directory = FSDirectory.open(new File(index).toPath)
-      val ireader = DirectoryReader.open(directory)
+      val directory: FSDirectory = FSDirectory.open(new File(index).toPath)
+      val ireader: DirectoryReader = DirectoryReader.open(directory)
 
       countTerms(ireader) match {
         case Right(map) => map.foreach(kv => println(s"[${kv._1}]: ${kv._2}"))

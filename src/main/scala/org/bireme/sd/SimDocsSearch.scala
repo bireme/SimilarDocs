@@ -121,7 +121,7 @@ class SimDocsSearch(val sdIndexPath: String,
                else outFields
 
     searchIds(text, sources, instances, maxDocs, minNGrams, lastDays).map {
-      case (id,score) => (score, loadDoc(id, oFields))
+      case (id, _, score) => (score, loadDoc(id, oFields))
     }
   }
 
@@ -135,7 +135,7 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
     * @param lastDays filter documents whose 'update_date' is younger or equal to lastDays days
     * @param excludeIds a set of document identifiers to exclude from output list
-    * @return a list of pairs with Lucene document id and document score
+    * @return a list of tuples of (Lucene document id, original document id and document score)
     */
   def searchIds(text: String,
                 sources: Option[Set[String]],
@@ -143,13 +143,13 @@ class SimDocsSearch(val sdIndexPath: String,
                 maxDocs: Int,
                 minNGrams: Int,
                 lastDays: Option[Int],
-                excludeIds: Option[Set[Int]] = None): List[(Int,Float)] = {
+                excludeIds: Option[Set[Int]] = None): List[(Int, String, Float)] = {
     require ((text != null) && text.nonEmpty)
     require (maxDocs > 0)
     require (minNGrams > 0)
 
     val text2: String = uniformText(text).mkString(" ")
-    if (text2.isEmpty) List[(Int,Float)]()
+    if (text2.isEmpty) List[(Int, String, Float)]()
     else {
       val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
       val ngrams: Set[String] = getNGrams(text2, analyzer, maxWords)
@@ -170,7 +170,7 @@ class SimDocsSearch(val sdIndexPath: String,
       // Retrieve documents from Min(500, lastDays2) days until today
       val scoreDocs: Array[ScoreDoc] = {
         val orQuery: Query = getQuery(text2, sources, instances, Some(daysAgoCal), Some(todayCal),
-                                      useDeCS = true, includeLowerDate = (lastDays2 < 500))
+                                      useDeCS = true, includeLowerDate = lastDays2 < 500)
         sdSearcher.search(orQuery, maxDocs * multi).scoreDocs
       }
       // Exclude documents present in excludeIds
@@ -180,7 +180,11 @@ class SimDocsSearch(val sdIndexPath: String,
       }
 
       if (lastDays2 < 500) {
-        getIdScore(scoreDocs2, ngrams, analyzer, maxDocs, minNGrams2)
+        getIdScore(scoreDocs2, ngrams, analyzer, maxDocs, minNGrams2).map {
+          case (lid, score) =>
+            val docId: String = Option(sdSearcher.doc(lid, Set("id").asJava).get("id")).getOrElse("")
+            (lid, docId, score)
+        }
       } else { // Complete with remaining documents from Max(1000, lastDays2) until Min(500, lastDays2)
         val daysAgoCal2: GregorianCalendar = todayCal.clone().asInstanceOf[GregorianCalendar]
         val scoreDocs3: Array[ScoreDoc] = {
@@ -193,7 +197,11 @@ class SimDocsSearch(val sdIndexPath: String,
             scoreDocs2 ++ sdSearcher.search(orQuery, maxDocs * multi).scoreDocs
           }
         }
-        getIdScore(scoreDocs3, ngrams, analyzer, maxDocs, minNGrams2)
+        getIdScore(scoreDocs3, ngrams, analyzer, maxDocs, minNGrams2).map {
+          case (lid, score) =>
+            val docId: String = Option(sdSearcher.doc(lid, Set("id").asJava).get("id")).getOrElse("")
+            (lid, docId, score)
+        }
       }
     }
   }

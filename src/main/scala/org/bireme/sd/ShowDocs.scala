@@ -9,8 +9,11 @@
 package org.bireme.sd
 
 import java.io.File
-import org.apache.lucene.index.{DirectoryReader,IndexReader}
+
+import org.apache.lucene.document.Document
+import org.apache.lucene.index.{DirectoryReader, IndexReader}
 import org.apache.lucene.store.FSDirectory
+
 import scala.collection.JavaConverters._
 
 /** Show a Lucene index document
@@ -38,8 +41,8 @@ object ShowDocs extends App {
     */
   def showDocument(indexName: String,
                    docNum: String): Unit = {
-    val directory = FSDirectory.open(new File(indexName).toPath)
-    val ireader = DirectoryReader.open(directory)
+    val directory: FSDirectory = FSDirectory.open(new File(indexName).toPath)
+    val ireader: DirectoryReader = DirectoryReader.open(directory)
 
     if (docNum.isEmpty) (0 until ireader.numDocs()).foreach(showDoc(ireader, _))
     else showDoc(ireader, docNum.toInt)
@@ -56,7 +59,7 @@ object ShowDocs extends App {
     */
   private def showDoc(ireader: IndexReader,
                       docNum: Int): Unit = {
-    val doc = ireader.document(docNum)
+    val doc: Document = ireader.document(docNum)
 
     println("----------------------------------------------------------")
     doc.getFields().asScala.foreach(field =>

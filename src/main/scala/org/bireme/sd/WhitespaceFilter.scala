@@ -20,8 +20,8 @@ import scala.collection.mutable
   * @param input the input token stream
 */
 class WhitespaceFilter(input: TokenStream) extends TokenFilter(input) {
-  private val termAtt = addAttribute(classOf[CharTermAttribute])
-  private val queue = new mutable.Queue[String]()
+  private val termAtt: CharTermAttribute = addAttribute(classOf[CharTermAttribute])
+  private val queue: mutable.Queue[String] = new mutable.Queue[String]()
 
   /**
     * Cleans all internal buffers

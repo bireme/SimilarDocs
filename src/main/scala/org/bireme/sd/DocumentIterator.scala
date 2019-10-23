@@ -26,7 +26,7 @@ import scala.util.{Failure, Success, Try}
 class DocumentIterator(ireader: IndexReader,
                        fieldsToLoad: Option[Set[String]]) extends Iterator[Document] {
   val query: Query = new MatchAllDocsQuery()
-  val isearcher = new IndexSearcher(ireader)
+  val isearcher: IndexSearcher = new IndexSearcher(ireader)
   var scoreDocs: List[ScoreDoc] = fillDocuments(None)
 
   override def hasNext: Boolean = {

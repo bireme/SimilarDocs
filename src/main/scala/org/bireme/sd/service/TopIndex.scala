@@ -54,10 +54,8 @@ class TopIndex(simSearch: SimDocsSearch,
 
   val lcAnalyzer: LowerCaseAnalyzer = new LowerCaseAnalyzer(true)
   val topDirectory: FSDirectory = FSDirectory.open(Paths.get(topIndexPath))
-  val topWriter: IndexWriter =  new IndexWriter(topDirectory,
-                                   new IndexWriterConfig(lcAnalyzer).
-                                  setOpenMode(IndexWriterConfig.OpenMode.
-                                                              CREATE_OR_APPEND))
+  val topWriter: IndexWriter =  new IndexWriter(topDirectory, new IndexWriterConfig(lcAnalyzer).
+                                  setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND))
   topWriter.commit()
 
   var finishing: Boolean = false  // Flag to stop asynchronous update
@@ -227,8 +225,13 @@ class TopIndex(simSearch: SimDocsSearch,
         val ids: String = kv._2._3.foldLeft("") {
           case (str, id) => s"$str<lucene_id>$id</lucene_id>"
         }
+        val dateLong: Long = kv._2._2.toLong
+        val updateDate: String = if (dateLong > 0) {
+          formatter.format(new Date(dateLong))
+        } else "not processed"
+
         s"$str<profile><name>${kv._1}</name><content>${kv._2._1}</content><update_date>" +
-        s"${kv._2._2}</update_date>$ids</profile>"
+        s"$updateDate</update_date>$ids</profile>"
     } + "</profiles>"
   }
 
