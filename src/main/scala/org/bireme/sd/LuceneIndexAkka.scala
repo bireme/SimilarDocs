@@ -66,22 +66,12 @@ class LuceneIndexMain(indexPath: String,
 
   val modFile = new File(modifiedIndexPath)
   if (!modFile.exists()) modFile.mkdirs()
-  if (fullIndexing) {
-    new File(modFile, "fileLastModified.db").delete()
-    new File(modFile, "docLastModified.db").delete()
-  }
+  if (fullIndexing) new File(modFile, "docLastModified.db").delete()
 
-  val fileLastModified: MVStore = new MVStore.Builder().fileName(s"$modifiedIndexPath/fileLastModified.db")
-    .compress().open()
   val docLastModified: MVStore = new MVStore.Builder().fileName(s"$modifiedIndexPath/docLastModified.db")
     .compress().open()
-
-  val lastModifiedFile: MVMap[String, Long] = fileLastModified.openMap("modFile")
   val lastModifiedDoc: MVMap[String, Long] = docLastModified.openMap("modDoc")
-  if (fullIndexing) {
-    lastModifiedFile.clear()
-    lastModifiedDoc.clear()
-  }
+  if (fullIndexing) lastModifiedDoc.clear()
 
   val excludeDays: Int = 2 // Number of days to remove from the last iahx update day
   val excludeTime: Long = excludeDays * 24 * 60 * 60 * 1000  // excludeDays in miliseconds
@@ -149,21 +139,8 @@ class LuceneIndexMain(indexPath: String,
     new File(xmlDir).listFiles().sorted.foreach {
       file =>
         if (file.isFile) {
-          val fname = file.getName
-          matcher.reset(fname)
-          if (matcher.matches) {
-            val fileLastModified: Long = file.lastModified()
-            Option(lastModifiedFile.get(fname)) match {
-              case Some(modified: Long) =>
-                if (fileLastModified > modified) {
-                  indexFile(file.getPath, encoding)
-                  lastModifiedFile.put(fname, fileLastModified)
-                }
-              case _ =>
-                indexFile(file.getPath, encoding)
-                lastModifiedFile.put(fname, fileLastModified)
-            }
-          }
+          matcher.reset(file.getName)
+          if (matcher.matches) indexFile(file.getPath, encoding)
         }
     }
   }
@@ -174,7 +151,6 @@ class LuceneIndexMain(indexPath: String,
     indexWriter.close()
     directory.close()
     log.info("Optimizing index 'sdIndex - end'")
-    fileLastModified.close()
     docLastModified.close()
     context.system.terminate()
   }
