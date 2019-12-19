@@ -15,7 +15,7 @@ object Conf {
 
   val maxDocs: Int = 10 // Maximum number of documents to be pre-processed or retrieved
 
-  val lastDays: Option[Int] = Some(7)  // Update only docs that are younger (entrance_date flag) than 'lastDays' days"
+  val lastDays: Option[Int] = Some(40)  // Update only docs that are younger (entrance_date flag) than 'lastDays' days"
 
   val sources: Option[Set[String]] = Some(Set("MEDLINE", "LILACS", "LIS", "colecionaSUS")) // Update only docs whose field 'db' belongs to sources"
 

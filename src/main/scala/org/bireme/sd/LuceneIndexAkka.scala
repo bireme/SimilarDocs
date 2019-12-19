@@ -73,7 +73,7 @@ class LuceneIndexMain(indexPath: String,
   val lastModifiedDoc: MVMap[String, Long] = docLastModified.openMap("modDoc")
   if (fullIndexing) lastModifiedDoc.clear()
 
-  val excludeDays: Int = 2 // Number of days to remove from the last iahx update day
+  val excludeDays: Int = 20 // Number of days to remove from the last iahx update day
   val excludeTime: Long = excludeDays * 24 * 60 * 60 * 1000  // excludeDays in miliseconds
   val lastIahxModification: Long = getIahxModification.getOrElse(new Date().getTime - excludeTime)
 
