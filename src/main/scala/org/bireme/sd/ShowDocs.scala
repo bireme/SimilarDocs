@@ -11,10 +11,12 @@ package org.bireme.sd
 import java.io.File
 
 import org.apache.lucene.document.Document
-import org.apache.lucene.index.{DirectoryReader, IndexReader}
+import org.apache.lucene.index.{DirectoryReader, IndexReader, MultiBits}
 import org.apache.lucene.store.FSDirectory
+import org.apache.lucene.util.Bits
 
-import scala.collection.JavaConverters._
+//import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /** Show a Lucene index document
   *
@@ -43,9 +45,11 @@ object ShowDocs extends App {
                    docNum: String): Unit = {
     val directory: FSDirectory = FSDirectory.open(new File(indexName).toPath)
     val ireader: DirectoryReader = DirectoryReader.open(directory)
+    //val liveDocs: Bits = MultiFields.getLiveDocs(ireader) // Lucene version before 8.0.0
+    val liveDocs: Bits = MultiBits.getLiveDocs(ireader) // Lucene version 8.0.0
 
-    if (docNum.isEmpty) (0 until ireader.numDocs()).foreach(showDoc(ireader, _))
-    else showDoc(ireader, docNum.toInt)
+    if (docNum.isEmpty) (0 until ireader.numDocs()).foreach(showDoc(ireader, _, liveDocs))
+    else showDoc(ireader, docNum.toInt, liveDocs)
 
     ireader.close()
     directory.close()
@@ -58,13 +62,13 @@ object ShowDocs extends App {
     * @param docNum Lucene document number
     */
   private def showDoc(ireader: IndexReader,
-                      docNum: Int): Unit = {
+                      docNum: Int,
+                      liveDocs: Bits): Unit = {
     val doc: Document = ireader.document(docNum)
+    val active: Boolean = (liveDocs == null) || liveDocs.get(docNum)
+    val header: String = if (active) s" id=$docNum " else s" id=$docNum  [DELETED] "
 
-    println("----------------------------------------------------------")
-    doc.getFields().asScala.foreach(field =>
-      println(s"[${field.name}]=${field.stringValue()}"))
-    //println(doc)
-    println("----------------------------------------------------------")
+    println(s"\n---------$header-------------------------------------")
+    doc.getFields().asScala.foreach(field => println(s"[${field.name}]=${field.stringValue()}"))
   }
 }

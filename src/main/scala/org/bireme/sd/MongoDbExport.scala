@@ -8,17 +8,14 @@
 
 package org.bireme.sd
 
-import com.mongodb.ServerAddress
-import com.mongodb.casbah.commons.MongoDBObject
-import com.mongodb.casbah.Imports._
-import com.mongodb.casbah.MongoClientOptions
-
 import java.io.File
-import java.nio.file.{Files,Paths}
+import java.nio.file.{Files, Paths}
 import java.nio.charset.Charset
 import java.text.SimpleDateFormat
-import java.util.{Calendar,Date,GregorianCalendar,TimeZone}
+import java.util.{Calendar, Date, GregorianCalendar, TimeZone}
 
+import org.mongodb.scala.{FindObservable, MongoClient, MongoCollection, MongoDatabase}
+import org.mongodb.scala.bson.collection.immutable.Document
 import play.api.libs.json._
 
 /** Export all documents from a MongoDb collection to a file
@@ -45,25 +42,26 @@ class MongoDbExport(host: String,
     */
   def exportDocuments(dataBase: String,
                       collection: String,
-                      beginDate: Date,
-                      endDate: Date,
+                      beginDate: Option[Date],
+                      endDate: Option[Date],
                       outFile: String,
                       prettyPrint: Boolean = false): Unit = {
     require(dataBase != null)
     require(collection != null)
     require(outFile != null)
 
-    val options = MongoClientOptions(connectTimeout = 60000)
-    //val mongoClient = MongoClient(host, port)
-    val mongoClient = MongoClient(new ServerAddress(host, port), options)
-    val dbase = mongoClient(dataBase)
-    val coll = dbase(collection)
-    val docs = if (beginDate == null) coll.find() else {
-//println(s"beginDate=$beginDate endDate=$endDate")
-      val between = MongoDBObject("$gte" -> beginDate, "$lt" -> endDate)
-      val query = MongoDBObject("timestamp" -> between)
-      coll.find(query)
+    val mongoClient: MongoClient = MongoClient(s"mongodb://$host:$port")
+    val dbase: MongoDatabase = mongoClient.getDatabase(dataBase)
+    val coll: MongoCollection[Document] = dbase.getCollection(collection)
+    val docs: FindObservable[Document] = beginDate match {
+      case Some(begDate) =>
+        val timestamp: Document = if (endDate.isDefined) Document("$gte" -> begDate, "$lt" -> endDate.get)
+                        else Document("$gte" -> begDate)
+        val query: Document = Document("timestamp" -> timestamp)
+        coll.find(query)
+      case None => coll.find()
     }
+
     val writer = Files.newBufferedWriter(Paths.get(outFile),
                                          Charset.forName("utf-8"))
     var first = true
@@ -142,7 +140,7 @@ object MongoDbExport extends App {
   val outFile = new File(outFileDir, outFileName).getPath
 
   if (exportAll)
-    mongoExp.exportDocuments(dbase, coll, null, null, outFile, prettyPrint)
+    mongoExp.exportDocuments(dbase, coll, None, None, outFile, prettyPrint)
   else
-    mongoExp.exportDocuments(dbase, coll, yesterday, today, outFile, prettyPrint)
+    mongoExp.exportDocuments(dbase, coll, Some(yesterday), Some(today), outFile, prettyPrint)
 }

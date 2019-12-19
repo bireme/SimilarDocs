@@ -8,7 +8,7 @@
 
 package org.bireme.sd.service
 
-import org.bireme.sd.SimDocsSearch
+import org.bireme.sd.{SimDocsSearch, Tools}
 
 /**
   * Application to test the same services offered by the associated web services
@@ -60,8 +60,10 @@ object TopIndexTestService extends App {
     case None => delProfile match {
       case Some(profId) => topIndex.deleteProfile(psId,profId)
       case None => getSimDocs match {
-        case Some(fields) => println(topIndex.getSimDocsXml(psId,
-                        fields.trim().split(" *, *").toSet, Set(), Conf.maxDocs, Conf.lastDays, Conf.sources))
+        case Some(fields) =>
+          val beginDate: Option[Long] = Some(Tools.getIahxModificationTime - Tools.daysToTime(Conf.excludeDays + Conf.numDays))
+          println(topIndex.getSimDocsXml(psId,
+                        fields.trim().split(" *, *").toSet, Set(), Conf.maxDocs, beginDate, Conf.sources))
         case None => if (showProfiles) println(topIndex.getProfilesXml(psId))
                      else if (cleanSimDocs) topIndex.resetAllTimes()
                      else usage()

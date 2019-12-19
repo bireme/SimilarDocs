@@ -31,6 +31,7 @@ class UniformFilter(input: TokenStream) extends TokenFilter(input) {
   override def reset(): Unit = {
     super.reset()
     termAtt.setEmpty()
+    ()
   }
 
   /**

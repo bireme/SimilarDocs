@@ -234,15 +234,21 @@ public class SDService extends HttpServlet {
                     final String outFields = request.getParameter("outFields");
                     final String[] oFields = (outFields == null)
                                     ? new String[0]: outFields.split(" *\\, *");
-                    final Option<Object> lastDays = 
-                            (request.getParameter("considerDate") != null)
-                            ? Conf.lastDays() : scala.Option.apply(null);
+                    Option<Object> beginDate;
+                    if (request.getParameter("considerDate") == null) {
+                        beginDate = scala.Option.apply(null);
+                    } else {
+                        final long beginTime = org.bireme.sd.Tools.getIahxModificationTime() - 
+                               org.bireme.sd.Tools.daysToTime(Conf.excludeDays() + Conf.numDays());
+                        beginDate = scala.Some.apply(beginTime);
+                    }                            
                     Set<String> fields = new HashSet<>();
                     for (String fld: oFields) {
                         fields.add(fld);
                     }
+                    
                     out.println(topIndex.getSimDocsXml(psId, profiles.toSet(),
-                        fields.toSet(), Conf.maxDocs(), lastDays, 
+                        fields.toSet(), Conf.maxDocs(), beginDate, 
                         Conf.sources(), Conf.instances()));
                 }
                 return;

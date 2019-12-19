@@ -5,22 +5,25 @@
 
   ==========================================================================*/
 
-
 package org.bireme.sd
 
 import java.io.File
+import java.nio.file.Path
 import java.text.{DateFormat, SimpleDateFormat}
+import java.time.temporal.ChronoUnit
 import java.util.{Calendar, Date, GregorianCalendar, TimeZone}
 
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import org.apache.lucene.analysis.{Analyzer, TokenStream}
-import org.apache.lucene.index.{DirectoryReader, IndexableField, Term}
+import org.apache.lucene.index.{DirectoryReader, Term}
 import org.apache.lucene.queryparser.classic.QueryParser
 import org.apache.lucene.search._
 import org.apache.lucene.store.FSDirectory
+import org.bireme.dh.CharSeq
 import org.bireme.sd.service.Conf
 
-import scala.collection.JavaConverters._
+//import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /** Class that looks for similar documents of given ones
   *
@@ -34,9 +37,13 @@ class SimDocsSearch(val sdIndexPath: String,
 
   val maxWords: Int = 100 /*20*/   // limit the max number of words to be used as input text
 
-  val decsDirectory: FSDirectory = FSDirectory.open(new File(decsIndexPath).toPath)
+  val decsPath: Path = new File(decsIndexPath).toPath
+  val decsDirectory: FSDirectory = FSDirectory.open(decsPath)
   val decsReader: DirectoryReader = DirectoryReader.open(decsDirectory)
   val decsSearcher: IndexSearcher = new IndexSearcher(decsReader)
+  val decsDescriptors: Map[Char, CharSeq] = OneWordDecs.getDescriptors(decsPath.toString)
+
+  val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
 
   val sdDirectory: FSDirectory = FSDirectory.open(new File(sdIndexPath).toPath)
   val sdReader: DirectoryReader = DirectoryReader.open(sdDirectory)
@@ -49,6 +56,7 @@ class SimDocsSearch(val sdIndexPath: String,
   val todayCal: GregorianCalendar = new GregorianCalendar(year, month, day, 0, 0) // begin of today
   val formatter: DateFormat = new SimpleDateFormat("yyyyMMdd")
   val today: String = formatter.format(todayCal.getTime)
+  val endDayAgo: Int = Tools.timeToDays(todayCal.getTimeInMillis - Tools.getIahxModificationTime) + Conf.excludeDays
 
   def close(): Unit = {
     decsReader.close()
@@ -82,13 +90,14 @@ class SimDocsSearch(val sdIndexPath: String,
     val srcs: Option[Set[String]] = if ((sources == null) || sources.isEmpty) None else Some(sources)
     val insts: Option[Set[String]] = if ((instances == null) || instances.isEmpty) None else Some(instances)
 
-    val docs: List[(Float, Map[String, List[String]])] =
+    val docs: List[(Int, Map[String, List[String]], Float, Set[String])] =
       search(text, outFields, maxDocs, service.Conf.minNGrams, srcs, insts, days)
     val docs2: List[(Float, Map[String, List[String]], Option[(List[String], List[String], List[String])])] =
       docs.map {
         doc =>
-          val ngrams = if (explain) Some(getCommonNGrams(text, doc._2)) else None
-          (doc._1, doc._2, ngrams)
+          val ngrams: Option[(List[String], List[String], List[String])] =
+            if (explain) Some(getCommonNGrams(text, doc._2)) else None
+          (doc._3, doc._2, ngrams)
       }
     doc2xml(docs2)
   }
@@ -112,98 +121,218 @@ class SimDocsSearch(val sdIndexPath: String,
              minNGrams: Int,
              sources: Option[Set[String]],
              instances: Option[Set[String]],
-             lastDays: Option[Int]): List[(Float,Map[String,List[String]])] = {
+             lastDays: Option[Int]): List[(Int, Map[String, List[String]], Float, Set[String])] = {
     require((text != null) && text.nonEmpty)
     require(maxDocs > 0)
     require(minNGrams > 0)
 
-    val oFields: Set[String] = if ((outFields == null) || outFields.isEmpty) Conf.idxFldNames + "id"
-               else outFields
-
-    searchIds(text, sources, instances, maxDocs, minNGrams, lastDays).map {
-      case (id, _, score) => (score, loadDoc(id, oFields))
+    val text2: String = uniformText(text).mkString(" ").trim
+    if (text2.isEmpty) List[(Int, Map[String, List[String]], Float, Set[String])]()
+    else {
+      val oFields: Set[String] = if ((outFields == null) || outFields.isEmpty) Conf.idxFldNames + "id" + "update_date"
+                                 else outFields
+      getDocuments(text2, sources, instances, lastDays, maxDocs, minNGrams, oFields).toList
     }
   }
 
   /**
-    * Searches for documents having a string in some fields
-    *
-    * @param text the text to be searched
-    * @param sources filter the valid values of the document field 'db'
-    * @param instances filter the valid values of the document field 'instance'
+    * Search a text and return an array of retrieved document info
+    * @param text input text to be searched
+    * @param sources set of sources to be used in the query expression
+    * @param instances set of instances to be used in the query expression
+    * @param daysAgo filter documents whose 'update_date' is younger or equal to lastDays days
     * @param maxDocs maximum number of returned documents
     * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
-    * @param lastDays filter documents whose 'update_date' is younger or equal to lastDays days
-    * @param excludeIds a set of document identifiers to exclude from output list
-    * @return a list of tuples of (Lucene document id, original document id and document score)
+    * @param outFields name of the fields that will be show in the output
+    * @return a list of tuples of (Lucene document id, document fields, document score, common ngrams of the document)
     */
-  def searchIds(text: String,
-                sources: Option[Set[String]],
-                instances: Option[Set[String]],
-                maxDocs: Int,
-                minNGrams: Int,
-                lastDays: Option[Int],
-                excludeIds: Option[Set[Int]] = None): List[(Int, String, Float)] = {
-    require ((text != null) && text.nonEmpty)
-    require (maxDocs > 0)
-    require (minNGrams > 0)
+  private def getDocuments(text: String,
+                           sources: Option[Set[String]],
+                           instances: Option[Set[String]],
+                           daysAgo: Option[Int],
+                           maxDocs: Int,
+                           minNGrams: Int,
+                           outFields: Set[String]): Array[(Int, Map[String,List[String]], Float, Set[String])] = {
+    val daysAgo2: Int = daysAgo.getOrElse(Integer.MAX_VALUE)
 
-    val text2: String = uniformText(text).mkString(" ")
-    if (text2.isEmpty) List[(Int, String, Float)]()
-    else {
-      val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
-      val ngrams: Set[String] = getNGrams(text2, analyzer, maxWords)
-      val nsize: Int = ngrams.size
-      val minNGrams2: Int =   // Choose the number of ngrams according to the number of ngrams of the input text
-        if (nsize <= 2) Math.max(1, Math.min(nsize, minNGrams))
-        else if (nsize <= 5) Math.max(2, Math.min(nsize, minNGrams))
-        else if (nsize <= 19) Math.max(3, Math.min(nsize, minNGrams))
-        else Math.max(4, Math.min(nsize, minNGrams))
-      val multi: Int = 200
+    getDocuments(text, sources, instances, daysAgo2, curDay=endDayAgo, maxDocs, minNGrams, outFields)
+  }
 
-      // Initial date
-      val lastDays2: Int = lastDays.getOrElse(7300) // if no lastDays then use 20 years
-      val daysAgoCal: GregorianCalendar = todayCal.clone().asInstanceOf[GregorianCalendar]
-      if (lastDays2 < 500) daysAgoCal.add(Calendar.DAY_OF_MONTH, -lastDays2 + 1) // from lastDays2 days ago
-      else daysAgoCal.add(Calendar.DAY_OF_MONTH, -500 + 1)               // from 500 days ago (improve recent document retrieval)
+  private def getDocuments(text: String,
+                           sources: Option[Set[String]],
+                           instances: Option[Set[String]],
+                           daysAgo: Int,
+                           curDay: Int,
+                           maxDocs: Int,
+                           minNGrams: Int,
+                           outFields: Set[String]): Array[(Int, Map[String,List[String]], Float, Set[String])] = {
+    getBeginEndDate(daysAgo, curDay).foldLeft(Array[(Int, Map[String,List[String]], Float, Set[String])]()) {
+      case (array, (begin,end)) =>
+        val orQuery: Query = getQuery(text, sources, instances, Some(begin), Some(end))
+        val meta: Array[(Map[String,List[String]], ScoreDoc, Set[String])] =
+          getDocMeta(text, orQuery, maxDocs, minNGrams, outFields)
+        val docs: Array[(Int, Map[String, List[String]], Float, Set[String])] =
+          array ++ meta.map(t => (t._2.doc, t._1, t._2.score, t._3))
+        if (docs.length < maxDocs) {
+          docs ++ getDocuments(text, sources, instances, daysAgo, getDaysAgo(begin) + 1, maxDocs - docs.length,
+                               minNGrams, outFields)
+        } else docs
+    }
+  }
 
-      // Retrieve documents from Min(500, lastDays2) days until today
-      val scoreDocs: Array[ScoreDoc] = {
-        val orQuery: Query = getQuery(text2, sources, instances, Some(daysAgoCal), Some(todayCal),
-                                      useDeCS = true, includeLowerDate = lastDays2 < 500)
-        sdSearcher.search(orQuery, maxDocs * multi).scoreDocs
-      }
-      // Exclude documents present in excludeIds
-      val scoreDocs2: Array[ScoreDoc] = excludeIds match {
-        case Some(eids) => scoreDocs.filterNot(sd => eids.contains(sd.doc))
-        case None => scoreDocs
-      }
-
-      if (lastDays2 < 500) {
-        getIdScore(scoreDocs2, ngrams, analyzer, maxDocs, minNGrams2).map {
-          case (lid, score) =>
-            val docId: String = Option(sdSearcher.doc(lid, Set("id").asJava).get("id")).getOrElse("")
-            (lid, docId, score)
-        }
-      } else { // Complete with remaining documents from Max(1000, lastDays2) until Min(500, lastDays2)
-        val daysAgoCal2: GregorianCalendar = todayCal.clone().asInstanceOf[GregorianCalendar]
-        val scoreDocs3: Array[ScoreDoc] = {
-          if (scoreDocs2.length >= maxDocs) scoreDocs2
-          else {
-            if (lastDays2 < 500) daysAgoCal2.add(Calendar.DAY_OF_MONTH, -1000 + 1) // from 1000 days ago
-            else daysAgoCal2.add(Calendar.DAY_OF_MONTH, -lastDays2 + 1) // from lastDays2 days ago
-            val orQuery: Query = getQuery(text2, sources, instances, Some(daysAgoCal2), Some(daysAgoCal),
-              useDeCS = true, includeLowerDate = true)
-            scoreDocs2 ++ sdSearcher.search(orQuery, maxDocs * multi).scoreDocs
-          }
-        }
-        getIdScore(scoreDocs3, ngrams, analyzer, maxDocs, minNGrams2).map {
-          case (lid, score) =>
-            val docId: String = Option(sdSearcher.doc(lid, Set("id").asJava).get("id")).getOrElse("")
-            (lid, docId, score)
-        }
+  /**
+    * Get a range of days considering the current day and the oldest acceptable day
+    * @param daysAgo the oldest day that is allowed
+    * @param curDay the current day used to consider the day range
+    * @return (initial calendar day, end calendar day)
+    */
+  private def getBeginEndDate(daysAgo: Int,
+                              curDay: Int): Option[(Calendar, Calendar)] = {
+    def getDayRange: Option[(Int, Int)] = {
+      curDay match {
+        case x if x <= 10 => Some(10, 0)
+        case x if x >= 11 && x <= 30 => Some(30, 11)
+        case x if x >= 31 && x <= 180 => Some(180, 31)
+        case x if x >= 181 && x <= 1095 => Some(1095, 181)
+        case x if x >= 1096 && x <= 3650 => Some(3650, 1096)
+        case x if x >= 3651 => Some(17800, 3671)
+        case _ => None
       }
     }
+
+    if (curDay > daysAgo) None
+    else getDayRange.map {
+      case (begin, end) => (getDaysAgoCalendar(begin), getDaysAgoCalendar(end))
+    }
+  }
+
+  /**
+    * Get retrieved document's fields, scores and set of common ngrams
+    *
+    * @param query Lucene query
+    * @param maxDocs maximum number of returned documents
+    * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
+    * @param outFields name of the fields that will be show in the output
+    * @return an array of tuples of (Lucene document fields, score doc, set of common ngrams)
+    */
+  private def getDocMeta(text: String,
+                         query: Query,
+                         maxDocs: Int,
+                         minNGrams: Int,
+                         outFields: Set[String]): Array[(Map[String,List[String]], ScoreDoc, Set[String])] = {
+    val ngrams: Set[String] = getNGrams(text, analyzer, maxWords)
+    val minNGrams2: Int = getMinNGrams(minNGrams, ngrams)
+    val result1: Array[(Map[String, List[String]], ScoreDoc, Set[String])] =
+      getDocMeta(text, query, maxDocs, minNGrams2, outFields, Array[(Map[String,List[String]], ScoreDoc, Set[String])](), None)
+
+    val orderByNgrams: Boolean = true
+
+    val result2: Array[(Map[String, List[String]], ScoreDoc, Set[String])] =
+      if (orderByNgrams) result1.sortWith(orderByNumNgrams)
+      else result1
+
+    result2.map(t => (t._1.filter(kv => outFields.contains(kv._1)), t._2, t._3))
+  }
+
+  /**
+    * Get retrieved document's fields, scores and common ngrams
+    *
+    * @param query Lucene query
+    * @param maxDocs maximum number of returned documents
+    * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
+    * @param outFields name of the fields that will be show in the output
+    * @param aux documents already processed
+    * @return an array of tuples of (Lucene document fields, score doc, common ngrams)
+    */
+  @scala.annotation.tailrec
+  private def getDocMeta(text: String,
+                         query: Query,
+                         maxDocs: Int,
+                         minNGrams: Int,
+                         outFields: Set[String],
+                         aux: Array[(Map[String,List[String]], ScoreDoc, Set[String])],
+                         lastScoreDoc: Option[ScoreDoc]): Array[(Map[String,List[String]], ScoreDoc, Set[String])] = {
+    val scoreDocs: Array[ScoreDoc] =
+      if (aux.isEmpty) sdSearcher.search(query, maxDocs).scoreDocs
+      else sdSearcher.searchAfter(lastScoreDoc.get, query, maxDocs).scoreDocs
+
+    val tuples1: Array[(Map[String, List[String]], ScoreDoc)] = scoreDocs.map {
+      scoreDoc => (loadDoc(scoreDoc.doc, outFields ++ service.Conf.idxFldNames  ++ Set("update_date")), scoreDoc)
+    }
+    val tuples2: Array[(Map[String, List[String]], ScoreDoc, Set[String])] = tuples1.map {
+      case (fields, scoreDoc) => (fields, scoreDoc, getCommonNGrams(text, fields)._3.toSet)
+    }
+    val tuples3: Array[(Map[String, List[String]], ScoreDoc, Set[String])] = tuples2.filter(_._3.size >= minNGrams)
+    val result: Array[(Map[String, List[String]], ScoreDoc, Set[String])] = aux ++ tuples3
+    if (result.length < maxDocs) getDocMeta(text, query, maxDocs, minNGrams, outFields, result, scoreDocs.lastOption)
+    else result
+  }
+
+  private def orderByNumNgrams(e1: (Map[String,List[String]], ScoreDoc, Set[String]),
+                               e2: (Map[String,List[String]], ScoreDoc, Set[String])): Boolean = {
+    if (e1._3.size > e2._3.size) true
+    else if (e1._3.size == e2._3.size)  {
+      if (e1._2.score > e2._2.score) true
+      else if (e1._2.score == e2._2.score) {
+        val upd_time1: String = e1._1.getOrElse("update_date", List("")).head
+        val upd_time2: String = e2._1.getOrElse("update_date", List("")).head
+        upd_time1.compareTo(upd_time2) > 0
+      } else false
+    } else false
+  }
+
+  /*
+  private def orderByDate(elem: ((Map[String,List[String]], ScoreDoc, Set[String]),
+                                 (Map[String,List[String]], ScoreDoc, Set[String]))): Boolean = {
+    val t1: String = elem._1._1.getOrElse("update_time", List("")).head
+    val t2: String = elem._2._1.getOrElse("update_time", List("")).head
+    val comp: Int = t1.compareTo(t2)
+
+    if (comp > 0) true
+    else if (comp == 0) elem._1._2.score > elem._2._2.score
+    else true
+  }
+  */
+
+  /**
+    * Retrieve the number of minimum ngrams according to the input text
+    * @param minNGrams suggested number of minimum ngrams
+    * @param ngrams number of ngrams found in the input text
+    * @return the "optimal" number of minimum ngrams
+    */
+  private def getMinNGrams(minNGrams: Int,
+                           ngrams: Set[String]): Int = {
+    val nsize: Int = ngrams.size
+
+    if (nsize <= 2) Math.max(1, Math.min(nsize, minNGrams))
+    else if (nsize <= 5) Math.max(2, Math.min(nsize, minNGrams))
+    else if (nsize <= 19) Math.max(3, Math.min(nsize, minNGrams))
+    else Math.max(4, Math.min(nsize, minNGrams))
+  }
+
+  /**
+    * @param days number the days ago to get the calendar
+    * @return the calendar of X days ago
+    */
+  private def getDaysAgoCalendar(days: Int): Calendar = {
+    assert (days >= 0)
+
+    if (days == 0) todayCal
+    else {
+      val dAgoCal: GregorianCalendar = todayCal.clone().asInstanceOf[GregorianCalendar]
+      dAgoCal.add(Calendar.DAY_OF_MONTH, -days + 1)
+      dAgoCal
+    }
+  }
+
+  /**
+    *
+    * @param cal the input Calendar
+    * @return the number of days from today until the calendar day
+    */
+  private def getDaysAgo(cal: Calendar): Int = {
+    val daysBetween: Long = ChronoUnit.DAYS.between(cal.toInstant, todayCal.toInstant) + 1
+    daysBetween.toInt
   }
 
   /**
@@ -213,7 +342,7 @@ class SimDocsSearch(val sdIndexPath: String,
     */
   private def uniformText(text: String): Set[String] = {
     Tools.strongUniformString(text)                            // uniform input string
-      .split(" +")                                      // break the input string into tokens
+      .split(" +")                                             // break the input string into tokens
       .filter(_.length >= Math.max(3, NGSize.ngram_min_size))  // delete tokens with small size
       .filter(tok => !Stopwords.All.contains(tok))             // delete tokens that are stopwords
       .toSet                                                   // transform an array into a set
@@ -228,25 +357,19 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param instances filter the valid values of the document field 'instance'
     * @param fromDate filter documents that are younger or equal to some date
     * @param toDate filter documents that are older or equal to some date
-    * @param useDeCS if true DeCS synonyms will be added to the input text, if false the original input text will be used
-    * @param includeLowerDate if true use [fromDate, toDate] else (fromDate, toDate]
     * @return the Lucene query object
     */
   private def getQuery(text: String,
                        sources: Option[Set[String]],
                        instances: Option[Set[String]],
-                       fromDate: Option[GregorianCalendar],
-                       toDate: Option[GregorianCalendar],
-                       useDeCS: Boolean,
-                       includeLowerDate: Boolean): Query = {
+                       fromDate: Option[Calendar],
+                       toDate: Option[Calendar]): Query = {
     require ((text != null) && text.nonEmpty)
 
     val queryText: Option[Query] = Some {
       val mqParser: QueryParser =
         new QueryParser(Conf.indexedField, new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size))
-      val textImproved: String =
-        if (useDeCS) OneWordDecs.addDecsSynonyms(text, decsSearcher)
-        else text
+      val textImproved: String = OneWordDecs.addDecsSynonyms(text, decsSearcher, decsDescriptors)
 
       mqParser.setDefaultOperator(QueryParser.Operator.OR)
       mqParser.parse(textImproved)
@@ -267,7 +390,7 @@ class SimDocsSearch(val sdIndexPath: String,
     else {
       val fromDateStr: String = formatter.format(fromDate.map(_.getTime).getOrElse(new Date(0)))
       val toDateStr: String = formatter.format(toDate.getOrElse(todayCal).getTime)
-      Some(TermRangeQuery.newStringRange("update_date", fromDateStr, toDateStr, includeLowerDate, true))
+      Some(TermRangeQuery.newStringRange("update_date", fromDateStr, toDateStr, true, true))
     }
 
     val qbuilder: BooleanQuery.Builder = new BooleanQuery.Builder()
@@ -275,57 +398,6 @@ class SimDocsSearch(val sdIndexPath: String,
       qbuilder.add(_, BooleanClause.Occur.MUST)
     }
     qbuilder.build
-  }
-
-  /**
-    * Get retrieved document's ids and scores filtering by number of common ngrams and then by update_date
-    *
-    * @param scoreDocs result of the Lucene search function
-    * @param ngrams a set of ngrams generated from the input search text
-    * @param analyzer Lucene analyzer
-    * @param maxDocs maximum number of returned documents
-    * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
-    * @return a list of pairs with Lucene document id and document score
-    */
-  private def getIdScore(scoreDocs: Array[ScoreDoc],
-                         ngrams: Set[String],
-                         analyzer: Analyzer,
-                         maxDocs: Int,
-                         minNGrams: Int): List[(Int, Float)] = {
-    val ud: Set[String] = service.Conf.idxFldNames + "update_date"
-
-    val tuple: Array[(Map[String, List[String]], ScoreDoc, String)] = scoreDocs.map {
-      scoreDoc =>
-        val doc: Map[String, List[String]] = loadDoc(scoreDoc.doc, ud)
-        (doc, scoreDoc, doc.getOrElse("update_date", List("~")).headOption.getOrElse("~"))  // (doc, scoreDoc, update_date)
-    }
-
-    val timeSorted: Array[(Map[String, List[String]], ScoreDoc, String)] =
-      tuple.sortWith((t1, t2) => t1._3.compareTo(t2._3) > 0)
-
-    val idScore: List[(Int, Float)] = timeSorted.foldLeft[List[(Int, Float)]](List()) {
-      case (lst, tuple) =>
-        if (lst.size < maxDocs) {
-          val docSet: Set[String] = tuple._1.foldLeft(Set[String]()) {
-            case (set, kv) =>
-              if (kv._1.equals("update_date")) set
-              else set ++ kv._2
-          }
-          val docStr: String = docSet.mkString(" ")
-          val simNGrams: Set[String] = getNGrams(docStr, analyzer, maxWords)
-          if (simNGrams.size >= minNGrams) {
-            val commonNGrams: Set[String] = ngrams.intersect(simNGrams)
-            if (commonNGrams.size >= minNGrams) { // Filter by number of common ngrams
-              //println(s"###>simNGrams=$simNGrams")
-              //println(s"===> commonNGrams.size=${commonNGrams.size} commonNGrams=$commonNGrams")
-              lst :+ (tuple._2.doc -> tuple._2.score)
-            }
-            else lst
-          } else lst
-        }
-        else lst
-    }
-    idScore
   }
 
   /**
@@ -340,9 +412,10 @@ class SimDocsSearch(val sdIndexPath: String,
     require(id >= 0)
     require((fields != null) && fields.nonEmpty)
 
-    asScalaBuffer[IndexableField](sdReader.document(id, fields.asJava).getFields()).
+    //asScalaBuffer[IndexableField](sdReader.document(id, fields.asJava).getFields()).
+    sdReader.document(id, fields.asJava).getFields().asScala.
       foldLeft[Map[String,List[String]]] (Map()) {
-      case (map2,fld) =>
+      case (map2, fld) =>
         val name: String = fld.name()
         val lst: List[String] = map2.getOrElse(name, List())
         map2 + ((name, fld.stringValue() :: lst))
@@ -363,7 +436,7 @@ class SimDocsSearch(val sdIndexPath: String,
     require(text != null)
     require(analyzer != null)
 
-    val tokenStream: TokenStream = analyzer.tokenStream(null, text)
+    val tokenStream: TokenStream = analyzer.tokenStream(null, text.trim)
     val cattr: CharTermAttribute = tokenStream.addAttribute(classOf[CharTermAttribute])
 
     tokenStream.reset()
@@ -510,6 +583,8 @@ object SimDocsSearch extends App {
 
   if (args.length < 3) usage()
 
+  println("Starting search ...")
+
   val startTime: Long = new Date().getTime
   val parameters = args.foldLeft[Map[String,String]](Map()) {
     case (map,par) =>
@@ -532,12 +607,13 @@ object SimDocsSearch extends App {
   val lastDays: Option[Int] = parameters.get("lastDays").map(_.toInt)
   val search: SimDocsSearch = new SimDocsSearch(sdIndex, decsIndex)
   val maxWords: Int = search.maxWords
-  val docs: List[(Float,Map[String,List[String]])] = search.search(text, outFields, maxDocs, minNGrams, sources,
-                                                                   instances, lastDays)
+
+  val docs: List[(Int, Map[String, List[String]], Float, Set[String])] =
+    search.search(text, outFields, maxDocs, minNGrams, sources,instances, lastDays)
 
   docs.foreach {
-    case (score, doc) =>
-      val (set_original, set_similar, set_common) = search.getCommonNGrams(args(2), doc)
+    case (_, doc, score, _) =>
+      val (set_original, set_similar, set_common) = search.getCommonNGrams(text, doc)
 
       println("\n------------------------------------------------------")
       println(s"score: $score")

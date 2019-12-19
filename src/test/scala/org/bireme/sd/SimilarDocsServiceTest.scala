@@ -10,9 +10,9 @@ package org.bireme.sd
 import java.net.{URI, URL}
 
 import org.bireme.sd.service.Conf
-import org.scalatest.Matchers._
-import org.scalatest._
-import org.scalatest.concurrent.Timeouts._
+import org.scalatest.matchers.should.Matchers._
+import org.scalatest.concurrent.TimeLimits._
+import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.time.SpanSugar._
 
 import scala.io._
@@ -23,7 +23,7 @@ import scala.util.matching.Regex
 * author: Heitor Barbieri
 * date: 20170717
 */
-class SimilarDocsServiceTest extends FlatSpec {
+class SimilarDocsServiceTest extends AnyFlatSpec {
 
   /**
     * Load the content of a web page and check if there is a timeout

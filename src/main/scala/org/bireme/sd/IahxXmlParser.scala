@@ -25,7 +25,7 @@ object IahxXmlParser {
 
   def getElements(xmlFile: String,
                   encoding: String,
-                  fldNames: Set[String]): Stream[mutable.Map[String,List[String]]] = {
+                  fldNames: Set[String]): LazyList[mutable.Map[String,List[String]]] = {
     val map: mutable.Map[String, List[String]] = mutable.Map.empty
 
     val source: BufferedSource = Source.fromFile(xmlFile, encoding)
@@ -51,12 +51,12 @@ object IahxXmlParser {
                          auxMap: mutable.Map[String,List[String]],
                          source: BufferedSource,
                          lines: Iterator[String]):
-                                            Stream[mutable.Map[String,List[String]]] = {
+                                            LazyList[mutable.Map[String,List[String]]] = {
     getDoc(fldNames, auxMap, lines) match {
       case Some(doc) => doc #:: docsStream(fldNames, auxMap, source, lines)
       case None =>
         source.close()
-        Stream.empty
+        LazyList.empty
     }
   }
 

@@ -14,11 +14,12 @@ import org.apache.lucene.analysis.core.KeywordAnalyzer
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.queryparser.classic.QueryParser
-import org.apache.lucene.search.{IndexSearcher, Query, TotalHitCountCollector}
+import org.apache.lucene.search.{IndexSearcher, Query, ScoreDoc, TopDocs, TotalHitCountCollector, TotalHits}
 import org.apache.lucene.store.FSDirectory
 import org.bireme.sd.service.Conf
 
-import scala.collection.JavaConverters._
+//import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.immutable.TreeMap
 
 // dengue vacinação na cidade de São Paulo
@@ -93,7 +94,7 @@ object SearchExplain extends App {
 
     tokenStream.reset()
     while (tokenStream.incrementToken()) lst.add(charTermAttribute.toString)
-    lst.asScala
+    lst.asScala.toSeq
   }
 
   private def getTotalHits(text: String): Int = {
@@ -117,13 +118,12 @@ object SearchExplain extends App {
   }
 
   private def getSentenceTotalHits(text: String,
-                                   useOR: Boolean):
-                                            (Long, Seq[(Int, String, Float)])= {
-    val query =  getQuery(text, useOR)
-    val topDocs = searcher.search(query, Conf.maxDocs)
-    val totalHits = topDocs.totalHits
-    val scoreDocs = topDocs.scoreDocs
-    val docs = scoreDocs.foldLeft[Seq[(Int,String,Float)]](Seq()) {
+                                   useOR: Boolean): (Long, Seq[(Int, String, Float)])= {
+    val query: Query =  getQuery(text, useOR)
+    val topDocs: TopDocs = searcher.search(query, Conf.maxDocs)
+    val totalHits: TotalHits = topDocs.totalHits
+    val scoreDocs: Array[ScoreDoc] = topDocs.scoreDocs
+    val docs: Seq[(Int, String, Float)] = scoreDocs.foldLeft[Seq[(Int,String,Float)]](Seq()) {
       case (seq, sc) =>
         val doc = sc.doc
         val id = searcher.doc(doc).get("id")
@@ -131,8 +131,8 @@ object SearchExplain extends App {
 
         seq :+ ((doc, id, score))
     }
-    //(totalHits.value, docs) Lucene 8.0.0
-    (totalHits, docs)
+    (totalHits.value, docs) // Lucene 8.0.0
+    //(totalHits, docs)
   }
 
   private def getQuery(text: String,

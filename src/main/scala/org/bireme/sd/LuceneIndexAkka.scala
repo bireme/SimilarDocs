@@ -10,24 +10,20 @@ package org.bireme.sd
 import java.io.File
 import java.nio.file.Path
 import java.text.{DateFormat, SimpleDateFormat}
-import java.util.Date
 import java.util.regex.{Matcher, Pattern}
 
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, PoisonPill, Props, Terminated}
 import akka.event.Logging
 import akka.routing.{ActorRefRoutee, Broadcast, RoundRobinRoutingLogic, Router}
-import bruma.master._
-import org.apache.http.client.methods.{CloseableHttpResponse, HttpGet}
-import org.apache.http.impl.client.{CloseableHttpClient, HttpClients}
-import org.apache.http.util.EntityUtils
 import org.apache.lucene.analysis.Analyzer
 import org.apache.lucene.document.{Document, Field, StoredField, StringField, TextField}
 import org.apache.lucene.index._
+import org.apache.lucene.search.{IndexSearcher, MatchAllDocsQuery, ScoreDoc}
 import org.apache.lucene.store.FSDirectory
 import org.bireme.sd.service.Conf
+import org.bireme.sd.service.Conf.excludeDays
 import org.h2.mvstore.{MVMap, MVStore}
 
-import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -35,6 +31,7 @@ import scala.util.control.NonFatal
 import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 
+// http://basalto02.bireme.br:8986/solr5/admin.html#/
 // http://basalto02.bireme.br:8986/solr5/admin/cores?action=STATUS
 // grep -Po "(?<=lastModified\">[^<]+"
 
@@ -47,7 +44,6 @@ class LuceneIndexMain(indexPath: String,
                       xmlFileFilter: String,
                       fldIdxNames: Set[String],
                       fldStrdNames: Set[String],
-                      decsDir: String,
                       encoding: String,
                       fullIndexing: Boolean) extends Actor with ActorLogging {
   context.system.eventStream.setLogLevel(Logging.InfoLevel)
@@ -73,16 +69,11 @@ class LuceneIndexMain(indexPath: String,
   val lastModifiedDoc: MVMap[String, Long] = docLastModified.openMap("modDoc")
   if (fullIndexing) lastModifiedDoc.clear()
 
-  val excludeDays: Int = 20 // Number of days to remove from the last iahx update day
-  val excludeTime: Long = excludeDays * 24 * 60 * 60 * 1000  // excludeDays in miliseconds
-  val lastIahxModification: Long = getIahxModification.getOrElse(new Date().getTime - excludeTime)
+  // Only index documents which are older than that date
+  val endDate: Long = Tools.getIahxModificationTime - Tools.daysToTime(excludeDays)
 
   val routerIdx: Router = createActors()
   var activeIdx: Int = idxWorkers
-
-  // Create decs index
-  log.info("Creating decs index")
-  OneWordDecs.createIndex(decsDir, decsIndexPath)
 
   // Create similar docs index
   createSimDocsIndex(xmlDir)
@@ -90,42 +81,13 @@ class LuceneIndexMain(indexPath: String,
   // finishing Actors
   routerIdx.route(Broadcast(Finishing()), self)
 
-  /**
-    *
-    * @return the iahx index document modification date in miliseconds
-    */
-  private def getIahxModification: Option[Long] = {
-    val iahx: String = "http://basalto02.bireme.br:8986/solr5/admin/cores?action=STATUS"
-    val regex: Regex = "(?<=lastModified\">)([^<]+)".r
-    val df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")   // 2019-10-06T19:09:52.79Z
-
-    Try {
-      val httpclient: CloseableHttpClient = HttpClients.createDefault()
-      val httpget: HttpGet = new HttpGet(iahx)
-      val response: CloseableHttpResponse = httpclient.execute(httpget)
-
-      response.getStatusLine.getStatusCode match {
-        case 200 => Option(EntityUtils.toString(response.getEntity)).flatMap {
-            line =>
-              regex.findFirstMatchIn(line).map {
-                mat => df.parse(mat.group(1)).getTime - excludeTime
-              }
-          }
-        case _ => None
-      }
-    }
-  } match {
-    case Success(value) => value
-    case Failure(_) => None
-  }
 
   private def createActors(): Router = {
-    val decsMap: Map[Int, Set[String]] = if (decsDir.isEmpty) Map[Int,Set[String]]()
-                                         else decx2Map(decsDir)
+    val decsMap: Map[Int, Set[String]] = getDescriptors(decsIndexPath)
 
     val routees: Vector[ActorRefRoutee] = Vector.fill(idxWorkers) {
       val r: ActorRef = context.actorOf(Props(classOf[LuceneIndexActor], indexWriter,
-        fldIdxNames, fldStrdNames, decsMap, lastModifiedDoc, lastIahxModification))
+        fldIdxNames, fldStrdNames, decsMap, lastModifiedDoc, endDate))
       context watch r
       ActorRefRoutee(r)
     }
@@ -153,6 +115,7 @@ class LuceneIndexMain(indexPath: String,
     log.info("Optimizing index 'sdIndex - end'")
     docLastModified.close()
     context.system.terminate()
+    ()
   }
 
   def receive: PartialFunction[Any, Unit] = {
@@ -171,39 +134,28 @@ class LuceneIndexMain(indexPath: String,
   }
 
   /**
-    * From a decs master file, converts it into a map of (decs code -> descriptors)
+    * Create a map of DeCS descriptors from a Lucene index
     *
+    * @param decsIndexPath Lucene index with DeCS documents
     * @return a map where the keys are the decs code (its mfn) and the values, the
-              the descriptors in English, Spanish and Portuguese
+    *         the descriptors in English, Spanish and Portuguese
     */
-  private def decx2Map(decsDir: String): Map[Int,Set[String]] = {
-    val mst = MasterFactory.getInstance(decsDir).open()
-    val map = mst.iterator().asScala.foldLeft[Map[Int,Set[String]]](Map()) {
-      case (map2,rec) =>
-        if (rec.isActive) {
-          val mfn = rec.getMfn
-
-          // English
-          val lst_1 = rec.getFieldList(1).asScala
-          val set_1 = lst_1.foldLeft[Set[String]](Set[String]()) {
-            case(set, fld) => set + fld.getContent
-          }
-          // Spanish
-          val lst_2 = rec.getFieldList(2).asScala
-          val set_2 = lst_2.foldLeft[Set[String]](set_1) {
-            case(set, fld) => set + fld.getContent
-          }
-          // Portuguese
-          val lst_3 = rec.getFieldList(3).asScala
-          val set_3 = lst_3.foldLeft[Set[String]](set_2) {
-            case(set, fld) => set + fld.getContent
-          }
-          map2 + ((mfn, set_3))
-        } else map2
+  def getDescriptors(decsIndexPath: String): Map[Int, Set[String]] = {
+    val directory: FSDirectory = FSDirectory.open(new File(decsIndexPath).toPath)
+    val ireader: DirectoryReader = DirectoryReader.open(directory)
+    val isearcher: IndexSearcher = new IndexSearcher(ireader)
+    val query: MatchAllDocsQuery = new MatchAllDocsQuery()
+    val hits: Array[ScoreDoc] = isearcher.search(query, Integer.MAX_VALUE).scoreDocs
+    val descriptors: Map[Int, Set[String]] = hits.foldLeft(Map[Int, Set[String]]()) {
+      case (map, hit) =>
+        val doc: Document = ireader.document(hit.doc)
+        val id: Int = doc.get("id").toInt
+        val descr: Set[String] = doc.getValues("descriptor").toSet
+        map + (id -> descr)
     }
-    mst.close()
-
-    map
+    ireader.close()
+    directory.close()
+    descriptors
   }
 }
 
@@ -212,7 +164,7 @@ class LuceneIndexActor(indexWriter: IndexWriter,
                        fldStrdNames: Set[String],
                        decsMap: Map[Int,Set[String]],
                        lastModifiedDoc: MVMap[String, Long],
-                       lastIahxModification: Long) extends Actor with ActorLogging {
+                       endDate: Long) extends Actor with ActorLogging {
   val regexp: Regex = """\^d\d+""".r
   val checkXml: CheckXml = new CheckXml()
   val fieldsIndexNames: Set[String] = if ((fldIdxNames == null) || fldIdxNames.isEmpty) Conf.idxFldNames
@@ -273,7 +225,7 @@ class LuceneIndexActor(indexWriter: IndexWriter,
                 upd =>
                   if (upd.nonEmpty) {
                     val updTimeNew: Long = formatter.parse(upd).getTime
-                    if (updTimeNew <= lastIahxModification) {  // include if document is already present in the iahx index
+                    if (updTimeNew <= endDate) {  // include if document is not too new compared to the iahx index processing time
                       Option(lastModifiedDoc.get(sid)) match {
                         case Some(mdate) =>
                           if (updTimeNew > mdate) {
@@ -365,14 +317,13 @@ object LuceneIndexAkka extends App {
 
   private def usage(): Unit = {
     Console.err.println("usage: LuceneIndexAkka" +
-      "\n\t<indexPath> - the name+path to the lucene index to be created" +
-      "\n\t<decsIndexPath> - the name+path to the lucene index to be created" +
-      "\n\t<idIndexPath> - the ids index of already indexed/stored documents" +
-      "\n\t<xmlDir> - directory of xml files used to create the index" +
+      "\n\t-sdIndex=<path> - the name+path to the lucene index of similar documents to be created" +
+      "\n\t-idIndex=<path> - the name+path index of already indexed/stored documents to be used or created" +
+      "\n\t-decsIndex=<path> - the name+path to the lucene index of DeCS descriptors to be used" +
+      "\n\t-xml=<path> - directory of xml files used to create the index" +
       "\n\t[-xmlFileFilter=<regExp>] - regular expression used to filter xml files" +
       "\n\t[-indexedFields=<field1>,...,<fieldN>] - xml doc fields to be indexed and stored" +
       "\n\t[-storedFields=<field1>,...,<fieldN>] - xml doc fields to be stored but not indexed" +
-      "\n\t[-decs=<dir>] - decs master file directory" +
       "\n\t[-encoding=<str>] - xml file encoding" +
       "\n\t[--fullIndexing] - if present, recreate the indexes from scratch")
     System.exit(1)
@@ -380,46 +331,32 @@ object LuceneIndexAkka extends App {
 
   if (args.length < 4) usage()
 
-  val parameters = args.drop(4).foldLeft[Map[String,String]](Map()) {
+  val parameters = args.foldLeft[Map[String,String]](Map()) {
     case (map,par) =>
       val split = par.split(" *= *", 2)
       if (split.length == 1) map + ((split(0).substring(2), ""))
       else map + ((split(0).substring(1), split(1)))
   }
 
-  val indexPath = args(0)
-  val decsIndexPath = args(1)
-  val idIndexPath = args(2)
-  val xmlDir = args(3)
+  val sdIndex = parameters("sdIndex")
+  val decsIndex = parameters("decsIndex")
+  val idIndex = parameters("idIndex")
+  val xml = parameters("xml")
   val xmlFileFilter = parameters.getOrElse("xmlFileFilter", ".+\\.xml")
   val sIdxFields = parameters.getOrElse("indexedFields", "")
   val fldIdxNames = if (sIdxFields.isEmpty) Conf.idxFldNames
                      else sIdxFields.split(" *, *").toSet
-  val sStrdFields = parameters.getOrElse("storedFields", "")
-  val fldStrdNames = if (sStrdFields.isEmpty) Set[String]()
-                      else sStrdFields.split(" *, *").toSet
-
-  val decsDir = parameters.getOrElse("decs", "")
+  val storedFields = parameters.getOrElse("storedFields", "")
+  val fldStrdNames = if (storedFields.isEmpty) Set[String]()
+                      else storedFields.split(" *, *").toSet
   val encoding = parameters.getOrElse("encoding", "ISO-8859-1")
   val fullIndexing = parameters.contains("fullIndexing")
 
   val system: ActorSystem = ActorSystem("Main")
   try {
-    val props: Props = Props(classOf[LuceneIndexMain], indexPath, decsIndexPath, idIndexPath,
-                      xmlDir, xmlFileFilter, fldIdxNames, fldStrdNames, decsDir, encoding,
-                      fullIndexing)
+    val props: Props = Props(classOf[LuceneIndexMain], sdIndex, decsIndex, idIndex,
+                      xml, xmlFileFilter, fldIdxNames, fldStrdNames, encoding, fullIndexing)
     system.actorOf(props, "app")
-
-    //val app = system.actorOf(props, "app")
-    //val stopped: Future[Boolean] = gracefulStop(app, 5 hours)
-
-    //Await.result(stopped, 5 hours)
-    //val terminator = system.actorOf(Props(classOf[Terminator], app),
-    //                                                "app-terminator")
-    //stopped onComplete {
-    //  case Success(_) => system.terminate()
-    //  case Failure(ex) => system.terminate(); throw ex
-    //}
   } catch {
     case NonFatal(e) =>
       println("---------------------------------------------------------------")
@@ -430,4 +367,6 @@ object LuceneIndexAkka extends App {
   }
 
   Await.result(system.whenTerminated, 24.hours)
+
+  println("*** Indexing finished!")
 }

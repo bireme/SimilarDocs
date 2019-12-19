@@ -10,7 +10,8 @@ package org.bireme.sd
 
 import java.io.File
 
-import collection.JavaConverters._
+//import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import org.apache.lucene.index._
 import org.apache.lucene.store.FSDirectory
 import org.apache.lucene.util.BytesRef
@@ -49,8 +50,8 @@ object ShowTotalHits extends App {
     Try {
       getFields(reader).foldLeft(TreeMap[String, Long]()) {
         case (map, field) =>
-          val terms: Terms = MultiFields.getTerms(reader, field)
-          //val terms: Terms = MultiTerms.getTerms(reader, field) Lucene 8.0.0
+          //val terms: Terms = MultiFields.getTerms(reader, field)
+          val terms: Terms = MultiTerms.getTerms(reader, field) //Lucene 8.0.0
 
           if (terms == null) map
           else getTermsCount(terms.iterator(), map)
@@ -76,8 +77,8 @@ object ShowTotalHits extends App {
   private def getFields(reader: IndexReader): Set[String] = {
     val finfos: FieldInfos = reader match {
       case lf: LeafReader => lf.getFieldInfos
-      case _ => MultiFields.getMergedFieldInfos(reader)
-      //case _ => FieldInfos.getMergedFieldInfos(reader) Lucene 8.0.0
+      //case _ => MultiFields.getMergedFieldInfos(reader)
+      case _ => FieldInfos.getMergedFieldInfos(reader) // Lucene 8.0.0
     }
     finfos.asScala.map(fi => fi.name).toSet
   }

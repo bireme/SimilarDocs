@@ -8,8 +8,10 @@
 
 package org.bireme.sd
 
-import scala.collection.JavaConverters._
+//import scala.collection.JavaConverters._
 import org.apache.lucene.analysis.CharArraySet
+
+import scala.jdk.CollectionConverters._
 
 /**
   * List of stopwords taken from page: http://www.ranks.nl/stopwords
@@ -19,7 +21,7 @@ import org.apache.lucene.analysis.CharArraySet
   **/
 object Stopwords {
   def getStopwords: CharArraySet =
-                           new CharArraySet(asJavaCollection[String](All), true)
+                           new CharArraySet(All.asJavaCollection, true)
 
   val English: Set[String] = Set[String](
     "a", "able", "about", "above", "abst", "accordance", "according", "accordingly",

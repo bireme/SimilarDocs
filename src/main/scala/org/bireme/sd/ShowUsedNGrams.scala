@@ -162,8 +162,8 @@ object ShowUsedNGrams extends App {
     else {
       val query: Query =  mqParser.parse(tok)
 
-      // searcher.search(query, 1).totalHits.value > 0 Lucene 8.0.0
-      searcher.search(query, 1).totalHits > 0
+      searcher.search(query, 1).totalHits.value > 0 // Lucene 8.0.0
+      //searcher.search(query, 1).totalHits > 0
     }
   }
 }

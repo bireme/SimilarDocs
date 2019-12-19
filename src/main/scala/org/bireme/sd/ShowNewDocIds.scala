@@ -16,7 +16,8 @@ import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.search.{IndexSearcher, TermRangeQuery}
 import org.apache.lucene.store.FSDirectory
 
-import scala.collection.JavaConverters._
+//import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /** Show a Lucene index document
   *

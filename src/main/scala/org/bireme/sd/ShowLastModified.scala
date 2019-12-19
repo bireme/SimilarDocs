@@ -11,7 +11,8 @@ import java.util
 
 import org.h2.mvstore.{MVMap, MVStore}
 
-import scala.collection.JavaConverters._
+//import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
 * Show the records of the MapDB database / table modFile

@@ -10,38 +10,84 @@ package org.bireme.sd
 
 import bruma.master._
 import java.io.File
+import java.nio.file.Path
 
 import org.apache.lucene.analysis.core.KeywordAnalyzer
 import org.apache.lucene.document.{Document, Field, StoredField, TextField}
 import org.apache.lucene.index.{DirectoryReader, IndexWriter, IndexWriterConfig, Term}
-import org.apache.lucene.search.{IndexSearcher, TermQuery, TopDocs}
+import org.apache.lucene.search.{IndexSearcher, MatchAllDocsQuery, ScoreDoc, TermQuery, TopDocs}
 import org.apache.lucene.store.FSDirectory
+import org.bireme.dh.{CharSeq, Highlighter}
 
-import scala.collection.JavaConverters._
+//import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
+import scala.collection.mutable
+
+/**
+  * Create a Lucene index with documents having DeCS descriptors and synonyms
+  */
 object OneWordDecs {
+  /**
+    * Create a Lucene index with documents having DeCS descriptors and synonyms
+    * @param decsDir Isis database path having DeCS records
+    * @param indexPath destination Lucene index with DeCS documents
+    */
   def createIndex(decsDir: String,
                   indexPath: String): Unit = {
     require(decsDir != null)
     require(indexPath != null)
 
-    val analyzer = new KeywordAnalyzer()
-    val directory = FSDirectory.open(new File(indexPath).toPath)
-    val config = new IndexWriterConfig(analyzer)
+    val analyzer: KeywordAnalyzer = new KeywordAnalyzer()
+    val directory: FSDirectory = FSDirectory.open(new File(indexPath).toPath)
+    val config: IndexWriterConfig = new IndexWriterConfig(analyzer)
     config.setOpenMode(IndexWriterConfig.OpenMode.CREATE)
-    val indexWriter = new IndexWriter(directory, config)
-    val mst = MasterFactory.getInstance(decsDir).setEncoding("IBM850").open()
+    val indexWriter: IndexWriter = new IndexWriter(directory, config)
+    //val mst: Master = MasterFactory.getInstance(decsDir).setEncoding("IBM850").open()
+    val mst: Master = MasterFactory.getInstance(decsDir).setEncoding("ISO8859-1").open()
 
-    mst.iterator().asScala.foreach(rec => createDoc(rec).foreach(indexWriter.addDocument(_)))
+    mst.iterator().asScala.foreach {
+      rec => createDoc(rec).foreach {
+        doc => indexWriter.addDocument(doc)
+      }
+    }
     indexWriter.forceMerge(1)
     indexWriter.close()
     directory.close()
   }
 
+  /**
+    * Create a map of DeCS descriptors from a Lucene index
+    * @param indexPath Lucene index with DeCS documents
+    * @return a map of descriptors to be used by Highlighter class (fast descriptor discovery)
+    */
+  def getDescriptors(indexPath: String): Map[Char, CharSeq] = {
+    val directory: FSDirectory = FSDirectory.open(new File(indexPath).toPath)
+    val ireader: DirectoryReader = DirectoryReader.open(directory)
+    val isearcher: IndexSearcher = new IndexSearcher(ireader)
+    val query: MatchAllDocsQuery = new MatchAllDocsQuery()
+    val hits: Array[ScoreDoc] = isearcher.search(query, Integer.MAX_VALUE).scoreDocs
+    val descriptors: Map[String, String] = hits.foldLeft(Map[String, String]()) {
+      case (map, hit) =>
+        val doc: Document = ireader.document(hit.doc)
+        map ++ doc2map(doc)
+    }
+
+    ireader.close()
+    directory.close()
+
+    Highlighter.createTermTree(descriptors)
+  }
+
+  /**
+    * Given an Isis DeCS record, create a Lucene document with descriptors and synonyms
+    * @param rec input DeCs record
+    * @return a Lucene document with descriptors and synonyms
+    */
   private def createDoc(rec: Record): Option[Document] = {
     if (rec.isActive) {
       // Create a set with synonyms with only one word
-      val sims = getFldSyns(rec, 50) ++ getFldSyns(rec, 23)
+      val sims: Set[String] = getFldSyns(rec, 50) ++ getFldSyns(rec, 23)
 
       if (sims.isEmpty) None
       else {
@@ -52,18 +98,42 @@ object OneWordDecs {
 
         doc.add(new StoredField("id", rec.getMfn))
         if (fld1 != null) doc.add(new TextField("descriptor",
-          Tools.uniformString(fld1.getContent.trim()), Field.Store.YES))
+          org.bireme.dh.Tools.uniformString2(fld1.getContent.trim())._1, Field.Store.YES))
         if (fld2 != null) doc.add(new TextField("descriptor",
-          Tools.uniformString(fld2.getContent.trim()), Field.Store.YES))
+          org.bireme.dh.Tools.uniformString2(fld2.getContent.trim())._1, Field.Store.YES))
         if (fld3 != null) doc.add(new TextField("descriptor",
-          Tools.uniformString(fld3.getContent.trim()), Field.Store.YES))
+          org.bireme.dh.Tools.uniformString2(fld3.getContent.trim())._1, Field.Store.YES))
         sims.foreach(syn => doc.add(new StoredField("synonym",
-          Tools.uniformString(syn.trim()))))
+          org.bireme.dh.Tools.uniformString2(syn.trim())._1)))
         Some(doc)
       }
     } else None
   }
 
+  /**
+    * Convert the document 'id' and 'descriptor' fields into a map
+    * @param doc input Lucene document
+    * @return a map this descriptors and id
+    */
+  private def doc2map(doc: Document): Map[String,String] = {
+    val stopwords = Set("la", "foram", "amp", "www") // are common words and have other meanings in other languages
+
+    Option(doc.get("id")).map(_.toInt) match {
+      case Some(id) => doc.getValues("descriptor")
+        .filterNot(desc => stopwords.contains(desc))
+        .foldLeft(mutable.Map[String,String]()) {
+          case (map, desc) => map += (desc -> id.toString)
+        }.toMap
+      case None => Map[String,String]()
+    }
+  }
+
+  /**
+    *
+    * @param rec input Isis record
+    * @param tag record tag used to retrieve synonyms
+    * @return a set of DeCS synonyms (those with only one word) of the input record
+    */
   private def getFldSyns(rec: Record,
                          tag: Int): Set[String] = {
     require (rec != null)
@@ -75,59 +145,57 @@ object OneWordDecs {
       case (set,fld) => fld.getSubfields.asScala.
         filter(sub => subIds.contains(sub.getId)).foldLeft[Set[String]](set) {
           case (s,sub) =>
-            val split = sub.getContent.trim().split(" +", 2)
-            if (split.size == 1) s + split.head else s
+            val content: String = sub.getContent.trim()
+            if (content.contains(" ")) s + content else s
         }
     }
   }
 
+  /**
+    * Given an input text, for each DeCS descriptor found, add its synonyms
+    * @param sentence input text
+    * @param decsSearcher lucene DeCS index
+    * @param descriptors a map of descriptors to be used by Highlighter class (fast descriptor discovery) - see getDescriptors()
+    * @return the input text with DeCS synonyms added
+    */
   def addDecsSynonyms(sentence: String,
-                      decsSearcher: IndexSearcher): String = {
+                      decsSearcher: IndexSearcher,
+                      descriptors: Map[Char, CharSeq]): String = {
     require (sentence != null)
     require (decsSearcher != null)
+    require (descriptors != null)
 
-    val inWords = Tools.uniformString(sentence.trim()).split(" +").toSeq
+    val synonyms: Set[String] = getDecsSynonyms(sentence.trim(), decsSearcher, descriptors)
 
-    getDecsSynonyms(inWords, 0, inWords.size - 1, decsSearcher).mkString(" ")
+    sentence + " " + synonyms.mkString(" ")
   }
 
-  private def getDecsSynonyms(inWords: Seq[String],
-                              beginPos: Int,
-                              endPos: Int,
-                              decsSearcher: IndexSearcher): Set[String] = {
-    require (inWords != null)
-    require (beginPos >= 0)
-    require (beginPos <= endPos)
-    require (decsSearcher != null)
+  /**
+    * Given an input text, for each DeCS descriptor found, add its synonyms
+    * @param inText input text
+    * @param decsSearcher lucene DeCS index
+    * @param descriptors a map of descriptors to be used by Highlighter class (fast descriptor discovery) - see getDescriptors()
+    * @return the input text with DeCS synonyms added
+    */
+  private def getDecsSynonyms(inText: String,
+                              decsSearcher: IndexSearcher,
+                              descriptors: Map[Char, CharSeq]): Set[String] = {
 
-    if (inWords.isEmpty) Set()
-    else if (endPos >= inWords.size) inWords.toSet
-    else {
-      val descr: Seq[String] = inWords.slice(beginPos, endPos + 1)
-      val descrStr: String = descr.mkString(" ")
-      val query: TermQuery = new TermQuery(new Term("descriptor", descrStr))
-      val topDocs: TopDocs = decsSearcher.search(query, 1)
+    val (_,_, descripts: Seq[String]) = Highlighter.highlight(x => x, inText, descriptors)
 
-      // if (topDocs.totalHits.value > 0) { Lucene 8.0.0
-      if (topDocs.totalHits > 0) {
-        val doc = decsSearcher.doc(topDocs.scoreDocs(0).doc)
-        doc.getFields("synonym").foldLeft[Set[String]](Set()) {
-          case (set,fld) => set + fld.stringValue()
-        } ++
-        (if (endPos + 1 <= inWords.size - 1)
-          descr.toSet ++ getDecsSynonyms(inWords, endPos + 1, inWords.size - 1, decsSearcher)
-         else descr.toSet)
-      } else {
-        if (endPos > beginPos)
-          getDecsSynonyms(inWords, beginPos, endPos - 1, decsSearcher)
-        else {
-          if (endPos + 1 <= inWords.size - 1) {
-            Set(inWords(beginPos)) ++
-              getDecsSynonyms(inWords, endPos + 1, inWords.size - 1, decsSearcher)
-          } else Set(inWords(beginPos))
-        }
-      }
-    }
+    descripts.foldLeft(mutable.Set[String]()) {
+      case (set, descr) =>
+        val query: TermQuery = new TermQuery(new Term("descriptor", descr))
+        val topDocs: TopDocs = decsSearcher.search(query, 1)
+
+         if (topDocs.totalHits.value > 0) {   // Lucene 8.0.0
+        //if (topDocs.totalHits > 0) {
+          val doc = decsSearcher.doc(topDocs.scoreDocs(0).doc)
+          doc.getValues("synonym").foldLeft(set) {
+            case (set, fld) => set += fld
+          }
+        } else set
+    }.toSet
   }
 }
 
@@ -150,10 +218,12 @@ object OneWordDecsTest extends App {
 
   if (args.length != 2) usage()
 
-  val decsDirectory = FSDirectory.open(new File(args(0)).toPath)
+  val decsPath: Path = new File(args(0)).toPath
+  val decsDirectory = FSDirectory.open(decsPath)
   val decsReader = DirectoryReader.open(decsDirectory)
   val decsSearcher = new IndexSearcher(decsReader)
-  val outSentence = OneWordDecs.addDecsSynonyms(args(1), decsSearcher)
+  val decsDescriptors = OneWordDecs.getDescriptors(decsPath.toString)
+  val outSentence = OneWordDecs.addDecsSynonyms(args(1), decsSearcher, decsDescriptors)
 
   decsReader.close()
   decsDirectory.close()

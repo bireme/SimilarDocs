@@ -9,15 +9,17 @@ package org.bireme.sd.service
 
 import java.nio.file.Paths
 import java.text.{DateFormat, SimpleDateFormat}
-import java.util.{Calendar, Date, GregorianCalendar, TimeZone}
+import java.util.{Calendar, Date}
 
+//import com.fasterxml.jackson.core.PrettyPrinter
 import org.apache.lucene.document._
 import org.apache.lucene.index._
 import org.apache.lucene.search._
 import org.apache.lucene.store.FSDirectory
 import org.bireme.sd.{DocumentIterator, SimDocsSearch, Tools}
 
-import scala.collection.JavaConverters._
+//import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -72,7 +74,7 @@ class TopIndex(simSearch: SimDocsSearch,
   }
 
   /**
-    * Adds a profile instance to a personal services document
+    * Add/update a profile instance to a personal services document
     *
     * @param user personal services document identifier
     * @param name profile name
@@ -120,6 +122,7 @@ class TopIndex(simSearch: SimDocsSearch,
     if (isNew) topWriter.addDocument(doc)
     else topWriter.updateDocument(new Term(idFldName, id), doc)
     topWriter.commit()
+    ()
   }
 
   /**
@@ -158,8 +161,9 @@ class TopIndex(simSearch: SimDocsSearch,
   def deleteProfiles(user: String): Unit = {
     require((user != null) && (!user.trim.isEmpty))
 
-   topWriter.deleteDocuments(new Term(userFldName, user.trim()))
-   topWriter.commit()
+    topWriter.deleteDocuments(new Term(userFldName, user.trim()))
+    topWriter.commit()
+    ()
   }
 
   /**
@@ -179,6 +183,7 @@ class TopIndex(simSearch: SimDocsSearch,
 
     topWriter.deleteDocuments(new Term(idFldName, id))
     topWriter.commit()
+    ()
   }
 
   /**
@@ -240,7 +245,7 @@ class TopIndex(simSearch: SimDocsSearch,
     * (some fields of that document)
     *
     * @param user personal services document unique id
-    * @return a collection of profiles (name, content, update date, ids). Profiles can not
+    * @return a collection of profiles: name -> (content, update date, ids). Profiles can not
     *         have more than one occurrence
     */
   def getProfiles(user: String): Map[String, (String, String, List[String])] = {
@@ -262,6 +267,31 @@ class TopIndex(simSearch: SimDocsSearch,
   }
 
   /**
+    * Given a personal services document described by user id and profile name, it returns a profile contents
+    * (some fields of that document)
+    *
+    * @param user personal services user unique id
+    * @param profile desired user profile
+    * @return a collection of profiles: (content, update date, ids). Profiles can not
+    *         have more than one occurrence
+    */
+  def getProfile(user: String,
+                 profile: String): Option[(String, String, List[String])] = {
+    require((user != null) && (!user.trim.isEmpty))
+    require((profile != null) && (!profile.trim.isEmpty))
+
+    getDocuments(Map(userFldName -> user.trim, nameFldName -> profile.trim)).flatMap {
+      _.headOption.map {
+          doc =>
+            val content: String = doc.getField(contentFldName).stringValue()
+            val updDate: String = doc.getField(updateFldName).stringValue()
+            val ids: List[String] = doc.getFields(sdIdFldName).map(_.stringValue()).toList
+            (content, updDate, ids)
+      }
+    }
+  }
+
+  /**
     * Given a id of a personal service document, profiles names and
     * similar documents fields where the profiles will be compared, returns
     * a list of similar documents represented as a XML document
@@ -270,7 +300,7 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param profiles  name of profiles used to find similar documents
     * @param outFields fields of similar documents to be retrieved
     * @param maxDocs the maximun number of similar documents to be retrieved
-    * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
+    * @param beginDate filter documents whose 'entrance_date' is younger or equal to beginDate
     * @param sources update only docs whose field 'db' belongs to sources"
     * @param instances update only docs whose field 'instance' belongs to sources"
     * @return an XML document with each desired field and its respective
@@ -280,7 +310,7 @@ class TopIndex(simSearch: SimDocsSearch,
                     profiles: Set[String],
                     outFields: Set[String],
                     maxDocs: Int = Conf.maxDocs,
-                    lastDays: Option[Int],
+                    beginDate: Option[Long],
                     sources: Option[Set[String]] = Conf.sources,
                     instances: Option[Set[String]] = Conf.instances): String = {
     require((psId != null) && (!psId.trim.isEmpty))
@@ -288,7 +318,7 @@ class TopIndex(simSearch: SimDocsSearch,
     require(outFields != null)
 
     val simDocs: List[Map[String, List[String]]] =
-      getSimDocs(psId, profiles, outFields, maxDocs, lastDays, sources, instances)
+      getSimDocs(psId, profiles, outFields, maxDocs, beginDate, sources, instances)
     val head: String = s"""<?xml version="1.0" encoding="UTF-8"?><documents total="${simDocs.size}">"""
     simDocs.foldLeft[String] (head) {
       case (str,map) =>
@@ -318,7 +348,7 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param names name of profiles used to find similar documents
     * @param outFlds fields of similar documents to be retrieved
     * @param maxDocs the maximun number of similar documents to be retrieved
-    * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
+    * @param beginDate filter documents whose 'entrance_date' is younger or equal to beginDate
     * @param sources update only docs whose field 'db' belongs to sources"
     * @param instances update only docs whose field 'instance' belongs to instances"
     * @return a list of similar documents, where each similar document is a
@@ -329,7 +359,7 @@ class TopIndex(simSearch: SimDocsSearch,
                  names: Set[String],
                  outFlds: Set[String],
                  maxDocs: Int,
-                 lastDays: Option[Int],
+                 beginDate: Option[Long],
                  sources: Option[Set[String]],
                  instances: Option[Set[String]]): List[Map[String,List[String]]] = {
     require((user != null) && (!user.trim.isEmpty))
@@ -353,50 +383,41 @@ class TopIndex(simSearch: SimDocsSearch,
           case None => lst
         }
     }
-    getSimDocs(docIds, outFlds, maxDocs, lastDays)
+    getSimDocs(docIds, outFlds, maxDocs, beginDate)
   }
 
   /**
-    * Given a id of a personal service document, profiles names and
-    * similar documents fields where the profiles will be compared, returns
-    * a list of similar documents
+    * Given a id of a personal service document, profiles names and similar documents fields where the profiles will be
+    * compared, returns a list of similar documents
     *
     * @param docIds document id list for each profile
     * @param outFlds fields of similar documents to be retrieved
     * @param maxDocs the maximun number of similar documents to be retrieved
-    * @param lastDays filter documents whose 'entrance_date' is younger or equal to x days
-    * @return a list of similar documents, where each similar document is a
-    *         a collection of field names and its contents. Each fields can
-    *         have more than one occurrence
+    * @param beginDate filter documents whose 'entrance_date' is younger or equal to beginDate
+    * @return a list of similar documents, where each similar document is a collection of field names and its contents.
+    *         Each fields can have more than one occurrence.
     */
   private def getSimDocs(docIds: List[List[Int]],
                          outFlds: Set[String],
                          maxDocs: Int,
-                         lastDays: Option[Int]): List[Map[String,List[String]]] = {
+                         beginDate: Option[Long]): List[Map[String,List[String]]] = {
     if (docIds.isEmpty) List()
     else {
       val sdDirectory: FSDirectory = FSDirectory.open(Paths.get(simSearch.sdIndexPath))
       val sdReader: DirectoryReader = DirectoryReader.open(sdDirectory)
       val sdSearcher: IndexSearcher = new IndexSearcher(sdReader)
+      val oFields: Set[String] = if (outFlds.isEmpty) Conf.idxFldNames ++ Set("db", "update_date") else outFlds
 
       val list: List[Map[String, List[String]]] = limitDocs(docIds, maxDocs, List()).
         foldLeft[List[Map[String, List[String]]]](List()) {
           case (lst, id) =>
-            val oFields: Set[String] = if (outFlds.isEmpty) Conf.idxFldNames else outFlds
             val fields: Map[String, List[String]] = getDocFields(id, sdSearcher, oFields)
             if (fields.isEmpty) lst else {
-              lastDays match {
-                case Some(ldays) =>
-                  val now: GregorianCalendar = new GregorianCalendar(TimeZone.getDefault)
-                  val year: Int = now.get(Calendar.YEAR)
-                  val month: Int = now.get(Calendar.MONTH)
-                  val day: Int = now.get(Calendar.DAY_OF_MONTH)
-                  val todayCal: GregorianCalendar = new GregorianCalendar(year, month, day, 0, 0) // begin of today
-                  todayCal.add(Calendar.DAY_OF_MONTH, -ldays + 1) // begin of x days ago
-                  val daysAgo: String = formatter.format(todayCal.getTime)
-
+              beginDate match {
+                case Some(bDate) =>
                   fields.get("update_date") match {
                     case Some(lst2) =>
+                      val daysAgo: String = formatter.format(bDate)
                       if (lst2.head.compareTo(daysAgo) >= 0) lst :+ fields
                       else lst
                     case None => lst
@@ -497,8 +518,8 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param content document field content
     * @return probably a list of Lucene documents
     */
-  private def getDocuments(field: String,
-                           content: String): Option[List[Document]] = {
+  def getDocuments(field: String,
+                   content: String): Option[List[Document]] = {
     require(field != null)
     require(content != null)
 
@@ -508,7 +529,36 @@ class TopIndex(simSearch: SimDocsSearch,
 
     val docs: TopDocs = topSearcher.search(query, Integer.MAX_VALUE)
     // val result = docs.totalHits.value match { Lucene 8.0.0
-    val result: Option[List[Document]] = docs.totalHits match {
+    val result: Option[List[Document]] = docs.totalHits.value match {
+      case 0 => None
+      case _ => docs.scoreDocs.foldLeft[Option[List[Document]]] (Some(List[Document]())) {
+        case (slst, sdoc) => slst.map(_ :+ topSearcher.doc(sdoc.doc))
+      }
+    }
+
+    topReader.close()
+    result
+  }
+
+  /**
+    * Retrieves Lucene Document objects given a map of (field name -> field content)
+    *
+    * @param fieldAndContent a map of document (field name -> field content)
+    * @return probably a list of Lucene documents
+    */
+  def getDocuments(fieldAndContent: Map[String,String]): Option[List[Document]] = {
+    require(fieldAndContent != null)
+
+    val topReader: DirectoryReader = DirectoryReader.open(topWriter)
+    val topSearcher: IndexSearcher = new IndexSearcher(topReader)
+
+    val bbuilder: BooleanQuery.Builder = new BooleanQuery.Builder()
+    fieldAndContent.foreach(kv => bbuilder.add(new TermQuery(new Term(kv._1, kv._2)), BooleanClause.Occur.MUST))
+    val query: BooleanQuery = bbuilder.build()
+
+    val docs: TopDocs = topSearcher.search(query, Integer.MAX_VALUE)
+    // val result = docs.totalHits.value match { Lucene 8.0.0
+    val result: Option[List[Document]] = docs.totalHits.value match {
       case 0 => None
       case _ => docs.scoreDocs.foldLeft[Option[List[Document]]] (Some(List[Document]())) {
         case (slst, sdoc) => slst.map(_ :+ topSearcher.doc(sdoc.doc))
@@ -536,7 +586,8 @@ class TopIndex(simSearch: SimDocsSearch,
     val topSearcher: IndexSearcher = new IndexSearcher(topReader)
     val topDocs: TopDocs = topSearcher.search(query, Integer.MAX_VALUE)
 
-    val totalHits = topDocs.totalHits.toInt  // topDocs.totalHits.value em Lucene 8.0.0
+    //val totalHits = topDocs.totalHits.toInt
+    val totalHits: Int = topDocs.totalHits.value.toInt // Lucene 8.0.0
     (0 until totalHits).foreach {
       pos =>
         val scoreDoc: ScoreDoc = topDocs.scoreDocs(pos)
@@ -567,6 +618,7 @@ class TopIndex(simSearch: SimDocsSearch,
         updating = false
       }
     }
+    ()
   }
 
   /**
@@ -639,17 +691,12 @@ class TopIndex(simSearch: SimDocsSearch,
     val content: String = doc.getField(contentFldName).stringValue()
     ndoc.add(new StoredField(contentFldName, content))
 
+    val beginDate: Long = Tools.getIahxModificationTime - Tools.daysToTime(Conf.excludeDays + Conf.numDays)
+    val lastDays: Int = Tools.timeToDays(updateTime - beginDate)
     // Include 'sd_id' (similar docs) fields
-    val docIds: List[Int] = simSearch.searchIds(content, sources, instances, maxDocs, Conf.minNGrams, Conf.lastDays).map(_._1)
-    val rem: Int = maxDocs - docIds.size
-
-    val docIds2: List[Int] = {
-      if (rem > 0) {
-        val ids: Option[Set[Int]] = Some(docIds.toSet)
-        docIds ++ simSearch.searchIds(content, sources, instances, rem, Conf.minNGrams, None, ids).map(_._1)
-      } else docIds
-    }
-    docIds2.foreach(sdId => ndoc.add(new StoredField(sdIdFldName, sdId)))
+    val docIds: List[Int] = simSearch.search(content, Set[String](), maxDocs, Conf.minNGrams, sources, instances,
+                                             Some(lastDays)).map(_._1)
+    docIds.foreach(sdId => ndoc.add(new StoredField(sdIdFldName, sdId)))
 
     // Update document
     topWriter.updateDocument(new Term(idFldName, id), ndoc)
@@ -709,8 +756,8 @@ class TopIndex(simSearch: SimDocsSearch,
     * @return the number of documents whose field "update_time" was set to zero
     */
   def resetAllTimes(): Int = {
-    val updateTime = 0
-    val query = new MatchAllDocsQuery()
+    val updateTime: Long = 0
+    val query: MatchAllDocsQuery = new MatchAllDocsQuery()
 
     val topReader: DirectoryReader = DirectoryReader.open(topWriter)
     val topSearcher: IndexSearcher = new IndexSearcher(topReader)
@@ -802,19 +849,24 @@ object TopIndex extends App {
   val profiles: Set[String] = parameters("profiles").split(" *, *").toSet
   val outFields: Set[String] = parameters.get("outFields") match {
     case Some(sFields) => sFields.split(" *, *").toSet
-    case None => Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs", "update_date")//service.Conf.idxFldNames
+    case None => Set("id", "ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs", "update_date")//service.Conf.idxFldNames
   }
   val maxDocs: Int = Conf.maxDocs
   val sources: Option[Set[String]] = Conf.sources
   val instances: Option[Set[String]] = Conf.instances
   val considerDate = parameters.contains("considerDate")
-  val lastDays: Option[Int] = if (considerDate) Conf.lastDays else None
+  val beginDate: Option[Long] = if (considerDate) {
+    Some(Tools.getIahxModificationTime - Tools.daysToTime(Conf.excludeDays + Conf.numDays))
+  } else None
   val search: SimDocsSearch = new SimDocsSearch(sdIndexPath, decsIndexPath)
   val topIndex: TopIndex = new TopIndex(search, topIndexPath)
   if (parameters.contains("preprocess")) preProcess(topIndex, maxDocs, sources, instances)
   else topIndex.resetUpdateTime(psId, profiles)
-  val result: String = topIndex.getSimDocsXml(psId, profiles, outFields, maxDocs, lastDays, sources, instances)
+  val result: String = topIndex.getSimDocsXml(psId, profiles, outFields, maxDocs, beginDate, sources, instances)
   topIndex.close()
 
+  /*val xml = XML.loadString("<a>Alana<b><c>Beth</c><d>Catie</d></b></a>")
+  val formatted = new PrettyPrinter(150, 4).format(xml)
+  print(formatted)*/
   println(s"result=$result")
 }

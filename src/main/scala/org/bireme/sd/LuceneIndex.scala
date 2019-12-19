@@ -17,7 +17,8 @@ import org.apache.lucene.document.{Document,Field,StoredField,TextField}
 import org.apache.lucene.index.{IndexWriter,IndexWriterConfig}
 import org.apache.lucene.store.FSDirectory
 
-import scala.collection.JavaConverters._
+//import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /** Creates a Lucene index from a set of xml document files
 *

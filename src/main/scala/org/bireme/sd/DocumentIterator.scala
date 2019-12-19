@@ -14,7 +14,8 @@ import org.apache.lucene.index.{DirectoryReader, IndexReader}
 import org.apache.lucene.search.{IndexSearcher, MatchAllDocsQuery, Query, ScoreDoc}
 import org.apache.lucene.store.FSDirectory
 
-import collection.JavaConverters._
+//import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
 /** Iterator of Lucene documents

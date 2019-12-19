@@ -1,6 +1,7 @@
 package org.bireme.sd
 
-import collection.JavaConverters._
+//import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 import java.io.File
 
@@ -23,7 +24,6 @@ object IndexTest extends App {
   if (size < 2) usage()
 
   val term = if (size > 2) args(2) else "dengue"
-
 
   val hits = Try[Int] {
     val directory: FSDirectory = FSDirectory.open(new File(args(0)).toPath)
@@ -54,8 +54,8 @@ object IndexTest extends App {
     val query = new TermQuery(term)
     val isearcher = new IndexSearcher(ireader)
     val topDocs: TopDocs = isearcher.search(query, 1000)
-    //val totalHits: Long = topDocs.totalHits.value Lucene 8.0.0
-    val totalHits: Long = topDocs.totalHits
+    val totalHits: Long = topDocs.totalHits.value //Lucene 8.0.0
+    //val totalHits: Long = topDocs.totalHits
 
     if (totalHits <= 0) throw new Exception("totalHits <= 0")
 
@@ -68,4 +68,3 @@ object IndexTest extends App {
     totalHits.toInt
   }
 }
-
