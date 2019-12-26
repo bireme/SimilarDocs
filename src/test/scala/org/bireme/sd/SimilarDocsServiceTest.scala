@@ -8,6 +8,7 @@
 package org.bireme.sd
 
 import java.net.{URI, URL}
+import java.util.{GregorianCalendar, TimeZone}
 
 import org.bireme.sd.service.Conf
 import org.scalatest.matchers.should.Matchers._
@@ -24,6 +25,10 @@ import scala.util.matching.Regex
 * date: 20170717
 */
 class SimilarDocsServiceTest extends AnyFlatSpec {
+
+  val todayCal: GregorianCalendar = new GregorianCalendar(TimeZone.getDefault)
+  val endDayAgo: Int = Tools.timeToDays(todayCal.getTimeInMillis - Tools.getIahxModificationTime) + Conf.excludeDays
+  val beginDayAgo: Int = endDayAgo + Conf.numDays
 
   /**
     * Load the content of a web page and check if there is a timeout
@@ -68,8 +73,8 @@ class SimilarDocsServiceTest extends AnyFlatSpec {
     }
   }
 
-  //val service = "http://similardocs.bireme.org"
-  val service = "http://basalto01.bireme.br:8180/SDService"
+  val service = "http://similardocs.bireme.org"
+  //val service = "http://basalto01.bireme.br:8180/SDService"
   //val service = "http://serverofi5.bireme.br:8180/SDService"
   //val service = "http://localhost:8084"
 
@@ -155,22 +160,31 @@ class SimilarDocsServiceTest extends AnyFlatSpec {
       }
   }
 
-  // === Check the "Get Similar Documents" service (quality of retrieved docs) using 'lastDays' parameter equal to 90 ===
+  // === Check the "Get Similar Documents" service (quality of retrieved docs) using 'lastDays' ===
   val profTotal: Map[String, Int] = profiles.foldLeft(Map[String, Int]()) {
     case (map, prof) =>
-      val url = s"$service/SDService?adhocSimilarDocs=${prof._2}&lastDays=90&sources=${Conf.sources.get.mkString(",")}"
+      val url = s"$service/SDService?adhocSimilarDocs=${prof._2}&lastDays=$beginDayAgo&sources=${Conf.sources.get.mkString(",")}"
       val content = pageContent(url)
       map + (prof._1 -> doc.findAllMatchIn(content).size)
   }
 
-  s"The user '$id'" should "have at least 01 similar document" in {
-    profTotal.values.sum should be > 0
+  val profTotalSum: Int = profTotal.values.sum
+  if (profTotalSum == 0) {
+    val profTotal: Map[String, Int] = profiles.foldLeft(Map[String, Int]()) {
+      case (map, prof) =>
+        val url = s"$service/SDService?adhocSimilarDocs=${prof._2}&lastDays=${2 * beginDayAgo}&sources=${Conf.sources.get.mkString(",")}"
+        val content = pageContent(url)
+        map + (prof._1 -> doc.findAllMatchIn(content).size)
+    }
+    s"The user '$id'" should "have at least 01 similar document" in {
+      profTotal.values.sum should be > 0
+    }
   }
 
   val doc1: Regex = "<document>".r
   profiles.foreach {
     prof =>
-      val url: String = s"$service/SDService?psId=$id&getSimDocs=${prof._1}"
+      val url: String = s"$service/SDService?psId=$id&getSimDocs=${prof._1}&considerDate="
       val content: String = pageContent(url).toLowerCase
       val found = doc1.findAllMatchIn(content).size
       val total = profTotal.getOrElse(prof._1, -1)
@@ -185,7 +199,7 @@ class SimilarDocsServiceTest extends AnyFlatSpec {
 
   found.foreach {
     prof =>
-      val url: String = s"$service/SDService?psId=$id&getSimDocs=$prof"
+      val url: String = s"$service/SDService?psId=$id&getSimDocs=$prof&considerDate="
       val content: String = pageContent(url).toLowerCase
       val profWords: Set[String] = profiles(prof).toLowerCase.replaceAll("\\[-,:_]", " ").
         split("[\\s+.]").filter(arr => arr.length > 3).toSet
@@ -236,19 +250,19 @@ class SimilarDocsServiceTest extends AnyFlatSpec {
       }
   }
 
-  // === Check the "Get Similar Documents" service (quality of retrieved docs) using 'lastDays' parameter equal to 7 ===
+  // === Check the "Get Similar Documents" service (quality of retrieved docs) using 'lastDays' parameter ===
   val profTotal2: Map[String, Int] = profiles_Renato.foldLeft(Map[String, Int]()) {
     case (map, prof) =>
-      val url = s"$service/SDService?adhocSimilarDocs=${prof._2}&lastDays=7&sources=${Conf.sources.get.mkString(",")}"
+      val url = s"$service/SDService?adhocSimilarDocs=${prof._2}&lastDays=$beginDayAgo&sources=${Conf.sources.get.mkString(",")}"
       val content = pageContent(url)
       map + (prof._1 -> doc.findAllMatchIn(content).size)
   }
 
-  // if there are no documents in 7 days then try 20 days
+  // if there are no documents then try with more 30 days
   if (profTotal2.values.sum == 0) {
     val profTotal2a: Map[String, Int] = profiles_Renato.foldLeft(Map[String, Int]()) {
       case (map, prof) =>
-        val url = s"$service/SDService?adhocSimilarDocs=${prof._2}&lastDays=20&sources=${Conf.sources.get.mkString(",")}"
+        val url = s"$service/SDService?adhocSimilarDocs=${prof._2}&lastDays=${beginDayAgo + 30}&sources=${Conf.sources.get.mkString(",")}"
         val content = pageContent(url)
         map + (prof._1 -> doc.findAllMatchIn(content).size)
     }

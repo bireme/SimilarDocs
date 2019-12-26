@@ -137,12 +137,22 @@ public class SDService extends HttpServlet {
                 if (adhocSimilarDocs.trim().isEmpty()) {
                     out.println("<ERROR>missing 'adhocSimDocs' parameter</ERROR>");
                 } else {
+                    final String explainPar = request.getParameter("explain");
+                    final Boolean explain = (explainPar == null) ? false :
+                                            (explainPar.trim().isEmpty()) ? true :
+                                             Boolean.parseBoolean(explainPar);
+                    
                     final String outFields = request.getParameter("outFields");
                     final String[] oFields = (outFields == null)
                                     ? new String[0]: outFields.split(" *\\, *");
                     Set<String> fields = new HashSet<>();
                     for (String fld: oFields) {
                         fields.add(fld);
+                    }
+                    if (explain) {                        
+                        for (String indField: org.bireme.sd.Tools.setToArray(Conf.idxFldNames())) {
+                            fields.add(indField);
+                        }                        
                     }
                     final String maxDocsPar = request.getParameter("maxDocs");
                     final int maxDocs = (maxDocsPar == null) ? Conf.maxDocs() :
@@ -169,10 +179,6 @@ public class SDService extends HttpServlet {
                         out.println("<ERROR>'lastDays' parameter should be >= 0</ERROR>");
                         return;
                     }
-                    final String explainPar = request.getParameter("explain");
-                    final Boolean explain = (explainPar == null) ? false :
-                                            (explainPar.trim().isEmpty()) ? true :
-                                             Boolean.parseBoolean(explainPar);
                     out.println(simSearch.search(adhocSimilarDocs, fields.toSet(),
                         maxDocs, srcSet.toSet(), instSet.toSet(), lastDays, explain));
                 }

@@ -96,7 +96,8 @@ class SimDocsSearch(val sdIndexPath: String,
       docs.map {
         doc =>
           val ngrams: Option[(List[String], List[String], List[String])] =
-            if (explain) Some(getCommonNGrams(text, doc._2)) else None
+            if (explain) Some(getCommonNGrams(text, loadDoc(doc._1, service.Conf.idxFldNames)))
+            else None
           (doc._3, doc._2, ngrams)
       }
     doc2xml(docs2)
@@ -112,8 +113,7 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param sources filter the valid values of the document field 'db'
     * @param instances filter the valid values of the document field 'instance'
     * @param lastDays filter documents whose 'update_date' is younger or equal to lastDays days
-    * @return a list of pairs with document score and a map of field name and a
-    *         list of its contents
+    * @return a list of pairs with document (id, fields, score, common ngrams)
     */
   def search(text: String,
              outFields: Set[String],
@@ -153,7 +153,7 @@ class SimDocsSearch(val sdIndexPath: String,
                            maxDocs: Int,
                            minNGrams: Int,
                            outFields: Set[String]): Array[(Int, Map[String,List[String]], Float, Set[String])] = {
-    val daysAgo2: Int = daysAgo.getOrElse(Integer.MAX_VALUE)
+    val daysAgo2: Int = daysAgo.getOrElse(18250)  // 50 years
 
     getDocuments(text, sources, instances, daysAgo2, curDay=endDayAgo, maxDocs, minNGrams, outFields)
   }
@@ -166,17 +166,19 @@ class SimDocsSearch(val sdIndexPath: String,
                            maxDocs: Int,
                            minNGrams: Int,
                            outFields: Set[String]): Array[(Int, Map[String,List[String]], Float, Set[String])] = {
-    getBeginEndDate(daysAgo, curDay).foldLeft(Array[(Int, Map[String,List[String]], Float, Set[String])]()) {
-      case (array, (begin,end)) =>
+    getBeginEndDate(daysAgo, curDay) match {
+      case Some((begin,end)) =>
         val orQuery: Query = getQuery(text, sources, instances, Some(begin), Some(end))
+//println("Query => " + orQuery.toString)
         val meta: Array[(Map[String,List[String]], ScoreDoc, Set[String])] =
           getDocMeta(text, orQuery, maxDocs, minNGrams, outFields)
         val docs: Array[(Int, Map[String, List[String]], Float, Set[String])] =
-          array ++ meta.map(t => (t._2.doc, t._1, t._2.score, t._3))
+          meta.map(t => (t._2.doc, t._1, t._2.score, t._3))
         if (docs.length < maxDocs) {
-          docs ++ getDocuments(text, sources, instances, daysAgo, getDaysAgo(begin) + 1, maxDocs - docs.length,
-                               minNGrams, outFields)
+          val curDay2: Int = getDaysAgo(begin) + 1
+          docs ++ getDocuments(text, sources, instances, daysAgo, curDay2, maxDocs - docs.length, minNGrams, outFields)
         } else docs
+      case None => Array[(Int, Map[String,List[String]], Float, Set[String])]()
     }
   }
 
@@ -190,12 +192,12 @@ class SimDocsSearch(val sdIndexPath: String,
                               curDay: Int): Option[(Calendar, Calendar)] = {
     def getDayRange: Option[(Int, Int)] = {
       curDay match {
-        case x if x <= 10 => Some(10, 0)
-        case x if x >= 11 && x <= 30 => Some(30, 11)
-        case x if x >= 31 && x <= 180 => Some(180, 31)
-        case x if x >= 181 && x <= 1095 => Some(1095, 181)
-        case x if x >= 1096 && x <= 3650 => Some(3650, 1096)
-        case x if x >= 3651 => Some(17800, 3671)
+        case x if x <= 10 => Some(Math.min(10,daysAgo), 0)
+        case x if x >= 11 && x <= 30 => Some(Math.min(30,daysAgo), 11)
+        case x if x >= 31 && x <= 180 => Some(Math.min(180,daysAgo), 31)
+        case x if x >= 181 && x <= 1095 => Some(Math.min(1095,daysAgo), 181)
+        case x if x >= 1096 && x <= 3650 => Some(Math.min(3650,daysAgo), 1096)
+        case x if x >= 3651 && x <= 18250 => Some(Math.min(18250,daysAgo), 3671)
         case _ => None
       }
     }
@@ -223,7 +225,7 @@ class SimDocsSearch(val sdIndexPath: String,
     val ngrams: Set[String] = getNGrams(text, analyzer, maxWords)
     val minNGrams2: Int = getMinNGrams(minNGrams, ngrams)
     val result1: Array[(Map[String, List[String]], ScoreDoc, Set[String])] =
-      getDocMeta(text, query, maxDocs, minNGrams2, outFields, Array[(Map[String,List[String]], ScoreDoc, Set[String])](), None)
+      getDocMeta(text, query, maxDocs, minNGrams2, outFields, Array[(Map[String,List[String]], ScoreDoc, Set[String])]())
 
     val orderByNgrams: Boolean = true
 
@@ -244,28 +246,24 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param aux documents already processed
     * @return an array of tuples of (Lucene document fields, score doc, common ngrams)
     */
-  @scala.annotation.tailrec
   private def getDocMeta(text: String,
                          query: Query,
                          maxDocs: Int,
                          minNGrams: Int,
                          outFields: Set[String],
-                         aux: Array[(Map[String,List[String]], ScoreDoc, Set[String])],
-                         lastScoreDoc: Option[ScoreDoc]): Array[(Map[String,List[String]], ScoreDoc, Set[String])] = {
-    val scoreDocs: Array[ScoreDoc] =
-      if (aux.isEmpty) sdSearcher.search(query, maxDocs).scoreDocs
-      else sdSearcher.searchAfter(lastScoreDoc.get, query, maxDocs).scoreDocs
-
+                         aux: Array[(Map[String,List[String]], ScoreDoc, Set[String])]):
+                                                            Array[(Map[String,List[String]], ScoreDoc, Set[String])] = {
+    val scoreDocs: Array[ScoreDoc] = sdSearcher.search(query, 150 * maxDocs).scoreDocs
     val tuples1: Array[(Map[String, List[String]], ScoreDoc)] = scoreDocs.map {
-      scoreDoc => (loadDoc(scoreDoc.doc, outFields ++ service.Conf.idxFldNames  ++ Set("update_date")), scoreDoc)
+      scoreDoc => (loadDoc(scoreDoc.doc, outFields ++ service.Conf.idxFldNames ++ Set("update_date")), scoreDoc)
     }
     val tuples2: Array[(Map[String, List[String]], ScoreDoc, Set[String])] = tuples1.map {
       case (fields, scoreDoc) => (fields, scoreDoc, getCommonNGrams(text, fields)._3.toSet)
     }
     val tuples3: Array[(Map[String, List[String]], ScoreDoc, Set[String])] = tuples2.filter(_._3.size >= minNGrams)
     val result: Array[(Map[String, List[String]], ScoreDoc, Set[String])] = aux ++ tuples3
-    if (result.length < maxDocs) getDocMeta(text, query, maxDocs, minNGrams, outFields, result, scoreDocs.lastOption)
-    else result
+
+    result.take(maxDocs)
   }
 
   private def orderByNumNgrams(e1: (Map[String,List[String]], ScoreDoc, Set[String]),
@@ -481,18 +479,21 @@ class SimDocsSearch(val sdIndexPath: String,
     */
   def getCommonNGrams(original: String,
                       doc: Map[String,List[String]]): (List[String], List[String], List[String]) = {
+    val exclude: Set[String] = Set("id", "db", "update_date")
     val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
     val docSet: Set[String] = doc.foldLeft(Set[String]()) {
       case (set, kv) =>
-        if (kv._1.equals("update_date")) set
+        if (exclude.contains(kv._1)) set
         else set ++ kv._2
     }
     val sim: String = docSet.mkString(" ")
     val set_original: Set[String] = getNGrams(Tools.uniformString(original), analyzer, maxWords)
     //val set_original: Set[String] = getNGrams(Tools.strongUniformString(original), analyzer, maxWords)
     val set_similar: Set[String] = getNGrams(Tools.uniformString(sim), analyzer, maxWords)
+//println(s"text0=[$sim] text=[${Tools.uniformString(sim)}] similar=[${set_similar.mkString(" ")}]")
     //val set_similar: Set[String] = getNGrams(Tools.strongUniformString(sim), analyzer, maxWords)
     val set_common: Set[String] = set_original.intersect(set_similar)
+//println(s"common=[${set_common.mkString(" ")}]")
 
     (set_original.toList, set_similar.toList, set_common.toList)
   }
@@ -542,7 +543,7 @@ class SimDocsSearch(val sdIndexPath: String,
                           )]): String = {
     require (docs != null)
 
-    docs.foldLeft[String]("<?xml version=\"1.0\" encoding=\"UTF-8\"?><documents>") {
+    docs.foldLeft[String](s"""<?xml version="1.0" encoding="UTF-8"?><documents total="${docs.size}">""") {
       case (str, doc) =>
         val fields: List[(String, List[String])] = doc._2.toList
         val fields2: List[(String, List[String])] = doc._3 match {
@@ -592,7 +593,6 @@ object SimDocsSearch extends App {
       if (split.length == 1) map + ((split(0).substring(2), ""))
       else map + ((split(0).substring(1), split(1)))
   }
-
   val sdIndex: String = parameters("sdIndex")
   val decsIndex: String = parameters("decsIndex")
   val text: String = parameters("text")
@@ -609,29 +609,20 @@ object SimDocsSearch extends App {
   val maxWords: Int = search.maxWords
 
   val docs: List[(Int, Map[String, List[String]], Float, Set[String])] =
-    search.search(text, outFields, maxDocs, minNGrams, sources,instances, lastDays)
-
+    search.search(text, outFields, maxDocs, minNGrams, sources, instances, lastDays)
   docs.foreach {
-    case (_, doc, score, _) =>
-      val (set_original, set_similar, set_common) = search.getCommonNGrams(text, doc)
+    case (id, doc, score, _) =>
+      val (set_original, set_similar, set_common) = search.getCommonNGrams(text, search.loadDoc(id, service.Conf.idxFldNames))
 
       println("\n------------------------------------------------------")
       println(s"score: $score")
-      print("original ngrams: ")
-      set_original.foreach(str => print(s"[$str] "))
-      print("\nsimilar ngrams: ")
-      set_similar.foreach(str => print(s"[$str] "))
-      print("\ncommon ngrams: ")
-      set_common.foreach(str => print(s"[$str] "))
+      print(s"original ngrams: ${set_original.mkString(", ")}")
+      print(s"\nsimilar ngrams: ${set_similar.mkString(", ")}")
+      print(s"\ncommon ngrams: ${set_common.mkString(", ")}")
       println("\n")
-      doc.foreach {
-        case(tag,list) =>
-          list.foreach {
-            content => println(s"[$tag]: $content")
-          }
-      }
+      doc.foreach { case (tag,list) => list.foreach(content => println(s"[$tag]: $content")) }
   }
+
   search.close()
-  //println(search.doc2json(docs))
   println(s"Elapsed time2: ${new Date().getTime - startTime}")
 }

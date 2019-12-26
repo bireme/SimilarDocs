@@ -162,6 +162,13 @@ object Tools {
 
     if (mod == 0) div else (div + 1)
   }
+
+  /**
+    * Convert scala set into array. Used in java code
+    * @param set input set to be converted
+    * @return output array
+    */
+  def setToArray(set: Set[String]): Array[String] = set.toArray
 }
 
 object ToolsApp extends App {
