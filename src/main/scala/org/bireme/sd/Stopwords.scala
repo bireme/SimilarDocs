@@ -20,8 +20,7 @@ import scala.jdk.CollectionConverters._
   * date: 20170102
   **/
 object Stopwords {
-  def getStopwords: CharArraySet =
-                           new CharArraySet(All.asJavaCollection, true)
+  def getStopwords: CharArraySet = new CharArraySet(All.asJavaCollection, true)
 
   val English: Set[String] = Set[String](
     "a", "able", "about", "above", "abst", "accordance", "according", "accordingly",

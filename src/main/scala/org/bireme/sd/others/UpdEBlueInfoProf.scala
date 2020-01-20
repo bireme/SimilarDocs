@@ -18,7 +18,7 @@ import org.bireme.sd.service.TopIndex
 import scala.collection.immutable.TreeSet
 
 /**
-  * Create and/or update e-BlueInfo profiles in the TopIndex Lucene index. Alse delete profiles
+  * Create and/or update e-BlueInfo profiles in the TopIndex Lucene index. Also delete profiles
   * that are not used anymore.
   */
 object UpdEBlueInfoProf extends App {
@@ -26,9 +26,9 @@ object UpdEBlueInfoProf extends App {
     System.err.println("usage: UpdEBlueInfoProf <options>")
     System.err.println("options:")
     System.err.println("\t-pdfPath=<path> - path to the pdfs files")
-    System.err.println("\t-decsPath=<path> - path to Isis decs master file")
-    System.err.println("\t-simDocsPath=<path> - path to the Similar Documents Lucene index")
-    System.err.println("\t-topIndexPath=<path> path/name to the TopIndex Lucene index")
+    System.err.println("\t-decsPath=<path> - path/name to Lucene DeCS index")
+    System.err.println("\t-simDocsPath=<path> - path/name to the Similar Documents Lucene index")
+    System.err.println("\t-topIndexPath=<path> - path/name to the TopIndex Lucene index")
   }
 
   if (args.length != 4) usage()

@@ -27,8 +27,8 @@ import scala.jdk.CollectionConverters._
 
 /** Class that looks for similar documents of given ones
   *
-  * @param sdIndexPath similar documents index path
-  * @param decsIndexPath decs index path
+  * @param sdIndexPath Lucene similar documents index path
+  * @param decsIndexPath Lucene index with DeCS documents
   */
 class SimDocsSearch(val sdIndexPath: String,
                     val decsIndexPath: String) {

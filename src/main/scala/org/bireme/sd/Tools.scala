@@ -160,7 +160,7 @@ object Tools {
     val div = (time / quo).toInt
     val mod = (time % quo).toInt
 
-    if (mod == 0) div else (div + 1)
+    if (mod == 0) div else div + 1
   }
 
   /**
