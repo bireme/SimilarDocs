@@ -31,7 +31,7 @@ object OneWordDecs {
   /**
     * Create a Lucene index with documents having DeCS descriptors and synonyms
     * @param decsDir Isis database path having DeCS records
-    * @param indexPath destination Lucene index with DeCS documents
+    * @param indexPath destination Lucene index with DeCS descritors/synonyms
     */
   def createIndex(decsDir: String,
                   indexPath: String): Unit = {
@@ -48,7 +48,7 @@ object OneWordDecs {
 
     mst.iterator().asScala.foreach {
       rec => createDoc(rec).foreach {
-        doc => indexWriter.addDocument(doc)
+        fld => indexWriter.addDocument(fld)
       }
     }
     indexWriter.forceMerge(1)
@@ -202,6 +202,8 @@ object OneWordDecs {
 object OneWordDecsCreate extends App {
   private def usage(): Unit = {
     Console.println("usage: OneWordDecsCreate <decsDir> <decsIndex>")
+    Console.println("\t<decsDir> - Isis database path having DeCS records")
+    Console.println("\t<decsIndex> - Lucene index with DeCS descritors/synonyms")
     System.exit(1)
   }
 
@@ -213,6 +215,8 @@ object OneWordDecsCreate extends App {
 object OneWordDecsTest extends App {
   private def usage(): Unit = {
     Console.println("usage: OneWordDecsTest <decsIndex> <sentence>")
+    Console.println("\t<decsIndex> - Lucene index with DeCS descritors/synonyms")
+    Console.println("\t<sentence> - text from which the descritors will be looked for")
     System.exit(1)
   }
 

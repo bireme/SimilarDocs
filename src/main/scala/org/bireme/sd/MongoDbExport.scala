@@ -8,15 +8,15 @@
 
 package org.bireme.sd
 
-import java.io.File
-import java.nio.file.{Files, Paths}
+import com.google.gson.{GsonBuilder, JsonParser}
+import java.io.{File, StringWriter}
 import java.nio.charset.Charset
+import java.nio.file.{Files, Paths}
 import java.text.SimpleDateFormat
 import java.util.{Calendar, Date, GregorianCalendar, TimeZone}
 
-import org.mongodb.scala.{FindObservable, MongoClient, MongoCollection, MongoDatabase}
 import org.mongodb.scala.bson.collection.immutable.Document
-import play.api.libs.json._
+import org.mongodb.scala.{FindObservable, MongoClient, MongoCollection, MongoDatabase}
 
 /** Export all documents from a MongoDb collection to a file
 *
@@ -64,17 +64,22 @@ class MongoDbExport(host: String,
 
     val writer = Files.newBufferedWriter(Paths.get(outFile),
                                          Charset.forName("utf-8"))
+    val gson = new GsonBuilder().setPrettyPrinting().create()
     var first = true
 
     writer.write("{\"docs\": [\n")
 
     docs.foreach {
       doc =>
-        val json = Json.parse(doc.toString)
-        val jsonStr = if (prettyPrint) Json.prettyPrint(json)
-                      else Json.stringify(json)
+        val writer = new StringWriter()
+        val docStr: String  = doc.toString
+        val jsonStr: String =
+          if (prettyPrint) gson.toJson(JsonParser.parseString(docStr))
+          else docStr
+
         if (first) first = false
         else writer.write(",\n")
+
         writer.write(jsonStr)
     }
 

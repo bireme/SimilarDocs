@@ -11,7 +11,6 @@ import java.io.File
 import java.util.Date
 
 import org.apache.lucene.document.Document
-import org.bireme.xds.XDocServer.{DocumentServer, FSDocServer}
 import org.bireme.sd.SimDocsSearch
 import org.bireme.sd.service.TopIndex
 
@@ -41,8 +40,8 @@ object UpdEBlueInfoProf extends App {
       else map + ((split(0).substring(1), split(1)))
   }
 
-  val userName: String = "<<<e-BlueInfo>>>"
-  val profName: String = "<<<id>>>>"
+  val userName: String = "~~~e-BlueInfo~~~"
+  val profName: String = "~~~id~~~"
 
   val pdfPath: String = parameters("pdfPath")
   val decsPath: String = parameters("decsPath")
@@ -100,21 +99,12 @@ object UpdEBlueInfoProf extends App {
     * @return a string having the union of strings of the fields title, descriptors, abstract from e-BlueInfo document info
     */
   private def getDocInfoContent(info: Map[String, Set[String]]): Option[String] = {
-    val title: Option[TreeSet[String]] = info.get("ti").map {
-      _.foldLeft(TreeSet[String]()) {
-        case (tset, tit) => tset + tit
-      }
-    }
-    val descriptors: Option[TreeSet[String]] = info.get("mh").map {
-      _.foldLeft(title.getOrElse(TreeSet[String]())) {
-        case (dset, descr) => dset + descr
-      }
-    }
-    val abstracts: Option[TreeSet[String]] = info.get("ab").map {
-      _.foldLeft(descriptors.getOrElse(TreeSet[String]())) {
-        case (aset, abstr) => aset + abstr
-      }
-    }
-    abstracts.map(_.mkString(" "))
+    val title: Set[String] = info.getOrElse("ti", Set[String]())
+    val descriptors: Set[String] = info.getOrElse("mh", Set[String]())
+    val abstracts: Set[String] = info.getOrElse("ab", Set[String]())
+    val all: TreeSet[String] = TreeSet[String]() ++ title ++ descriptors ++ abstracts
+
+    if (all.isEmpty) None
+    else Some(all.mkString(" "))
   }
 }

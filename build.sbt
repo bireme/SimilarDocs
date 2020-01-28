@@ -62,12 +62,12 @@ lazy val SDService = (project in file("./SDService")).
 
 val luceneVersion = "8.4.1" //"7.5.0"
 val akkaVersion =  "2.6.1" //"2.5.25"
-val httpClientVersion = "4.5.10" //"4.5.9"
+val httpClientVersion = "4.5.11" //"4.5.9"
 val scalaTestVersion = "3.1.0" //"3.0.8"
 val mongodbDriverVersion = "2.8.0" //"2.7.0"
-val playVersion = "2.8.1" //"2.7.4"
 //val hairyfotrVersion = "0.1.17"
 val h2DatabaseVersion = "1.4.200" //"1.4.199"
+val gsonVersion = "2.8.6"
 
 libraryDependencies ++= Seq(
   "org.apache.lucene" % "lucene-core" % luceneVersion,
@@ -75,14 +75,15 @@ libraryDependencies ++= Seq(
   "org.apache.lucene" % "lucene-queryparser" % luceneVersion,
   "org.apache.lucene" % "lucene-queries" % luceneVersion,
   "org.apache.lucene" % "lucene-backward-codecs" % luceneVersion,
+  "org.apache.lucene" % "lucene-codecs" % luceneVersion % Test,
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   //"com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
   "org.apache.httpcomponents" % "httpclient" % httpClientVersion,
   "org.scalactic" %% "scalactic" % scalaTestVersion,
   "org.scalatest" %% "scalatest" % scalaTestVersion % "test",
   "org.mongodb.scala" %% "mongo-scala-driver" % mongodbDriverVersion,
-  "com.typesafe.play" %% "play-json" % playVersion,
-  "com.h2database" % "h2" % h2DatabaseVersion
+  "com.h2database" % "h2" % h2DatabaseVersion,
+  "com.google.code.gson" % "gson" % gsonVersion
 )
 
 test in assembly := {}
@@ -92,8 +93,13 @@ trapExit :=  false  // To allow System.exit() without an exception (TestIndex.sc
 
 //addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % hairyfotrVersion)
 
-assemblyMergeStrategy in assembly := {
-  case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+/*assemblyMergeStrategy in assembly := {
+  //case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+  case PathList("META-INF", xs @ _*) =>
+    (xs map {_.toLowerCase}) match {
+      case ("manifest.mf" :: Nil) => MergeStrategy.discard
+      case _ => MergeStrategy.last
+    }
   case x => MergeStrategy.first
-}
+}*/
 
