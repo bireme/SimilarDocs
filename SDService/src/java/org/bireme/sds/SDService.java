@@ -63,12 +63,8 @@ public class SDService extends HttpServlet {
         topIndex = new TopIndex(simSearch, topIndexPath);
                 
         topIndex.resetAllTimes();
-        topIndex.asyncUpdSimilarDocs(Conf.maxDocs(), Conf.sources(), 
-                                     Conf.instances());
-        /*
-        topIndex.updateAllSimilarDocs(Conf.maxDocs(), Conf.sources(), 
-                                      Conf.instances());//updaterService.stop();
-        */
+        /*topIndex.asyncUpdSimilarDocs(Conf.maxDocs(), Conf.sources(),
+                                     Conf.instances());*/
       
         context.setAttribute("MAINTENANCE_MODE", Boolean.FALSE);
     }
@@ -147,12 +143,14 @@ public class SDService extends HttpServlet {
                                     ? new String[0]: outFields.split(" *\\, *");
                     Set<String> fields = new HashSet<>();
                     for (String fld: oFields) {
-                        fields.add(fld);
+                        fields.addOne(fld);
                     }
                     if (explain) {                        
                         for (String indField: org.bireme.sd.Tools.setToArray(Conf.idxFldNames())) {
-                            fields.add(indField);
-                        }                        
+                            fields.addOne(indField);
+                        }                 
+                        fields.addOne("db");
+                        fields.addOne("update_date");
                     }
                     final String maxDocsPar = request.getParameter("maxDocs");
                     final int maxDocs = (maxDocsPar == null) ? Conf.maxDocs() :
@@ -179,8 +177,12 @@ public class SDService extends HttpServlet {
                         out.println("<ERROR>'lastDays' parameter should be >= 0</ERROR>");
                         return;
                     }
+                    final String oneTimePer = request.getParameter("oneTimePeriod");
+                    final boolean oneTimePeriod = (oneTimePer == null) ? false :
+                            Boolean.parseBoolean(oneTimePer);
                     out.println(simSearch.search(adhocSimilarDocs, fields.toSet(),
-                        maxDocs, srcSet.toSet(), instSet.toSet(), lastDays, explain));
+                        maxDocs, srcSet.toSet(), instSet.toSet(), lastDays, 
+                        explain, !oneTimePeriod));
                 }
                 return;
             }
@@ -279,7 +281,7 @@ public class SDService extends HttpServlet {
         out.println("psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;]");
         out.println("psId=&lt;id&gt;&amp;showUsers=true");
         out.println("psId=&lt;id&gt;&amp;showProfiles=true");
-        out.println("adhocSimilarDocs=&lt;sentence&gt;[outFields=&lt;field&gt;,...,&lt;field&gt;][maxDocs=&lt;num&gt;][sources=&lt;src&gt;,...,&lt;src&gt;][instances=&lt;inst&gt;,...,&lt;inst&gt;][&amp;lastDays=&lt;num&gt;][&amp;explain=&lt;bool&gt;]");
+        out.println("adhocSimilarDocs=&lt;sentence&gt;[outFields=&lt;field&gt;,...,&lt;field&gt;][maxDocs=&lt;num&gt;][sources=&lt;src&gt;,...,&lt;src&gt;][instances=&lt;inst&gt;,...,&lt;inst&gt;][&amp;lastDays=&lt;num&gt;][&amp;explain=&lt;bool&gt;][&amp;oneTimePeriod=&lt;bool&gt;]");
         out.println("</SYNTAX>");
     }
 

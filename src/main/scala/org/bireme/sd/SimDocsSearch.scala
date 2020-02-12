@@ -10,7 +10,6 @@ package org.bireme.sd
 import java.io.File
 import java.nio.file.Path
 import java.text.{DateFormat, SimpleDateFormat}
-import java.time.temporal.ChronoUnit
 import java.util.{Calendar, Date, GregorianCalendar, TimeZone}
 
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
@@ -22,7 +21,6 @@ import org.apache.lucene.store.FSDirectory
 import org.bireme.dh.CharSeq
 import org.bireme.sd.service.Conf
 
-//import scala.collection.JavaConverters._
 import scala.jdk.CollectionConverters._
 
 /** Class that looks for similar documents of given ones
@@ -75,6 +73,7 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param instances filter the valid values of the document field 'instance'
     * @param lastDays filter documents whose 'update_date' is younger or equal to lastDays days
     * @param explain if true add original, similar and common ngrams to the each outputed similar document
+    * @param splitTime if true split the period of time to look for similar docs
     * @return a json string of the similar documents
     */
   def search(text: String,
@@ -83,7 +82,8 @@ class SimDocsSearch(val sdIndexPath: String,
              sources: Set[String],
              instances: Set[String],
              lastDays: Int,
-             explain: Boolean): String = {
+             explain: Boolean,
+             splitTime: Boolean): String = {
     require((text != null) && (!text.isEmpty))
 
     val days: Option[Int] = if (lastDays <= 0) None else Some(lastDays)
@@ -91,7 +91,7 @@ class SimDocsSearch(val sdIndexPath: String,
     val insts: Option[Set[String]] = if ((instances == null) || instances.isEmpty) None else Some(instances)
 
     val docs: List[(Int, Map[String, List[String]], Float, Set[String])] =
-      search(text, outFields, maxDocs, service.Conf.minNGrams, srcs, insts, days)
+      search(text, outFields, maxDocs, service.Conf.minNGrams, srcs, insts, days, splitTime)
     val docs2: List[(Float, Map[String, List[String]], Option[(List[String], List[String], List[String])])] =
       docs.map {
         doc =>
@@ -113,6 +113,7 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param sources filter the valid values of the document field 'db'
     * @param instances filter the valid values of the document field 'instance'
     * @param lastDays filter documents whose 'update_date' is younger or equal to lastDays days
+    * @param splitTime if true split the period of time to look for similar docs
     * @return a list of pairs with document (id, fields, score, common ngrams)
     */
   def search(text: String,
@@ -121,7 +122,8 @@ class SimDocsSearch(val sdIndexPath: String,
              minNGrams: Int,
              sources: Option[Set[String]],
              instances: Option[Set[String]],
-             lastDays: Option[Int]): List[(Int, Map[String, List[String]], Float, Set[String])] = {
+             lastDays: Option[Int],
+             splitTime: Boolean): List[(Int, Map[String, List[String]], Float, Set[String])] = {
     require((text != null) && text.nonEmpty)
     require(maxDocs > 0)
     require(minNGrams > 0)
@@ -131,7 +133,7 @@ class SimDocsSearch(val sdIndexPath: String,
     else {
       val oFields: Set[String] = if ((outFields == null) || outFields.isEmpty) Conf.idxFldNames + "id" + "update_date"
                                  else outFields
-      getDocuments(text2, sources, instances, lastDays, maxDocs, minNGrams, oFields).toList
+      getDocuments(text2, sources, instances, lastDays, maxDocs, minNGrams, oFields, splitTime).toList
     }
   }
 
@@ -144,6 +146,7 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param maxDocs maximum number of returned documents
     * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
     * @param outFields name of the fields that will be show in the output
+    * @param splitTime if true split the period of time to look for similar docs
     * @return a list of tuples of (Lucene document id, document fields, document score, common ngrams of the document)
     */
   private def getDocuments(text: String,
@@ -152,65 +155,123 @@ class SimDocsSearch(val sdIndexPath: String,
                            daysAgo: Option[Int],
                            maxDocs: Int,
                            minNGrams: Int,
-                           outFields: Set[String]): Array[(Int, Map[String,List[String]], Float, Set[String])] = {
-    val daysAgo2: Int = daysAgo.getOrElse(18250)  // 50 years
+                           outFields: Set[String],
+                           splitTime: Boolean): Array[(Int, Map[String,List[String]], Float, Set[String])] = {
+    val lowerLimit: Int = daysAgo.getOrElse(18250)  // 50 years
 
-    getDocuments(text, sources, instances, daysAgo2, curDay=endDayAgo, maxDocs, minNGrams, outFields)
+    if (splitTime)
+      getDocuments(text, sources, instances, endDayAgo, lowerLimit, endDayAgo, maxDocs, minNGrams, outFields)
+    else
+      getDocuments(text, sources, instances, lowerLimit, endDayAgo, maxDocs, minNGrams, outFields)
   }
 
+  /**
+    * Search a text and return an array of retrieved document info
+    * @param text input text to be searched
+    * @param sources set of sources to be used in the query expression
+    * @param instances set of instances to be used in the query expression
+    * @param curDay number of days from today used as base date to compute time range used in the query
+    * @param lowerLimit filter documents whose 'update_date' is younger or equal to 'lowerLimit' days
+    * @param upperLimit filter documents whose 'update_date' is older or equal to 'upperLimit' days
+    * @param maxDocs maximum number of returned documents
+    * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
+    * @param outFields name of the fields that will be show in the output
+    * @return a list of tuples of (Lucene document id, document fields, document score, common ngrams of the document)
+    */
   private def getDocuments(text: String,
                            sources: Option[Set[String]],
                            instances: Option[Set[String]],
-                           daysAgo: Int,
                            curDay: Int,
+                           lowerLimit: Int,
+                           upperLimit: Int,
                            maxDocs: Int,
                            minNGrams: Int,
                            outFields: Set[String]): Array[(Int, Map[String,List[String]], Float, Set[String])] = {
-    getBeginEndDate(daysAgo, curDay) match {
-      case Some((begin,end)) =>
-        val orQuery: Query = getQuery(text, sources, instances, Some(begin), Some(end))
-//println("Query => " + orQuery.toString)
+    //println(s"curDay=$curDay lowerLimit=$lowerLimit upperLimit=$upperLimit")
+
+    getBeginEndCalendar(curDay, lowerLimit, upperLimit) match {
+      case Some((begin, _, beginCal, endCal)) =>
+        val orQuery: Query = getQuery(text, sources, instances, Some(beginCal), Some(endCal))
         val meta: Array[(Map[String,List[String]], ScoreDoc, Set[String])] =
           getDocMeta(text, orQuery, maxDocs, minNGrams, outFields)
         val docs: Array[(Int, Map[String, List[String]], Float, Set[String])] =
           meta.map(t => (t._2.doc, t._1, t._2.score, t._3))
         if (docs.length < maxDocs) {
-          val curDay2: Int = getDaysAgo(begin) + 1
-          docs ++ getDocuments(text, sources, instances, daysAgo, curDay2, maxDocs - docs.length, minNGrams, outFields)
+          val curDay2 = begin + 1
+          docs ++
+            getDocuments(text, sources, instances, curDay2, lowerLimit, upperLimit, maxDocs - docs.length, minNGrams, outFields)
         } else docs
       case None => Array[(Int, Map[String,List[String]], Float, Set[String])]()
     }
   }
 
   /**
-    * Get a range of days considering the current day and the oldest acceptable day
-    * @param daysAgo the oldest day that is allowed
-    * @param curDay the current day used to consider the day range
-    * @return (initial calendar day, end calendar day)
+    * Search a text and return an array of retrieved document info. Does not split time into periods of time.
+    * @param text input text to be searched
+    * @param sources set of sources to be used in the query expression
+    * @param instances set of instances to be used in the query expression
+    * @param lowerLimit filter documents whose 'update_date' is younger or equal to 'lowerLimit' days
+    * @param upperLimit filter documents whose 'update_date' is older or equal to 'upperLimit' days
+    * @param maxDocs maximum number of returned documents
+    * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
+    * @param outFields name of the fields that will be show in the output
+    * @return a list of tuples of (Lucene document id, document fields, document score, common ngrams of the document)
     */
-  private def getBeginEndDate(daysAgo: Int,
-                              curDay: Int): Option[(Calendar, Calendar)] = {
-    def getDayRange: Option[(Int, Int)] = {
-      curDay match {
-        case x if x <= 10 => Some(Math.min(10,daysAgo), 0)
-        case x if x >= 11 && x <= 30 => Some(Math.min(30,daysAgo), 11)
-        case x if x >= 31 && x <= 180 => Some(Math.min(180,daysAgo), 31)
-        case x if x >= 181 && x <= 1095 => Some(Math.min(1095,daysAgo), 181)
-        case x if x >= 1096 && x <= 3650 => Some(Math.min(3650,daysAgo), 1096)
-        case x if x >= 3651 && x <= 18250 => Some(Math.min(18250,daysAgo), 3671)
+  private def getDocuments(text: String,
+                           sources: Option[Set[String]],
+                           instances: Option[Set[String]],
+                           lowerLimit: Int,
+                           upperLimit: Int,
+                           maxDocs: Int,
+                           minNGrams: Int,
+                           outFields: Set[String]): Array[(Int, Map[String,List[String]], Float, Set[String])] = {
+    val orQuery: Query =
+      getQuery(text, sources, instances, Some(getDaysAgoCalendar(lowerLimit)), Some(getDaysAgoCalendar(upperLimit)))
+    val meta: Array[(Map[String,List[String]], ScoreDoc, Set[String])] =
+      getDocMeta(text, orQuery, maxDocs, minNGrams, outFields)
+
+    meta.map(t => (t._2.doc, t._1, t._2.score, t._3))
+  }
+
+  /**
+    * Get a range of days considering the current day and the oldest/newest acceptable day
+    * @param curDay the current day used to compute the day range
+    * @param lowerLimit the maximum number of days ago used to calculate the initial search date
+    * @param upperLimit the minimum number of days ago used to calculate the end search date
+    * @return (initial day, end day, initial calendar day, end calendar day)
+    */
+  private def getBeginEndCalendar(curDay: Int,
+                                  lowerLimit: Int,
+                                  upperLimit: Int): Option[(Int, Int, Calendar, Calendar)] = {
+    def getDayRange(curDay: Int,
+                    lowerLimit: Int,
+                    upperLimit: Int): Option[(Int, Int)] = {
+      if (curDay > lowerLimit) None
+      else curDay match {
+        case x if x < 0 => None
+        case x if x >= 0 && x <= 10 => Some(Math.min(10,lowerLimit), Math.max(0,upperLimit))
+        case x if x >= 11 && x <= 40 => Some(Math.min(40,lowerLimit), Math.max(11,upperLimit))
+        case x if x >= 41 && x <= 70 => Some(Math.min(60,lowerLimit), Math.max(41,upperLimit))
+        case x if x >= 71 && x <= 100 => Some(Math.min(100,lowerLimit), Math.max(71,upperLimit))
+        case x if x >= 101 && x <= 160 => Some(Math.min(160,lowerLimit), Math.max(101,upperLimit))
+        case x if x >= 161 && x <= 220 => Some(Math.min(220,lowerLimit), Math.max(161,upperLimit))
+        case x if x >= 221 && x <= 280 => Some(Math.min(280,lowerLimit), Math.max(221,upperLimit))
+        case x if x >= 281 && x <= 460 => Some(Math.min(460,lowerLimit), Math.max(281,upperLimit))
+        case x if x >= 461 && x <= 820 => Some(Math.min(820,lowerLimit), Math.max(461,upperLimit))
+        case x if x >= 821 && x <= 1180 => Some(Math.min(1180,lowerLimit), Math.max(821,upperLimit))
+        case x if x >= 1181 && x <= 18250 => Some(Math.min(18250,lowerLimit), Math.max(1181,upperLimit))
         case _ => None
       }
     }
-
-    if (curDay > daysAgo) None
-    else getDayRange.map {
-      case (begin, end) => (getDaysAgoCalendar(begin), getDaysAgoCalendar(end))
+    getDayRange(curDay, lowerLimit, upperLimit).map {
+      case (begin, end) => (begin, end, getDaysAgoCalendar(begin), getDaysAgoCalendar(end))
     }
   }
 
   /**
     * Get retrieved document's fields, scores and set of common ngrams
     *
+    * @param text input text to be searched
     * @param query Lucene query
     * @param maxDocs maximum number of returned documents
     * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
@@ -224,35 +285,6 @@ class SimDocsSearch(val sdIndexPath: String,
                          outFields: Set[String]): Array[(Map[String,List[String]], ScoreDoc, Set[String])] = {
     val ngrams: Set[String] = getNGrams(text, analyzer, maxWords)
     val minNGrams2: Int = getMinNGrams(minNGrams, ngrams)
-    val result1: Array[(Map[String, List[String]], ScoreDoc, Set[String])] =
-      getDocMeta(text, query, maxDocs, minNGrams2, outFields, Array[(Map[String,List[String]], ScoreDoc, Set[String])]())
-
-    val orderByNgrams: Boolean = true
-
-    val result2: Array[(Map[String, List[String]], ScoreDoc, Set[String])] =
-      if (orderByNgrams) result1.sortWith(orderByNumNgrams)
-      else result1
-
-    result2.map(t => (t._1.filter(kv => outFields.contains(kv._1)), t._2, t._3))
-  }
-
-  /**
-    * Get retrieved document's fields, scores and common ngrams
-    *
-    * @param query Lucene query
-    * @param maxDocs maximum number of returned documents
-    * @param minNGrams minimum number of common ngrams retrieved to consider returning a document
-    * @param outFields name of the fields that will be show in the output
-    * @param aux documents already processed
-    * @return an array of tuples of (Lucene document fields, score doc, common ngrams)
-    */
-  private def getDocMeta(text: String,
-                         query: Query,
-                         maxDocs: Int,
-                         minNGrams: Int,
-                         outFields: Set[String],
-                         aux: Array[(Map[String,List[String]], ScoreDoc, Set[String])]):
-                                                            Array[(Map[String,List[String]], ScoreDoc, Set[String])] = {
     val scoreDocs: Array[ScoreDoc] = sdSearcher.search(query, 150 * maxDocs).scoreDocs
     val tuples1: Array[(Map[String, List[String]], ScoreDoc)] = scoreDocs.map {
       scoreDoc => (loadDoc(scoreDoc.doc, outFields ++ service.Conf.idxFldNames ++ Set("update_date")), scoreDoc)
@@ -260,37 +292,30 @@ class SimDocsSearch(val sdIndexPath: String,
     val tuples2: Array[(Map[String, List[String]], ScoreDoc, Set[String])] = tuples1.map {
       case (fields, scoreDoc) => (fields, scoreDoc, getCommonNGrams(text, fields)._3.toSet)
     }
-    val tuples3: Array[(Map[String, List[String]], ScoreDoc, Set[String])] = tuples2.filter(_._3.size >= minNGrams)
-    val result: Array[(Map[String, List[String]], ScoreDoc, Set[String])] = aux ++ tuples3
+    val result1: Array[(Map[String, List[String]], ScoreDoc, Set[String])] = tuples2.filter(_._3.size >= minNGrams2)
+    val orderByNgrams: Boolean = true
+    val result2: Array[(Map[String, List[String]], ScoreDoc, Set[String])] =
+      if (orderByNgrams) result1.sortWith(orderByNumNgrams)
+      else result1
 
-    result.take(maxDocs)
+    result2.take(maxDocs).map(t => (t._1.filter(kv => outFields.contains(kv._1)), t._2, t._3))
   }
 
+  /**
+    * Order two documents according the number of common ngrams (search text ngrams and retrieved document ngrams)
+    * @param e1 first document
+    * @param e2 second document
+    * @return true if e1 >= e2 or false otherwise
+    */
   private def orderByNumNgrams(e1: (Map[String,List[String]], ScoreDoc, Set[String]),
                                e2: (Map[String,List[String]], ScoreDoc, Set[String])): Boolean = {
-    if (e1._3.size > e2._3.size) true
+    if (e1._3.size > e2._3.size) true  // numNGrams
     else if (e1._3.size == e2._3.size)  {
-      if (e1._2.score > e2._2.score) true
-      else if (e1._2.score == e2._2.score) {
-        val upd_time1: String = e1._1.getOrElse("update_date", List("")).head
-        val upd_time2: String = e2._1.getOrElse("update_date", List("")).head
-        upd_time1.compareTo(upd_time2) > 0
-      } else false
+      val upd_time1: String = e1._1.getOrElse("update_date", List("")).head
+      val upd_time2: String = e2._1.getOrElse("update_date", List("")).head
+      upd_time1.compareTo(upd_time2) > 0
     } else false
   }
-
-  /*
-  private def orderByDate(elem: ((Map[String,List[String]], ScoreDoc, Set[String]),
-                                 (Map[String,List[String]], ScoreDoc, Set[String]))): Boolean = {
-    val t1: String = elem._1._1.getOrElse("update_time", List("")).head
-    val t2: String = elem._2._1.getOrElse("update_time", List("")).head
-    val comp: Int = t1.compareTo(t2)
-
-    if (comp > 0) true
-    else if (comp == 0) elem._1._2.score > elem._2._2.score
-    else true
-  }
-  */
 
   /**
     * Retrieve the number of minimum ngrams according to the input text
@@ -321,16 +346,6 @@ class SimDocsSearch(val sdIndexPath: String,
       dAgoCal.add(Calendar.DAY_OF_MONTH, -days + 1)
       dAgoCal
     }
-  }
-
-  /**
-    *
-    * @param cal the input Calendar
-    * @return the number of days from today until the calendar day
-    */
-  private def getDaysAgo(cal: Calendar): Int = {
-    val daysBetween: Long = ChronoUnit.DAYS.between(cal.toInstant, todayCal.toInstant) + 1
-    daysBetween.toInt
   }
 
   /**
@@ -578,7 +593,8 @@ object SimDocsSearch extends App {
     "\n\t[-minNGrams=<num>] - minimum number of common ngrams retrieved to consider returning a document field text" +
     "\n\t[-sources=<src1>,<src2>,...,<src>] - return only docs that have the value of their field 'db' equal to <srci>" +
     "\n\t[-instances=<inst1>,<inst2>,...,<inst>] - return only docs that have the value of their field 'instance' equal to <insti>" +
-    "\n\t[-lastDays=<num>] - return only docs that are younger than 'lastDays' days compared to update_date flag")
+    "\n\t[-lastDays=<num>] - return only docs that are younger than 'lastDays' days compared to update_date flag" +
+    "\n\t[--splitTime] - if present, split the period of time to look for similar docs")
     System.exit(1)
   }
 
@@ -605,20 +621,21 @@ object SimDocsSearch extends App {
   val sources: Option[Set[String]] = parameters.get("sources").map(_.split(" *, *").toSet)
   val instances: Option[Set[String]] = parameters.get("instances").map(_.split(" *, *").toSet)
   val lastDays: Option[Int] = parameters.get("lastDays").map(_.toInt)
+  val splitTime: Boolean = parameters.contains("splitTime")
   val search: SimDocsSearch = new SimDocsSearch(sdIndex, decsIndex)
   val maxWords: Int = search.maxWords
 
   val docs: List[(Int, Map[String, List[String]], Float, Set[String])] =
-    search.search(text, outFields, maxDocs, minNGrams, sources, instances, lastDays)
+    search.search(text, outFields, maxDocs, minNGrams, sources, instances, lastDays, splitTime)
   docs.foreach {
     case (id, doc, score, _) =>
       val (set_original, set_similar, set_common) = search.getCommonNGrams(text, search.loadDoc(id, service.Conf.idxFldNames))
 
       println("\n------------------------------------------------------")
       println(s"score: $score")
-      print(s"original ngrams: ${set_original.mkString(", ")}")
-      print(s"\nsimilar ngrams: ${set_similar.mkString(", ")}")
-      print(s"\ncommon ngrams: ${set_common.mkString(", ")}")
+      print(s"original ngrams[${set_original.size}]: ${set_original.mkString(", ")}")
+      print(s"\nsimilar ngrams[${set_similar.size}]: ${set_similar.mkString(", ")}")
+      print(s"\ncommon ngrams[${set_common.size}]: ${set_common.mkString(", ")}")
       println("\n")
       doc.foreach { case (tag,list) => list.foreach(content => println(s"[$tag]: $content")) }
   }

@@ -68,7 +68,11 @@ class TopIndex(simSearch: SimDocsSearch,
     */
   def close(): Unit = {
     finishing = true
-    updating = false
+    while (updating) {
+      wait(1000)
+      println("waiting update to finished")
+    }
+    assert(!updating)
     topWriter.close()
     topDirectory.close()
   }
@@ -657,13 +661,15 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param sources update only docs whose field 'db' belongs to sources"
     * @param instances update only docs whose field 'instance' belongs to sources"
     * @param autoCommit do a commit after write
+    * @param splitTime if true split the period of time to look for similar docs
     * @return document with its similar doc fields updated
     */
   private def updateSimilarDocs(doc: Document,
                                 maxDocs: Int,
                                 sources: Option[Set[String]],
                                 instances: Option[Set[String]],
-                                autoCommit: Boolean = true): Document = {
+                                autoCommit: Boolean = true,
+                                splitTime: Boolean = true): Document = {
     val updateTime: Long = new Date().getTime
     val ndoc: Document = new Document()
 
@@ -691,11 +697,9 @@ class TopIndex(simSearch: SimDocsSearch,
     val content: String = doc.getField(contentFldName).stringValue()
     ndoc.add(new StoredField(contentFldName, content))
 
-    val beginDate: Long = Tools.getIahxModificationTime - Tools.daysToTime(Conf.excludeDays + Conf.numDays)
-    val lastDays: Int = Tools.timeToDays(updateTime - beginDate)
     // Include 'sd_id' (similar docs) fields
-    val docIds: List[Int] = simSearch.search(content, Set[String](), maxDocs, Conf.minNGrams, sources, instances,
-                                             Some(lastDays)).map(_._1)
+    val docIds: List[Int] = simSearch.search(content, Set[String](), maxDocs, Conf.minNGrams, sources, instances, None, splitTime)
+      .map(_._1)
     docIds.foreach(sdId => ndoc.add(new StoredField(sdIdFldName, sdId)))
 
     // Update document

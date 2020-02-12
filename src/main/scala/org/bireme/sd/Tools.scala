@@ -152,6 +152,7 @@ object Tools {
 
   /**
     * Convert time in milisecongs into days
+    *
     * @param time number of miliseconds since 1970
     * @return the number of converted days
     */
@@ -165,6 +166,7 @@ object Tools {
 
   /**
     * Convert scala set into array. Used in java code
+    *
     * @param set input set to be converted
     * @return output array
     */
