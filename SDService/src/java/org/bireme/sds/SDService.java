@@ -111,19 +111,19 @@ public class SDService extends HttpServlet {
                         topIndex = new TopIndex(simSearch, topIndexPath);
         
                         topIndex.resetAllTimes();
-                        topIndex.asyncUpdSimilarDocs(Conf.maxDocs(), 
-                                Conf.sources(), Conf.instances());
                         context.setAttribute("MAINTENANCE_MODE", false);
+                        topIndex.asyncUpdSimilarDocs(Conf.maxDocs(), 
+                                Conf.sources(), Conf.instances());                        
                         out.println("<result><maintenance_mode>false</maintenance_mode></result>");
                     } catch(Exception ex) {
-                        out.println("<result><status>ERROR</error><message>" +
-                                ex.toString() + "</message></result>");
+                        out.println("<result><ERROR>" +
+                                ex.toString() + "</ERROR></result>");
                     }
                 }
                 return;
             }
             if (maintenanceMode) {
-                out.println("<WARNING>System in maintenance mode</WARNING>");
+                out.println("<WARNING>System is in maintenance mode</WARNING>");
                 return;
             }
 
@@ -177,7 +177,7 @@ public class SDService extends HttpServlet {
                         out.println("<ERROR>'lastDays' parameter should be >= 0</ERROR>");
                         return;
                     }
-                    final String oneTimePer = request.getParameter("oneTimePeriod");
+                    final String oneTimePer = request.getParameter("ignoreUpdateDate");
                     final boolean oneTimePeriod = (oneTimePer == null) ? false :
                             Boolean.parseBoolean(oneTimePer);
                     out.println(simSearch.search(adhocSimilarDocs, fields.toSet(),

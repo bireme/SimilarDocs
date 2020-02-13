@@ -11,14 +11,12 @@ import java.nio.file.Paths
 import java.text.{DateFormat, SimpleDateFormat}
 import java.util.{Calendar, Date}
 
-//import com.fasterxml.jackson.core.PrettyPrinter
 import org.apache.lucene.document._
 import org.apache.lucene.index._
 import org.apache.lucene.search._
 import org.apache.lucene.store.FSDirectory
 import org.bireme.sd.{DocumentIterator, SimDocsSearch, Tools}
 
-//import scala.collection.JavaConverters._
 import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -60,8 +58,8 @@ class TopIndex(simSearch: SimDocsSearch,
                                   setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND))
   topWriter.commit()
 
-  var finishing: Boolean = false  // Flag to stop asynchronous update
-  var updating: Boolean = false   // Flag to indicate if there is an executing asynchronous update
+  private var finishing: Boolean = false  // Flag to stop asynchronous update
+  private var updating: Boolean = false   // Flag to indicate if there is an executing asynchronous update
 
   /**
     * Closes all open resources
@@ -69,12 +67,14 @@ class TopIndex(simSearch: SimDocsSearch,
   def close(): Unit = {
     finishing = true
     while (updating) {
-      wait(1000)
-      println("waiting update to finished")
+      assert(finishing)
+      Thread.sleep(1000)
+      println(s"close() - waiting update to finished. updating=$updating")
     }
     assert(!updating)
     topWriter.close()
     topDirectory.close()
+    println("close() finalizado!")
   }
 
   /**
@@ -615,10 +615,10 @@ class TopIndex(simSearch: SimDocsSearch,
   def asyncUpdSimilarDocs(maxDocs: Int,
                           sources: Option[Set[String]],
                           instances: Option[Set[String]]): Unit = {
-    if (!updating) {
+    if (!finishing && !updating) {
       Future {
         updating = true
-        while (!finishing && updateSimilarDocs(maxDocs, sources, instances).isDefined) {}
+        while ((!finishing) && updateSimilarDocs(maxDocs, sources, instances).isDefined) {}
         updating = false
       }
     }
@@ -640,11 +640,11 @@ class TopIndex(simSearch: SimDocsSearch,
     val topReader: DirectoryReader = DirectoryReader.open(topWriter)
     val topSearcher: IndexSearcher = new IndexSearcher(topReader)
     val topDocs: TopDocs = topSearcher.search(query, 1)
-//println(s"###documentos a serem atualizados:${topDocs.totalHits} 0<=x<=${updateTime  - deltaTime}")
+//println(s"###documentos a serem atualizados:${topDocs.totalHits.value}")
 
     // Update 'update time' field
     // val retSet = if (topDocs.totalHits.value == 0) None else { Lucene 8.0.0
-    val retSet: Option[Document] = if (topDocs.totalHits == 0) None else {
+    val retSet: Option[Document] = if (topDocs.totalHits.value == 0) None else {
       val doc: Document = topSearcher.doc(topDocs.scoreDocs(0).doc)
       val ndoc: Document = updateSimilarDocs(doc, maxDocs, sources, instances)
       Some(ndoc)

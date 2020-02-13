@@ -187,10 +187,11 @@ class SimDocsSearch(val sdIndexPath: String,
                            maxDocs: Int,
                            minNGrams: Int,
                            outFields: Set[String]): Array[(Int, Map[String,List[String]], Float, Set[String])] = {
-    //println(s"curDay=$curDay lowerLimit=$lowerLimit upperLimit=$upperLimit")
+    //println(s"curDay=$curDay lowerLimit=$lowerLimit upperLimit=$upperLimit text=$text")
 
     getBeginEndCalendar(curDay, lowerLimit, upperLimit) match {
-      case Some((begin, _, beginCal, endCal)) =>
+      case Some((begin, end, beginCal, endCal)) =>
+        //println(s"begin=$begin end=$end")
         val orQuery: Query = getQuery(text, sources, instances, Some(beginCal), Some(endCal))
         val meta: Array[(Map[String,List[String]], ScoreDoc, Set[String])] =
           getDocMeta(text, orQuery, maxDocs, minNGrams, outFields)
@@ -243,28 +244,36 @@ class SimDocsSearch(val sdIndexPath: String,
   private def getBeginEndCalendar(curDay: Int,
                                   lowerLimit: Int,
                                   upperLimit: Int): Option[(Int, Int, Calendar, Calendar)] = {
-    def getDayRange(curDay: Int,
-                    lowerLimit: Int,
-                    upperLimit: Int): Option[(Int, Int)] = {
-      if (curDay > lowerLimit) None
-      else curDay match {
-        case x if x < 0 => None
-        case x if x >= 0 && x <= 10 => Some(Math.min(10,lowerLimit), Math.max(0,upperLimit))
-        case x if x >= 11 && x <= 40 => Some(Math.min(40,lowerLimit), Math.max(11,upperLimit))
-        case x if x >= 41 && x <= 70 => Some(Math.min(60,lowerLimit), Math.max(41,upperLimit))
-        case x if x >= 71 && x <= 100 => Some(Math.min(100,lowerLimit), Math.max(71,upperLimit))
-        case x if x >= 101 && x <= 160 => Some(Math.min(160,lowerLimit), Math.max(101,upperLimit))
-        case x if x >= 161 && x <= 220 => Some(Math.min(220,lowerLimit), Math.max(161,upperLimit))
-        case x if x >= 221 && x <= 280 => Some(Math.min(280,lowerLimit), Math.max(221,upperLimit))
-        case x if x >= 281 && x <= 460 => Some(Math.min(460,lowerLimit), Math.max(281,upperLimit))
-        case x if x >= 461 && x <= 820 => Some(Math.min(820,lowerLimit), Math.max(461,upperLimit))
-        case x if x >= 821 && x <= 1180 => Some(Math.min(1180,lowerLimit), Math.max(821,upperLimit))
-        case x if x >= 1181 && x <= 18250 => Some(Math.min(18250,lowerLimit), Math.max(1181,upperLimit))
-        case _ => None
-      }
-    }
     getDayRange(curDay, lowerLimit, upperLimit).map {
       case (begin, end) => (begin, end, getDaysAgoCalendar(begin), getDaysAgoCalendar(end))
+    }
+  }
+
+  /**
+    * Given a current day and possible upper and lower day limits, give a subrange of days
+    * @param curDay the current day used to compute the day range
+    * @param lowerLimit the maximum number of days ago used to calculate the initial search date
+    * @param upperLimit the minimum number of days ago used to calculate the end search date
+    * @return (initial day, end day)
+    */
+  def getDayRange(curDay: Int,
+                  lowerLimit: Int,
+                  upperLimit: Int): Option[(Int, Int)] = {
+    if (curDay > lowerLimit) None
+    else curDay match {
+      case x if x < 0 => None
+      case x if x >= 0 && x <= 10 => Some(Math.min(10,lowerLimit), Math.max(0,upperLimit))
+      case x if x >= 11 && x <= 40 => Some(Math.min(40,lowerLimit), Math.max(11,upperLimit))
+      case x if x >= 41 && x <= 70 => Some(Math.min(70,lowerLimit), Math.max(41,upperLimit))
+      case x if x >= 71 && x <= 100 => Some(Math.min(100,lowerLimit), Math.max(71,upperLimit))
+      case x if x >= 101 && x <= 160 => Some(Math.min(160,lowerLimit), Math.max(101,upperLimit))
+      case x if x >= 161 && x <= 220 => Some(Math.min(220,lowerLimit), Math.max(161,upperLimit))
+      case x if x >= 221 && x <= 280 => Some(Math.min(280,lowerLimit), Math.max(221,upperLimit))
+      case x if x >= 281 && x <= 460 => Some(Math.min(460,lowerLimit), Math.max(281,upperLimit))
+      case x if x >= 461 && x <= 820 => Some(Math.min(820,lowerLimit), Math.max(461,upperLimit))
+      case x if x >= 821 && x <= 1180 => Some(Math.min(1180,lowerLimit), Math.max(821,upperLimit))
+      case x if x >= 1181 && x <= 18250 => Some(Math.min(18250,lowerLimit), Math.max(1181,upperLimit))
+      case _ => None
     }
   }
 
@@ -385,7 +394,8 @@ class SimDocsSearch(val sdIndexPath: String,
       val textImproved: String = OneWordDecs.addDecsSynonyms(text, decsSearcher, decsDescriptors)
 
       mqParser.setDefaultOperator(QueryParser.Operator.OR)
-      mqParser.parse(textImproved)
+      //mqParser.parse(textImproved)
+      mqParser.parse(textImproved.replaceAll("[()]", ""))
     }
     val querySources: Option[Query] = sources.map {
       set =>
@@ -505,10 +515,10 @@ class SimDocsSearch(val sdIndexPath: String,
     val set_original: Set[String] = getNGrams(Tools.uniformString(original), analyzer, maxWords)
     //val set_original: Set[String] = getNGrams(Tools.strongUniformString(original), analyzer, maxWords)
     val set_similar: Set[String] = getNGrams(Tools.uniformString(sim), analyzer, maxWords)
-//println(s"text0=[$sim] text=[${Tools.uniformString(sim)}] similar=[${set_similar.mkString(" ")}]")
+    //println(s"text0=[$sim] text=[${Tools.uniformString(sim)}] similar=[${set_similar.mkString(" ")}]")
     //val set_similar: Set[String] = getNGrams(Tools.strongUniformString(sim), analyzer, maxWords)
     val set_common: Set[String] = set_original.intersect(set_similar)
-//println(s"common=[${set_common.mkString(" ")}]")
+    //println(s"common=[${set_common.mkString(" ")}]")
 
     (set_original.toList, set_similar.toList, set_common.toList)
   }

@@ -67,7 +67,7 @@ in a database, for example, LILACS+MEDLINE.</div>
         <h3>Adhoc similar documents</h3>
         <div>Retrieve documents having most of words present in an input string</div>
         <br/>
-        <div>Syntax: <b>SDService?adhocSimilarDocs=&lt;text&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;maxDocs=&lt;num&gt;][&amp;sources=&lt;src&gt;,...,&lt;src&gt;][&amp;instances=&lt;inst&gt;,...,&lt;inst&gt;][&amp;lastDays=&lt;number_of_days&gt;][&amp;explain=&lt;bool&gt;][&amp;oneTimePeriod=&lt;bool&gt;]</b></div>
+        <div>Syntax: <b>SDService?adhocSimilarDocs=&lt;text&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;maxDocs=&lt;num&gt;][&amp;sources=&lt;src&gt;,...,&lt;src&gt;][&amp;instances=&lt;inst&gt;,...,&lt;inst&gt;][&amp;lastDays=&lt;number_of_days&gt;][&amp;explain=&lt;bool&gt;][&amp;ignoreUpdateDate=&lt;bool&gt;]</b></div>
         <br/>
         <div><b>adhocSimilarDocs:</b> words to be used to look for similar documents</div>
         <div><b>outFields:</b> tags of similar doc field to be outputed. If no fields were specified all fields will be outputed. Optional parameter.</div>
@@ -76,7 +76,7 @@ in a database, for example, LILACS+MEDLINE.</div>
         <div><b>instances:</b> if present, return only documents whose 'instance' field are equal to some instance specified in this parameter. If no instance was specified, the retrieved documents will not be filtered by 'instance' field. Optional parameter.</div>
         <div><b>lastDays:</b> if present, show only documents that are younger than 'number_of_days' days. Optional parameter.</div>
         <div><b>explain:</b> if present or if true, show the origin document ngrams, the similar document ngrams and the common ngrams. Optional parameter.</div>
-        <div><b>oneTimePeriod:</b> if present of if true, show the most similar documents do not considering the entry date of them</div>
+        <div><b>ignoreUpdateDate</b> if present of if true, show the most similar documents do not considering the entry date of them</div>
         <br/>
         <div>Example: SDService?adhocSimilarDocs=books,cars,hobbies&sources=LILACS,LIS&lastDays=7</div>
         <br/>
