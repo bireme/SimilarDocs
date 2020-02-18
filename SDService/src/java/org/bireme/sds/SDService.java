@@ -281,7 +281,7 @@ public class SDService extends HttpServlet {
         out.println("psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;]");
         out.println("psId=&lt;id&gt;&amp;showUsers=true");
         out.println("psId=&lt;id&gt;&amp;showProfiles=true");
-        out.println("adhocSimilarDocs=&lt;sentence&gt;[outFields=&lt;field&gt;,...,&lt;field&gt;][maxDocs=&lt;num&gt;][sources=&lt;src&gt;,...,&lt;src&gt;][instances=&lt;inst&gt;,...,&lt;inst&gt;][&amp;lastDays=&lt;num&gt;][&amp;explain=&lt;bool&gt;][&amp;oneTimePeriod=&lt;bool&gt;]");
+        out.println("adhocSimilarDocs=&lt;sentence&gt;[outFields=&lt;field&gt;,...,&lt;field&gt;][maxDocs=&lt;num&gt;][sources=&lt;src&gt;,...,&lt;src&gt;][instances=&lt;inst&gt;,...,&lt;inst&gt;][&amp;lastDays=&lt;num&gt;][&amp;explain=&lt;bool&gt;][&amp;ignoreUpdateDate=&lt;bool&gt;]");
         out.println("</SYNTAX>");
     }
 

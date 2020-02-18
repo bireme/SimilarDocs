@@ -190,7 +190,7 @@ class SimDocsSearch(val sdIndexPath: String,
     //println(s"curDay=$curDay lowerLimit=$lowerLimit upperLimit=$upperLimit text=$text")
 
     getBeginEndCalendar(curDay, lowerLimit, upperLimit) match {
-      case Some((begin, end, beginCal, endCal)) =>
+      case Some((begin, _, beginCal, endCal)) =>
         //println(s"begin=$begin end=$end")
         val orQuery: Query = getQuery(text, sources, instances, Some(beginCal), Some(endCal))
         val meta: Array[(Map[String,List[String]], ScoreDoc, Set[String])] =

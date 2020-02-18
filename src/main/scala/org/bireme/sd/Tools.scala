@@ -17,9 +17,12 @@ import java.util.Date
 import org.apache.http.client.methods.{CloseableHttpResponse, HttpGet}
 import org.apache.http.impl.client.{CloseableHttpClient, HttpClients}
 import org.apache.http.util.EntityUtils
+import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
+import org.apache.lucene.analysis.{Analyzer, TokenStream}
 import org.apache.lucene.index.{DirectoryReader, LeafReaderContext, TermsEnum}
 import org.apache.lucene.store.FSDirectory
 
+import scala.collection.immutable.TreeMap
 import scala.collection.mutable
 import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
@@ -96,7 +99,7 @@ object Tools {
   }
 
   /**
-    * Creates a collection of fiels terms
+    * Creates a collection of fields terms
     *
     * @param terms a enumerations of terms from a field
     * @return a stream of terms from a field
@@ -171,6 +174,49 @@ object Tools {
     * @return output array
     */
   def setToArray(set: Set[String]): Array[String] = set.toArray
+
+  /**
+    * Calculates all tokens of a string and its associated occurrences
+    *
+    * @param text input text used to extract ngrams
+    * @param analyzer Lucene analyzer object. See Lucene documentation
+    * @param sort if true sort the tokens, if false the tokens' order is unknown
+    * @return a map of ngrams and its number of occurrences
+    */
+  def getTokens(text: String,
+                analyzer: Analyzer,
+                sort: Boolean): Map[String,Int] = {
+    val tokenStream: TokenStream = analyzer.tokenStream(null, text)
+    val cattr: CharTermAttribute = tokenStream.addAttribute(classOf[CharTermAttribute])
+
+    tokenStream.reset()
+    val map: Map[String, Int] =
+      if (sort) getTokens(tokenStream, cattr, TreeMap[String,Int]())
+      else getTokens(tokenStream, cattr, Map[String,Int]())
+    tokenStream.end()
+    tokenStream.close()
+
+    map
+  }
+
+  /**
+    * Calculates all tokens of a token stream and its associated occurrences
+    *
+    * @param tokenStream Lucene token stream object
+    * @param cattr Lucene CharTermAttribute object. See Lucene documentation
+    * @param auxMap auxiliary working map object
+    * @return a map of tokens and its number of occurrences
+    */
+  @scala.annotation.tailrec
+  def getTokens(tokenStream: TokenStream,
+                cattr: CharTermAttribute,
+                auxMap: Map[String,Int]): Map[String,Int] = {
+    if (tokenStream.incrementToken()) {
+      val tok: String = cattr.toString
+      val occ: Int = auxMap.getOrElse(tok, 0)
+      getTokens(tokenStream, cattr, auxMap + ((tok,occ+1)))
+    } else auxMap
+  }
 }
 
 object ToolsApp extends App {

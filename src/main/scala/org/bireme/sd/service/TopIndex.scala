@@ -11,11 +11,12 @@ import java.nio.file.Paths
 import java.text.{DateFormat, SimpleDateFormat}
 import java.util.{Calendar, Date}
 
+import org.apache.lucene.analysis.Analyzer
 import org.apache.lucene.document._
 import org.apache.lucene.index._
 import org.apache.lucene.search._
 import org.apache.lucene.store.FSDirectory
-import org.bireme.sd.{DocumentIterator, SimDocsSearch, Tools}
+import org.bireme.sd.{DocumentIterator, NGSize, NGramAnalyzer, SimDocsSearch, Tools}
 
 import scala.jdk.CollectionConverters._
 import scala.collection.mutable
@@ -53,6 +54,7 @@ class TopIndex(simSearch: SimDocsSearch,
   val formatter: DateFormat = new SimpleDateFormat("yyyyMMdd")
 
   val lcAnalyzer: LowerCaseAnalyzer = new LowerCaseAnalyzer(true)
+  val ngAnalyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
   val topDirectory: FSDirectory = FSDirectory.open(Paths.get(topIndexPath))
   val topWriter: IndexWriter =  new IndexWriter(topDirectory, new IndexWriterConfig(lcAnalyzer).
                                   setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND))
@@ -120,7 +122,8 @@ class TopIndex(simSearch: SimDocsSearch,
     doc.add(new StoredField(updateFldName, updateTime))
 
     // Add profile content field and similar docs id fields to the document
-    addProfile(doc, content)
+    val tokens: Map[String, Int] = Tools.getTokens(content, ngAnalyzer, sort=false)
+    addProfile(doc, tokens.keys.mkString(" "))
 
     // Saves document
     if (isNew) topWriter.addDocument(doc)
@@ -141,7 +144,7 @@ class TopIndex(simSearch: SimDocsSearch,
     require(doc != null)
     require((content != null) && (!content.trim.isEmpty))
 
-    val newContent: String = Tools.strongUniformString(content, sort = true)
+    val newContent: String = Tools.strongUniformString(content)
     val oldContent: String = doc.get(contentFldName)
 
     // Add profile field

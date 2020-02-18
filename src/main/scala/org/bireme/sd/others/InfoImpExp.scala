@@ -40,7 +40,7 @@ object InfoImpExp {
           val info: Info = value2.map {
             case (k2,v2) =>
               val set1: Set[JsValue] = v2.asInstanceOf[JsArray].value.toSet
-              val set2: Set[String] = set1.map(_.toString())
+              val set2: Set[String] = set1.map(_.as[String])
               k2 -> set2
           }
           k -> info
