@@ -61,6 +61,7 @@ class SimDocsSearch(val sdIndexPath: String,
     decsDirectory.close()
     sdReader.close()
     sdDirectory.close()
+    analyzer.close()
   }
 
   /**

@@ -112,6 +112,7 @@ class LuceneIndexMain(indexPath: String,
     indexWriter.forceMerge(1)
     indexWriter.close()
     directory.close()
+    analyzer.close()
     log.info("Optimizing index 'sdIndex - end'")
     docLastModified.close()
     context.system.terminate()

@@ -73,6 +73,11 @@ public class SDService extends HttpServlet {
     public void destroy() {
         topIndex.close();
         simSearch.close();
+        try {
+            Thread.sleep(20000); 
+        } catch (InterruptedException ex) {
+            System.out.println(ex.toString());
+        }
         super.destroy();
     }
 
@@ -90,6 +95,7 @@ public class SDService extends HttpServlet {
                                                         throws ServletException,
                                                                    IOException {
         response.setContentType("text/xml;charset=UTF-8");
+        response.addHeader("Access-Control-Allow-Origin", "*");
 
         final ServletContext context = request.getServletContext();
         final boolean maintenanceMode =
@@ -102,6 +108,8 @@ public class SDService extends HttpServlet {
             if (maint != null) {
                 if (maint) { // requiring that maintenance mode be on
                     context.setAttribute("MAINTENANCE_MODE", true);
+                    topIndex.close();
+                    simSearch.close();
                     out.println("<result><maintenance_mode>true</maintenance_mode></result>");
                 } else {
                     try {

@@ -70,13 +70,15 @@ class TopIndex(simSearch: SimDocsSearch,
     finishing = true
     while (updating) {
       assert(finishing)
-      Thread.sleep(1000)
-      println(s"close() - waiting update to finished. updating=$updating")
+      Thread.sleep(5000)
+      println(s"${new Date} - close() - waiting update to finished. updating=$updating")
     }
     assert(!updating)
     topWriter.close()
     topDirectory.close()
-    println("close() finalizado!")
+    lcAnalyzer.close()
+    ngAnalyzer.close()
+    println(s"${new Date} - close() finished!")
   }
 
   /**
@@ -621,8 +623,11 @@ class TopIndex(simSearch: SimDocsSearch,
     if (!finishing && !updating) {
       Future {
         updating = true
-        while ((!finishing) && updateSimilarDocs(maxDocs, sources, instances).isDefined) {}
+        while ((!finishing) && updateSimilarDocs(maxDocs, sources, instances).isDefined) {
+          println(s"+++ more one document updated! finishing=$finishing")
+        }
         updating = false
+        println(s"${new Date} - updating was set to false")
       }
     }
     ()
@@ -707,6 +712,7 @@ class TopIndex(simSearch: SimDocsSearch,
 
     // Update document
     topWriter.updateDocument(new Term(idFldName, id), ndoc)
+    println(s"+++ ${new Date} - updating document id:$id")
     if (autoCommit) topWriter.commit()
 
     ndoc
