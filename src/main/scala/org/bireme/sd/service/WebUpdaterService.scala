@@ -24,7 +24,7 @@ object WebUpdaterService extends App {
 
   @scala.annotation.tailrec
   def updateOneDocument(url: String): Unit = {
-    val response: Try[HttpResponse[String]] = Try (Http(url).timeout(connTimeoutMs = 10000, readTimeoutMs = 100000)
+    val response: Try[HttpResponse[String]] = Try (Http(url).timeout(connTimeoutMs = 10000, readTimeoutMs = 500000)
                                                   .param("updateOneProfile","true").asString)
     response match {
       case Success(resp) =>
@@ -35,13 +35,16 @@ object WebUpdaterService extends App {
           } else if (body.contains("maintenance mode")) {
             println("[WebUpdaterService] Waiting maintenance mode to finished")
             Thread.sleep(5 * 60 * 1000)
+            updateOneDocument(url)
           } else {
             val msg = body.substring(1, body.length - 3)
             println(s"[WebUpdaterService] Updated $msg")
             updateOneDocument(url)
           }
         } else println(s"[WebUpdaterService] SimilarDocs service error: ${resp.code}")
-      case Failure(exception) => println(s"[WebUpdaterService] Exception:${exception.getMessage}")
+      case Failure(exception) =>
+        println(s"[WebUpdaterService] Exception:${exception.getMessage}")
+        updateOneDocument(url)
     }
   }
 }
