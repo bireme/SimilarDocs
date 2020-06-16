@@ -15,6 +15,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.lucene.document.Document;
 
 import org.bireme.sd.SimDocsSearch;
 import org.bireme.sd.service.Conf;
@@ -101,8 +102,8 @@ public class SDService extends HttpServlet {
         final boolean maintenanceMode =
                               (Boolean)context.getAttribute("MAINTENANCE_MODE");
         final String maintenance = request.getParameter("maintenance");
-        final Boolean maint = (maintenance != null) ? Boolean.valueOf(maintenance)
-                                                    : null;        
+        final Boolean maint = (maintenance == null) ? null
+                                                    : Boolean.valueOf(maintenance);
 
         try (PrintWriter out = response.getWriter()) {
             if (maint != null) {
@@ -120,8 +121,8 @@ public class SDService extends HttpServlet {
         
                         topIndex.resetAllTimes();
                         context.setAttribute("MAINTENANCE_MODE", false);
-                        topIndex.asyncUpdSimilarDocs(Conf.maxDocs(), 
-                                Conf.sources(), Conf.instances());                        
+                        /*topIndex.asyncUpdSimilarDocs(Conf.maxDocs(), 
+                                Conf.sources(), Conf.instances());*/                        
                         out.println("<result><maintenance_mode>false</maintenance_mode></result>");
                     } catch(Exception ex) {
                         out.println("<result><ERROR>" +
@@ -272,11 +273,29 @@ public class SDService extends HttpServlet {
             
             // Show Profiles
             final String showProfiles = request.getParameter("showProfiles");
-            if (showProfiles == null) {
-                usage(out);
-            } else {
+            if (showProfiles != null) {
                 out.println(topIndex.getProfilesXml(psId)); // showProfiles
+                return;
             }
+
+            // Update one record profile
+            final String updateOneProfile = request.getParameter("updateOneProfile");
+            if (updateOneProfile != null) {
+                final Option<Document> optDoc = topIndex.updateSimilarDocs(Conf.maxDocs(), 
+                        Conf.sources(), Conf.instances());
+                if (optDoc.isEmpty()) {
+                    out.println("finished");
+                } else {
+                    final Document doc = optDoc.get();
+                    final String id = doc.get("id");
+                    
+                    out.println("doc id=" + id);
+                }
+                return;
+            }
+
+            // Default action
+            usage(out);
         }
     }
 
