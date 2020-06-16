@@ -202,6 +202,22 @@ public class SDService extends HttpServlet {
                 out.println(topIndex.getUsersXml()); // showUsers
                 return;
             }
+            
+            // Update one record profile
+            final String updateOneProfile = request.getParameter("updateOneProfile");
+            if (updateOneProfile != null) {
+                final Option<Document> optDoc = topIndex.updateSimilarDocs(Conf.maxDocs(), 
+                        Conf.sources(), Conf.instances());
+                if (optDoc.isEmpty()) {
+                    out.println("<finished/>");
+                } else {
+                    final Document doc = optDoc.get();
+                    final String id = doc.get("id");
+                    
+                    out.println("<doc id='" + id + "'/>");
+                }
+                return;
+            }
 
             final String psId = request.getParameter("psId");
             if ((psId == null) || (psId.trim().isEmpty())) {
@@ -275,22 +291,6 @@ public class SDService extends HttpServlet {
             final String showProfiles = request.getParameter("showProfiles");
             if (showProfiles != null) {
                 out.println(topIndex.getProfilesXml(psId)); // showProfiles
-                return;
-            }
-
-            // Update one record profile
-            final String updateOneProfile = request.getParameter("updateOneProfile");
-            if (updateOneProfile != null) {
-                final Option<Document> optDoc = topIndex.updateSimilarDocs(Conf.maxDocs(), 
-                        Conf.sources(), Conf.instances());
-                if (optDoc.isEmpty()) {
-                    out.println("finished");
-                } else {
-                    final Document doc = optDoc.get();
-                    final String id = doc.get("id");
-                    
-                    out.println("doc id=" + id);
-                }
                 return;
             }
 
