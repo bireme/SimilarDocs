@@ -1,7 +1,7 @@
 lazy val commonSettings = Seq(
   organization := "br.bireme",
   version := "5.0.0",
-  scalaVersion := "2.13.2", // "2.12.9",  // casbah congelado
+  scalaVersion := "2.13.3", // "2.12.9",  // casbah congelado
   /*scalacOptions ++= Seq(
     "-encoding", "utf8",
     "-deprecation",

@@ -106,7 +106,7 @@ class SimilarDocsServiceTest extends AnyFlatSpec {
 
     title.findFirstMatchIn(content) match {
       case Some(mat) => mat.group(1) should be ("Similar Documents Service")
-      case None => fail
+      case None => fail()
     }
   }
 

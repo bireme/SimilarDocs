@@ -30,17 +30,17 @@ object WebUpdaterService extends App {
       case Success(resp) =>
         if (resp.code == 200) {
           val body: String = resp.body
-          if (body.equals("finished")) {
+          if (body.startsWith("<finished/>")) {
             println(s"[WebUpdaterService] All documents were updated")
-          } else if (body.contains("maintenance mode")) {
+          } else if (body.contains("maintenance_mode")) {
             println("[WebUpdaterService] Waiting maintenance mode to finished")
             Thread.sleep(5 * 60 * 1000)
             updateOneDocument(url)
-          } else {
+          } else if (body.startsWith("<doc")) {
             val msg = body.substring(1, body.length - 3)
-            println(s"[WebUpdaterService] Updated $msg")
+            println(s"[WebUpdaterService] Updated [$msg]")
             updateOneDocument(url)
-          }
+          } else println(s"[WebUpdaterService] Unknown message error: [$body]")
         } else println(s"[WebUpdaterService] SimilarDocs service error: ${resp.code}")
       case Failure(exception) =>
         println(s"[WebUpdaterService] Exception:${exception.getMessage}")
@@ -48,3 +48,4 @@ object WebUpdaterService extends App {
     }
   }
 }
+

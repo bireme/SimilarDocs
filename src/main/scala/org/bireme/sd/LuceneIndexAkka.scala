@@ -48,7 +48,7 @@ class LuceneIndexMain(indexPath: String,
                       fullIndexing: Boolean) extends Actor with ActorLogging {
   context.system.eventStream.setLogLevel(Logging.InfoLevel)
 
-  val idxWorkers = 10 // Number of actors to run concurrently
+  val idxWorkers = Runtime.getRuntime.availableProcessors() // Number of actors to run concurrently
   val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
   val indexPathTrim: String = indexPath.trim
   val indexPath1: String = if (indexPathTrim.endsWith("/")) indexPathTrim.substring(0, indexPathTrim.length - 1)

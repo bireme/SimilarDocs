@@ -43,7 +43,7 @@ object UpdateProfiles extends App {
   val sdIndexPath = parameters("sdIndexPath")
 
   val buff: BufferedSource = Source.fromFile(infoPath, "utf-8")
-  val json: String = buff.getLines.mkString("\n")
+  val json: String = buff.getLines().mkString("\n")
   buff.close()
 
   InfoImpExp.json2Map(json) match {
@@ -74,10 +74,13 @@ object UpdateProfiles extends App {
         println(s"+++id=$id")
         getDocInfoContent(info) match {
           case Some(infoContent: String) =>
-            getProfContent(usrName, topIndex, profileName) match {
-              case Some(profContent) =>
-                if (!infoContent.equals(profContent)) topIndex.addProfile(usrName, profileName, infoContent)
-              case None => topIndex.addProfile(usrName, profileName, infoContent)
+            val infoContentT = infoContent.trim
+            if (infoContentT.nonEmpty) {
+              getProfContent(usrName, topIndex, profileName) match {
+                case Some(profContent) =>
+                  if (!infoContentT.trim.equals(profContent)) topIndex.addProfile(usrName, profileName, infoContentT)
+                case None => topIndex.addProfile(usrName, profileName, infoContentT)
+              }
             }
           case None => System.err.println(s"ERROR: failure while getting document metadata. Id=$id")
         }

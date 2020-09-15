@@ -13,7 +13,7 @@ import org.apache.lucene.index.{DirectoryReader, IndexReader, Term}
 import org.apache.lucene.search.{IndexSearcher, TermQuery, TopDocs}
 import org.apache.lucene.store.FSDirectory
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
 object IndexTest extends App {
@@ -61,7 +61,7 @@ object IndexTest extends App {
     val isearcher = new IndexSearcher(ireader)
     val topDocs: TopDocs = isearcher.search(query, 1000)
     //val totalHits: Long = topDocs.totalHits.value Lucene 8.0.0
-    val totalHits: Long = topDocs.totalHits
+    val totalHits: Long = topDocs.totalHits.value
 
     if (totalHits <= 0) throw new Exception("totalHits <= 0")
 

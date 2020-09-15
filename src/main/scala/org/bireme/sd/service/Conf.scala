@@ -17,7 +17,7 @@ object Conf {
 
   // endDate = iahxLastModificationTime - excludeDays
   // beginDate = endDate - numDays
-  val excludeDays: Int = 3 // Number of days before lastModificationTime to calculate the endDate
+  val excludeDays: Int = 7 // Number of days before lastModificationTime to calculate the endDate
   val numDays: Int = 10  // Number of days before the endDate to calculate the beginDate
 
   val sources: Option[Set[String]] = Some(Set("MEDLINE", "LILACS", "LIS", "colecionaSUS")) // Update only docs whose field 'db' belongs to sources"
