@@ -1,7 +1,7 @@
 lazy val commonSettings = Seq(
   organization := "br.bireme",
   version := "5.0.0",
-  scalaVersion := "2.13.3", // "2.12.9",  // casbah congelado
+  scalaVersion := "2.13.6", //"2.13.5", //"2.13.3", // "2.12.9",  // casbah congelado
   /*scalacOptions ++= Seq(
     "-encoding", "utf8",
     "-deprecation",
@@ -12,12 +12,11 @@ lazy val commonSettings = Seq(
   )*/
 
   // See https://sanj.ink/posts/2019-06-14-scalac-2.13-options-and-flags.html
-  scalacOptions in Compile ++= Seq(
+  Compile / scalacOptions ++= Seq(
     "-Wdead-code",
     "-Wextra-implicit",
     "-Wnumeric-widen",
     "-Woctal-literal",
-    "-Wself-implicit",
     "-Wunused:imports",
     "-Wunused:patvars",
     "-Wunused:privates",
@@ -28,13 +27,13 @@ lazy val commonSettings = Seq(
     "-Wunused:linted",
     "-Wvalue-discard",
     "-explaintypes",
+    "-Xlint:implicit-recursion",
     "-Xlint:constant",  // Constant arithmetic expression results in an error.
     "-Xlint:delayedinit-select",  // Selecting member of DelayedInit.
     "-Xlint:doc-detached",  // A detached Scaladoc comment.
     "-Xlint:inaccessible",  // Inaccessible types in method signatures.
     "-Xlint:infer-any",  // A type argument is inferred to be `Any`.
     "-Xlint:missing-interpolator",  // A string literal appears to be missing an interpolator id.
-    "-Xlint:nullary-override",  // Warn when non-nullary `def f()' overrides nullary `def f'.
     "-Xlint:nullary-unit",  // Warn when nullary methods return Unit.
     "-Xlint:option-implicit",  // Option.apply used implicit view.
     "-Xlint:package-object-classes",  // Class or object defined in package object.
@@ -59,17 +58,16 @@ lazy val SDService = (project in file("./SDService")).
     name := "SDService"
   )
 
-
-val luceneVersion = "8.5.1" //"8.4.1"
-val akkaVersion =  "2.6.5" //"2.6.1"
-val httpClientVersion = "4.5.12" //"4.5.11"
+val luceneVersion = "8.9.0" //"8.7.0"
+val akkaVersion =  "2.6.15" //"2.6.10"
+val httpClientVersion = "4.5.13" //"4.5.12"
 val scalajHttpVersion = "2.4.2" //"2.4.1"
-val scalaTestVersion = "3.1.2" //"3.1.0"
-val mongodbDriverVersion = "4.0.3" //"2.8.0"
+val scalaTestVersion = "3.2.9" //"3.2.3"
+val mongodbDriverVersion = "4.2.3" //"4.1.1"
 //val hairyfotrVersion = "0.1.17"
 val h2DatabaseVersion = "1.4.200" //"1.4.199"
-val gsonVersion = "2.8.6"
-val playJsonVersion = "2.8.1"
+val gsonVersion = "2.8.7" //"2.8.6"
+val playJsonVersion = "2.9.2" //"2.8.1"
 
 libraryDependencies ++= Seq(
   "org.apache.lucene" % "lucene-core" % luceneVersion,
@@ -90,9 +88,9 @@ libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play-json" % playJsonVersion
 )
 
-test in assembly := {}
+assembly / test := {}
 
-logBuffered in Test := false
+Test / logBuffered := false
 trapExit :=  false  // To allow System.exit() without an exception (TestIndex.scala)
 
 //addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % hairyfotrVersion)
@@ -107,9 +105,9 @@ trapExit :=  false  // To allow System.exit() without an exception (TestIndex.sc
   case x => MergeStrategy.first
 }*/
 
-assemblyMergeStrategy in assembly := {
+assembly / assemblyMergeStrategy := {
   case "module-info.class" => MergeStrategy.discard
   case x =>
-    val oldStrategy = (assemblyMergeStrategy in assembly).value
+    val oldStrategy = (assembly / assemblyMergeStrategy).value
     oldStrategy(x)
 }
