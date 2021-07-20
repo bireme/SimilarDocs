@@ -10,9 +10,11 @@ package org.bireme.sd.others
 import org.apache.lucene.document.Document
 import org.bireme.sd.SimDocsSearch
 import org.bireme.sd.service.TopIndex
+import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 
 import scala.collection.immutable.TreeSet
 import scala.io.{BufferedSource, Source}
+import scala.util.Try
 
 object UpdateProfiles extends App {
   type Info = Map[String, Set[String]]
@@ -46,7 +48,7 @@ object UpdateProfiles extends App {
   val json: String = buff.getLines().mkString("\n")
   buff.close()
 
-  InfoImpExp.json2Map(json) match {
+  json2Map(json) match {
     case Some(infos) =>
       val simSearch: SimDocsSearch = new SimDocsSearch(sdIndexPath, decsIndexPath)
       val topIndex: TopIndex = new TopIndex(simSearch, topIndexPath)
@@ -117,5 +119,31 @@ object UpdateProfiles extends App {
 
     if (all.isEmpty) None
     else Some(all.mkString(" "))
+  }
+
+  /**
+    * Convert a string having json object(s) into a map of type "[id, info]"
+    *
+    * @param jsonStr the input string having json content
+    * @return the output map object
+    */
+  def json2Map(jsonStr: String): Option[Map[String, Info]] = {
+    Try {
+      val json: JsValue = Json.parse(jsonStr)
+      val jObj: JsObject = json.asInstanceOf[JsObject]
+      val value1: Map[String, JsValue] = jObj.value.toMap
+
+      value1.map {
+        case (k,v) =>
+          val value2: Map[String, JsValue] = v.asInstanceOf[JsObject].value.toMap
+          val info: Info = value2.map {
+            case (k2,v2) =>
+              val set1: Set[JsValue] = v2.asInstanceOf[JsArray].value.toSet
+              val set2: Set[String] = set1.map(_.as[String])
+              k2 -> set2
+          }
+          k -> info
+      }
+    }.toOption
   }
 }
