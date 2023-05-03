@@ -93,10 +93,10 @@ object ShowUsedNGrams extends App {
     * @param analyzer Lucene Analyzer object. See Lucene documentation
     * @return a map of ngrams and its associated number of occurrences
     */
-  def getIndexNGrams(text: String,
-                     fields: Set[String],
-                     searcher: IndexSearcher,
-                     analyzer: Analyzer): Map[String,Int] = {
+  private def getIndexNGrams(text: String,
+                             fields: Set[String],
+                             searcher: IndexSearcher,
+                             analyzer: Analyzer): Map[String,Int] = {
     getNGrams(text, analyzer).filter {
       case (tok,_) => hasToken(tok,fields,searcher,analyzer)
     }

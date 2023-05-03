@@ -24,7 +24,8 @@ object UpdateProfiles extends App {
     System.err.println("\nOptions:")
     System.err.println("\t-userName=<name> - SimilarDocs profile owner")
     System.err.println("\t-infoPath=<path> - path to info json file")
-    System.err.println("\t-decsIndexPath=<path> - path to the Lucene DeCS index")
+    System.err.println("\t-decsIndexPath=<path> - path to the Lucene DeCS index (Highlighter)")
+    System.err.println("\t-oneWordDecsIndexPath=<path> - path to the Lucene DeCS index")
     System.err.println("\t-topIndexPath=<path> - path to the Lucene topIndex index")
     System.err.println("\t-sdIndexPath=<path> - path to the Lucene sdIndex index")
     System.exit(1)
@@ -38,19 +39,20 @@ object UpdateProfiles extends App {
       if (split.length == 2) map + ((split(0).substring(1), split(1)))
       else {usage(); map}
   }
-  val userName = parameters("userName")
-  val infoPath = parameters("infoPath")
-  val decsIndexPath = parameters("decsIndexPath")
-  val topIndexPath = parameters("topIndexPath")
-  val sdIndexPath = parameters("sdIndexPath")
+  private val userName: String = parameters("userName")
+  private val infoPath: String = parameters("infoPath")
+  private val decsIndexPath: String = parameters("decsIndexPath")
+  private val oneWordDecsIndexPath: String = parameters("oneWordDecsIndexPath")
+  private val topIndexPath: String = parameters("topIndexPath")
+  private val sdIndexPath: String = parameters("sdIndexPath")
 
-  val buff: BufferedSource = Source.fromFile(infoPath, "utf-8")
+  private val buff: BufferedSource = Source.fromFile(infoPath, "utf-8")
   val json: String = buff.getLines().mkString("\n")
   buff.close()
 
   json2Map(json) match {
     case Some(infos) =>
-      val simSearch: SimDocsSearch = new SimDocsSearch(sdIndexPath, decsIndexPath)
+      val simSearch: SimDocsSearch = new SimDocsSearch(sdIndexPath, decsIndexPath, oneWordDecsIndexPath)
       val topIndex: TopIndex = new TopIndex(simSearch, topIndexPath)
 
       updProfiles(userName, infos, topIndex)
@@ -65,9 +67,9 @@ object UpdateProfiles extends App {
     * @param infos a map of all info to be include in the user's profile
     * @param topIndex path to Lucene profile index
     */
-  def updProfiles(userName: String,
-                  infos: Map[String, Info],
-                  topIndex: TopIndex): Unit = {
+  private def updProfiles(userName: String,
+                          infos: Map[String, Info],
+                          topIndex: TopIndex): Unit = {
     val usrName = userName.trim
 
     infos foreach {
@@ -127,7 +129,7 @@ object UpdateProfiles extends App {
     * @param jsonStr the input string having json content
     * @return the output map object
     */
-  def json2Map(jsonStr: String): Option[Map[String, Info]] = {
+  private def json2Map(jsonStr: String): Option[Map[String, Info]] = {
     Try {
       val json: JsValue = Json.parse(jsonStr)
       val jObj: JsObject = json.asInstanceOf[JsObject]

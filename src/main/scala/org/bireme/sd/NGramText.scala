@@ -39,8 +39,8 @@ object NGramText {
     * @param analyzer Lucene analyzer
     * @return sequence of (token, frequency)
     */
-  def getTokenSet(text: String,
-                  analyzer: Analyzer): Option[Seq[(String, Int)]] = {
+  private def getTokenSet(text: String,
+                          analyzer: Analyzer): Option[Seq[(String, Int)]] = {
     val ts: TokenStream = analyzer.tokenStream("context", new StringReader(text))
 
     Try {

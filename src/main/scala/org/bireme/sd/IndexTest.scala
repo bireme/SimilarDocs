@@ -36,10 +36,9 @@ object IndexTest extends App {
     hitNum
   } match {
     case Success(h) => h
-    case Failure(msg) => {
+    case Failure(msg) =>
       println(s"ERROR: IndexTest - ${msg.toString}")
       0
-    }
   }
 //println(s"hits=$hits")
   val retValue = if (hits > 255) 255 else hits
@@ -64,7 +63,7 @@ object IndexTest extends App {
 
     topDocs.scoreDocs.foreach {
       scoreDoc =>
-        val doc = ireader.document(scoreDoc.doc)
+        val doc = ireader.storedFields.document(scoreDoc.doc) // ireader.document(scoreDoc.doc)
         doc.getFields().asScala.map(_.stringValue())
     }
 

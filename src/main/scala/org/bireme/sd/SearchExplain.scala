@@ -30,12 +30,12 @@ object SearchExplain extends App {
     System.exit(1)
   }
   if (args.length < 2) usage()
-  val dir = FSDirectory.open(new File(args(0)).toPath)
-  val reader = DirectoryReader.open(dir)
-  val searcher = new IndexSearcher(reader)
-  val sentence = Tools.uniformString(args(1))
-  val tokens = getTokens(sentence)
-  val words = sentence.trim.split(" +")
+  private val dir = FSDirectory.open(new File(args(0)).toPath)
+  private val reader = DirectoryReader.open(dir)
+  private val searcher = new IndexSearcher(reader)
+  private val sentence = Tools.uniformString(args(1))
+  private val tokens = getTokens(sentence)
+  private val words = sentence.trim.split(" +")
 
   println(s"\nSentence:\n${args(1)}")
 
@@ -43,7 +43,7 @@ object SearchExplain extends App {
   tokens.foreach(tok => print(s"[$tok] "))
 
   println("\n\nHits:")
-  val order = tokens.foldLeft[Map[Int,Set[String]]](TreeMap()) {
+  private val order = tokens.foldLeft[Map[Int,Set[String]]](TreeMap()) {
     case (map,tok) =>
       val hits = getTotalHits(tok)
       val values = map.getOrElse(hits, Set[String]())
@@ -52,7 +52,7 @@ object SearchExplain extends App {
   order.foreach(kv => kv._2.foreach(value => println(s"[$value]: ${kv._1}")))
 
   println("\nWord Hits:")
-  val worder = words.foldLeft[Map[Int,Set[String]]](TreeMap()) {
+  private val worder = words.foldLeft[Map[Int,Set[String]]](TreeMap()) {
     case (map,word) =>
       val hits = getWordTotalHits(word)
       val values = map.getOrElse(hits, Set[String]())
@@ -71,8 +71,8 @@ object SearchExplain extends App {
   println(s"[OR]: ${getQuery(sentence, useOR = true)}")
   println(s"\n[AND]: ${getQuery(sentence, useOR = true)}")
 
-  val OR = getSentenceTotalHits(sentence, useOR = true)
-  val AND = getSentenceTotalHits(sentence, useOR = false)
+  private val OR = getSentenceTotalHits(sentence, useOR = true)
+  private val AND = getSentenceTotalHits(sentence, useOR = false)
 
   println("\nSentence Hits:")
   println(s"[OR]: ${OR._1}")
@@ -126,7 +126,7 @@ object SearchExplain extends App {
     val docs: Seq[(Int, String, Float)] = scoreDocs.foldLeft[Seq[(Int,String,Float)]](Seq()) {
       case (seq, sc) =>
         val doc = sc.doc
-        val id = searcher.doc(doc).get("id")
+        val id = searcher.storedFields().document(doc).get("id") // searcher.doc(doc).get("id")
         val score = sc.score
 
         seq :+ ((doc, id, score))

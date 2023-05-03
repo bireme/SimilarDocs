@@ -18,7 +18,7 @@ import scala.util.{Failure, Success, Try}
 
 class FSDocServer(rootDir: File,
                   fileExtension: Option[String] = None) extends DocumentServer {
-  val extension: String = fileExtension.map {
+  private val extension: String = fileExtension.map {
     ext =>
       val extt = ext.trim
       if (extt.isEmpty) ""
@@ -40,7 +40,7 @@ class FSDocServer(rootDir: File,
     * @param root father directory
     * @return a set having all pdf document ids
     */
-  def getDocuments(root: File): Set[String] = {
+  private def getDocuments(root: File): Set[String] = {
     val esize = extension.length
 
     root.listFiles().foldLeft[Set[String]](Set()) {

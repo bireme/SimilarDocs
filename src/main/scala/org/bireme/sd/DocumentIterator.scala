@@ -48,8 +48,8 @@ class DocumentIterator(ireader: IndexReader,
         h
     }
     fieldsToLoad match {
-      case Some(fields) => isearcher.doc(sdoc.doc, fields.asJava)
-      case None => isearcher.doc(sdoc.doc)
+      case Some(fields) => isearcher.storedFields.document(sdoc.doc, fields.asJava) //isearcher.doc(sdoc.doc, fields.asJava)
+      case None => isearcher.storedFields.document(sdoc.doc)  // isearcher.doc(sdoc.doc)
     }
   }
 

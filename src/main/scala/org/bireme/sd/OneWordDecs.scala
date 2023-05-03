@@ -9,25 +9,26 @@
 package org.bireme.sd
 
 import bruma.master._
+
 import java.io.File
 import java.nio.file.Path
-
 import org.apache.lucene.analysis.core.KeywordAnalyzer
 import org.apache.lucene.document.{Document, Field, StoredField, TextField}
 import org.apache.lucene.index.{DirectoryReader, IndexWriter, IndexWriterConfig, Term}
-import org.apache.lucene.search.{IndexSearcher, MatchAllDocsQuery, ScoreDoc, TermQuery, TopDocs}
+import org.apache.lucene.search.{IndexSearcher, TermQuery, TopDocs}
 import org.apache.lucene.store.FSDirectory
-import org.bireme.dh.{CharSeq, Highlighter}
+import org.bireme.dh.{Config, Highlighter}
 
-//import scala.collection.JavaConverters._
 import scala.jdk.CollectionConverters._
-
 import scala.collection.mutable
 
 /**
   * Create a Lucene index with documents having DeCS descriptors and synonyms
   */
 object OneWordDecs {
+  private val conf: Config = Config(None, None, scanMainHeadings=true, scanEntryTerms=true, scanQualifiers=true,
+    scanPublicationTypes=true, scanCheckTags=true, scanGeographics=true)
+
   /**
     * Create a Lucene index with documents having DeCS descriptors and synonyms
     * @param decsDir Isis database path having DeCS records
@@ -54,29 +55,6 @@ object OneWordDecs {
     indexWriter.forceMerge(1)
     indexWriter.close()
     directory.close()
-  }
-
-  /**
-    * Create a map of DeCS descriptors from a Lucene index
-    * @param indexPath Lucene index with DeCS documents
-    * @return a map of descriptors to be used by Highlighter class (fast descriptor discovery)
-    */
-  def getDescriptors(indexPath: String): Map[Char, CharSeq] = {
-    val directory: FSDirectory = FSDirectory.open(new File(indexPath).toPath)
-    val ireader: DirectoryReader = DirectoryReader.open(directory)
-    val isearcher: IndexSearcher = new IndexSearcher(ireader)
-    val query: MatchAllDocsQuery = new MatchAllDocsQuery()
-    val hits: Array[ScoreDoc] = isearcher.search(query, Integer.MAX_VALUE).scoreDocs
-    val descriptors: Map[String, String] = hits.foldLeft(Map[String, String]()) {
-      case (map, hit) =>
-        val doc: Document = ireader.document(hit.doc)
-        map ++ doc2map(doc)
-    }
-
-    ireader.close()
-    directory.close()
-
-    Highlighter.createTermTree(descriptors)
   }
 
   /**
@@ -111,24 +89,6 @@ object OneWordDecs {
   }
 
   /**
-    * Convert the document 'id' and 'descriptor' fields into a map
-    * @param doc input Lucene document
-    * @return a map this descriptors and id
-    */
-  private def doc2map(doc: Document): Map[String,String] = {
-    val stopwords = Set("la", "foram", "amp", "www") // are common words and have other meanings in other languages
-
-    Option(doc.get("id")).map(_.toInt) match {
-      case Some(id) => doc.getValues("descriptor")
-        .filterNot(desc => stopwords.contains(desc))
-        .foldLeft(mutable.Map[String,String]()) {
-          case (map, desc) => map += (desc -> id.toString)
-        }.toMap
-      case None => Map[String,String]()
-    }
-  }
-
-  /**
     *
     * @param rec input Isis record
     * @param tag record tag used to retrieve synonyms
@@ -155,17 +115,17 @@ object OneWordDecs {
     * Given an input text, for each DeCS descriptor found, add its synonyms
     * @param sentence input text
     * @param decsSearcher lucene DeCS index
-    * @param descriptors a map of descriptors to be used by Highlighter class (fast descriptor discovery) - see getDescriptors()
+    * @param highlighter the object which will locate DeCS terms in a sentence
     * @return the input text with DeCS synonyms added
     */
   def addDecsSynonyms(sentence: String,
                       decsSearcher: IndexSearcher,
-                      descriptors: Map[Char, CharSeq]): String = {
+                      highlighter: Highlighter): String = {
     require (sentence != null)
     require (decsSearcher != null)
-    require (descriptors != null)
+    require (highlighter != null)
 
-    val synonyms: Set[String] = getDecsSynonyms(sentence.trim(), decsSearcher, descriptors)
+    val synonyms: Set[String] = getDecsSynonyms(sentence.trim(), decsSearcher, highlighter, conf)
 
     sentence + " " + synonyms.mkString(" ")
   }
@@ -174,14 +134,16 @@ object OneWordDecs {
     * Given an input text, for each DeCS descriptor found, add its synonyms
     * @param inText input text
     * @param decsSearcher lucene DeCS index
-    * @param descriptors a map of descriptors to be used by Highlighter class (fast descriptor discovery) - see getDescriptors()
+    * @param highlighter the object which will locate DeCS terms in a sentence
+    * @param conf configuration indicating which type of DeCS terms should be highlighted
     * @return the input text with DeCS synonyms added
     */
   private def getDecsSynonyms(inText: String,
                               decsSearcher: IndexSearcher,
-                              descriptors: Map[Char, CharSeq]): Set[String] = {
+                              highlighter: Highlighter,
+                              conf: Config): Set[String] = {
 
-    val (_,_, descripts: Seq[String]) = Highlighter.highlight(x => x, inText, descriptors)
+    val (_,_, descripts: Seq[String]) = highlighter.highlight("", "", inText, conf)
 
     descripts.foldLeft(mutable.Set[String]()) {
       case (set, descr) =>
@@ -190,7 +152,7 @@ object OneWordDecs {
 
          if (topDocs.totalHits.value > 0) {   // Lucene 8.0.0
         //if (topDocs.totalHits > 0) {
-          val doc = decsSearcher.doc(topDocs.scoreDocs(0).doc)
+          val doc = decsSearcher.storedFields().document(topDocs.scoreDocs(0).doc) // decsSearcher.doc(topDocs.scoreDocs(0).doc)
           doc.getValues("synonym").foldLeft(set) {
             case (set, fld) => set += fld
           }
@@ -222,15 +184,16 @@ object OneWordDecsTest extends App {
 
   if (args.length != 2) usage()
 
-  val decsPath: Path = new File(args(0)).toPath
-  val decsDirectory = FSDirectory.open(decsPath)
-  val decsReader = DirectoryReader.open(decsDirectory)
-  val decsSearcher = new IndexSearcher(decsReader)
-  val decsDescriptors = OneWordDecs.getDescriptors(decsPath.toString)
-  val outSentence = OneWordDecs.addDecsSynonyms(args(1), decsSearcher, decsDescriptors)
+  private val decsPath: Path = new File(args(0)).toPath
+  private val decsDirectory = FSDirectory.open(decsPath)
+  private val decsReader = DirectoryReader.open(decsDirectory)
+  private val decsSearcher = new IndexSearcher(decsReader)
+  private val highlighter = new Highlighter(args(0))
+  private val outSentence = OneWordDecs.addDecsSynonyms(args(1), decsSearcher, highlighter)
 
   decsReader.close()
   decsDirectory.close()
+  highlighter.close()
 
   System.out.println("in:" + args(1))
   System.out.println("out:" + outSentence)

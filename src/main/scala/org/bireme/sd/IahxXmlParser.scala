@@ -21,7 +21,7 @@ import scala.util.{Failure, Success, Try}
   * date: 20170110
   */
 object IahxXmlParser {
-  val field_regexp: Regex = """ *<field name="(.+?)">(.+?)</field> *""".r
+  private val field_regexp: Regex = """ *<field name="(.+?)">(.+?)</field> *""".r
 
   def getElements(xmlFile: String,
                   encoding: String,

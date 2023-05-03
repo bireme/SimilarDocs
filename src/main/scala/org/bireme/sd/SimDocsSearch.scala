@@ -11,14 +11,13 @@ import java.io.File
 import java.nio.file.Path
 import java.text.{DateFormat, SimpleDateFormat}
 import java.util.{Calendar, Date, GregorianCalendar, TimeZone}
-
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import org.apache.lucene.analysis.{Analyzer, TokenStream}
 import org.apache.lucene.index.{DirectoryReader, Term}
 import org.apache.lucene.queryparser.classic.QueryParser
 import org.apache.lucene.search._
 import org.apache.lucene.store.FSDirectory
-import org.bireme.dh.CharSeq
+import org.bireme.dh.Highlighter
 import org.bireme.sd.service.Conf
 
 import scala.jdk.CollectionConverters._
@@ -26,35 +25,37 @@ import scala.jdk.CollectionConverters._
 /** Class that looks for similar documents of given ones
   *
   * @param sdIndexPath Lucene similar documents index path
-  * @param decsIndexPath Lucene index with DeCS documents
+  * @param decsIndexPath Lucene index with DeCS documents in the format required by DeCSHighlighter
+  * @param oneWordDecsIndex Lucene index with DeCS documents in the format required by SimilarDocs (OneWordDeCS)
   */
 class SimDocsSearch(val sdIndexPath: String,
-                    val decsIndexPath: String) {
+                    val decsIndexPath: String,
+                    val oneWordDecsIndex: String) {
   require(sdIndexPath != null)
   require(decsIndexPath != null)
+  require(oneWordDecsIndex != null)
 
-  val maxWords: Int = 100 /*20*/   // limit the max number of words to be used as input text
+  private val maxWords: Int = 100 /*20*/   // limit the max number of words to be used as input text
 
-  val decsPath: Path = new File(decsIndexPath).toPath
-  val decsDirectory: FSDirectory = FSDirectory.open(decsPath)
-  val decsReader: DirectoryReader = DirectoryReader.open(decsDirectory)
-  val decsSearcher: IndexSearcher = new IndexSearcher(decsReader)
-  val decsDescriptors: Map[Char, CharSeq] = OneWordDecs.getDescriptors(decsPath.toString)
+  private val decsPath: Path = new File(oneWordDecsIndex).toPath
+  private val decsDirectory: FSDirectory = FSDirectory.open(decsPath)
+  private val decsReader: DirectoryReader = DirectoryReader.open(decsDirectory)
+  private val decsSearcher: IndexSearcher = new IndexSearcher(decsReader)
+  private val highlighter: Highlighter = new Highlighter(decsIndexPath)
 
-  val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
+  private val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
 
-  val sdDirectory: FSDirectory = FSDirectory.open(new File(sdIndexPath).toPath)
-  val sdReader: DirectoryReader = DirectoryReader.open(sdDirectory)
-  val sdSearcher: IndexSearcher = new IndexSearcher(sdReader)
+  private val sdDirectory: FSDirectory = FSDirectory.open(new File(sdIndexPath).toPath)
+  private val sdReader: DirectoryReader = DirectoryReader.open(sdDirectory)
+  private val sdSearcher: IndexSearcher = new IndexSearcher(sdReader)
 
-  val now: GregorianCalendar = new GregorianCalendar(TimeZone.getDefault)
-  val year: Int = now.get(Calendar.YEAR)
-  val month: Int = now.get(Calendar.MONTH)
-  val day: Int = now.get(Calendar.DAY_OF_MONTH)
-  val todayCal: GregorianCalendar = new GregorianCalendar(year, month, day, 0, 0) // begin of today
-  val formatter: DateFormat = new SimpleDateFormat("yyyyMMdd")
-  val today: String = formatter.format(todayCal.getTime)
-  val endDayAgo: Int = Tools.timeToDays(todayCal.getTimeInMillis - Tools.getIahxModificationTime) + Conf.excludeDays
+  private val now: GregorianCalendar = new GregorianCalendar(TimeZone.getDefault)
+  private val year: Int = now.get(Calendar.YEAR)
+  private val month: Int = now.get(Calendar.MONTH)
+  private val day: Int = now.get(Calendar.DAY_OF_MONTH)
+  private val todayCal: GregorianCalendar = new GregorianCalendar(year, month, day, 0, 0) // begin of today
+  private val formatter: DateFormat = new SimpleDateFormat("yyyyMMdd")
+  private val endDayAgo: Int = Tools.timeToDays(todayCal.getTimeInMillis - Tools.getIahxModificationTime) + Conf.excludeDays
 
   def close(): Unit = {
     decsReader.close()
@@ -62,6 +63,7 @@ class SimDocsSearch(val sdIndexPath: String,
     sdReader.close()
     sdDirectory.close()
     analyzer.close()
+    highlighter.close()
   }
 
   /**
@@ -85,7 +87,7 @@ class SimDocsSearch(val sdIndexPath: String,
              lastDays: Int,
              explain: Boolean,
              splitTime: Boolean): String = {
-    require((text != null) && (!text.isEmpty))
+    require((text != null) && text.nonEmpty)
 
     val days: Option[Int] = if (lastDays <= 0) None else Some(lastDays)
     val srcs: Option[Set[String]] = if ((sources == null) || sources.isEmpty) None else Some(sources)
@@ -159,6 +161,7 @@ class SimDocsSearch(val sdIndexPath: String,
                            outFields: Set[String],
                            splitTime: Boolean): Array[(Int, Map[String,List[String]], Float, Set[String])] = {
     val lowerLimit: Int = daysAgo.getOrElse(18250)  // 50 years
+    assert (lowerLimit >= endDayAgo)
 
     if (splitTime)
       getDocuments(text, sources, instances, endDayAgo, lowerLimit, endDayAgo, maxDocs, minNGrams, outFields)
@@ -392,7 +395,7 @@ class SimDocsSearch(val sdIndexPath: String,
     val queryText: Option[Query] = Some {
       val mqParser: QueryParser =
         new QueryParser(Conf.indexedField, new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size))
-      val textImproved: String = OneWordDecs.addDecsSynonyms(text, decsSearcher, decsDescriptors)
+      val textImproved: String = OneWordDecs.addDecsSynonyms(text, decsSearcher, highlighter)
 
       mqParser.setDefaultOperator(QueryParser.Operator.OR)
       //mqParser.parse(textImproved)
@@ -437,7 +440,7 @@ class SimDocsSearch(val sdIndexPath: String,
     require((fields != null) && fields.nonEmpty)
 
     //asScalaBuffer[IndexableField](sdReader.document(id, fields.asJava).getFields()).
-    sdReader.document(id, fields.asJava).getFields().asScala.
+    sdReader.storedFields().document(id, fields.asJava).getFields().asScala.   //sdReader.document(id, fields.asJava).getFields().asScala.
       foldLeft[Map[String,List[String]]] (Map()) {
       case (map2, fld) =>
         val name: String = fld.name()
@@ -563,7 +566,7 @@ class SimDocsSearch(val sdIndexPath: String,
     * @param docs a list of (score, document[map of fields], (original_ngrams, similar_ngrams, common_ngrams))
     * @return a xml string representation of the document
     **/
-  def doc2xml(docs: List[(Float,
+  private def doc2xml(docs: List[(Float,
                           Map[String,List[String]],
                           Option[(List[String], List[String], List[String])]
                           )]): String = {
@@ -597,7 +600,8 @@ object SimDocsSearch extends App {
   private def usage(): Unit = {
     Console.err.println("usage: SimDocsSearch" +
     "\n\t-sdIndex=<sdIndexPath> - lucene Index where the similar document will be searched" +
-    "\n\t-decsIndex=<decsIndexPath> - lucene Index where the one word decs synonyms document will be searched" +
+    "\n\t-decsIndex=<decsIndexPath> - lucene Index where DeCS terms present in a document will be found (DeCSHighlighter)" +
+    "\n\t-oneWordDecsIndex=<oneWordDecsIndexPath> - lucene Index where DeCS synonyms will be found and used to find similar documents (SimilarDocs)" +
     "\n\t-text=<str> - text used to look for similar documents" +
     "\n\t[<-outFields=<field>,<field>,...,<field>] - document fields used will be show in the output" +
     "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
@@ -609,34 +613,35 @@ object SimDocsSearch extends App {
     System.exit(1)
   }
 
-  if (args.length < 3) usage()
+  if (args.length < 4) usage()
 
   println("Starting search ...")
 
-  val startTime: Long = new Date().getTime
-  val parameters = args.foldLeft[Map[String,String]](Map()) {
+  private val startTime: Long = new Date().getTime
+  private val parameters = args.foldLeft[Map[String,String]](Map()) {
     case (map,par) =>
       val split = par.split(" *= *", 2)
       if (split.length == 1) map + ((split(0).substring(2), ""))
       else map + ((split(0).substring(1), split(1)))
   }
-  val sdIndex: String = parameters("sdIndex")
-  val decsIndex: String = parameters("decsIndex")
-  val text: String = parameters("text")
-  val outFields: Set[String] = parameters.get("outFields") match {
+  private val sdIndex: String = parameters("sdIndex")
+  private val decsIndex: String = parameters("decsIndex")
+  private val oneWorldDecsIndex: String = parameters("oneWordDecsIndex")
+  private val text: String = parameters("text")
+  private val outFields: Set[String] = parameters.get("outFields") match {
     case Some(sFields) => sFields.split(" *, *").toSet
     case None => Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs", "id", "db", "update_date")//service.Conf.idxFldNames
   }
-  val maxDocs: Int = parameters.getOrElse("maxDocs", "10").toInt
-  val minNGrams: Int = parameters.getOrElse("minNGrams", Conf.minNGrams.toString).toInt
-  val sources: Option[Set[String]] = parameters.get("sources").map(_.split(" *, *").toSet)
-  val instances: Option[Set[String]] = parameters.get("instances").map(_.split(" *, *").toSet)
-  val lastDays: Option[Int] = parameters.get("lastDays").map(_.toInt)
-  val splitTime: Boolean = parameters.contains("splitTime")
-  val search: SimDocsSearch = new SimDocsSearch(sdIndex, decsIndex)
-  val maxWords: Int = search.maxWords
+  private val maxDocs: Int = parameters.getOrElse("maxDocs", "10").toInt
+  private val minNGrams: Int = parameters.getOrElse("minNGrams", Conf.minNGrams.toString).toInt
+  private val sources: Option[Set[String]] = parameters.get("sources").map(_.split(" *, *").toSet)
+  private val instances: Option[Set[String]] = parameters.get("instances").map(_.split(" *, *").toSet)
+  private val lastDays: Option[Int] = parameters.get("lastDays").map(_.toInt)
+  private val splitTime: Boolean = parameters.contains("splitTime")
+  private val search: SimDocsSearch = new SimDocsSearch(sdIndex, decsIndex, oneWorldDecsIndex)
+  //private val maxWords: Int = search.maxWords
 
-  val docs: List[(Int, Map[String, List[String]], Float, Set[String])] =
+  private val docs: List[(Int, Map[String, List[String]], Float, Set[String])] =
     search.search(text, outFields, maxDocs, minNGrams, sources, instances, lastDays, splitTime)
   docs.foreach {
     case (id, doc, score, _) =>

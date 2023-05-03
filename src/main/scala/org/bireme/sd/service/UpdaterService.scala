@@ -58,11 +58,11 @@ class UpdaterService(topDocs: TopIndex) {
 
 object UpdaterService extends App {
   private def usage(): Unit = {
-    System.err.println("usage: UpdaterService -sdIndex=<path> -decsIndex=<path> -topIndex=<path> (--start|--stop)")
+    System.err.println("usage: UpdaterService -sdIndex=<path> -decsIndex=<path> -oneWordDecsIndexPath=<path> -topIndex=<path> (--start|--stop)")
     System.exit(1)
   }
 
-  if (args.length != 4) usage()
+  if (args.length != 5) usage()
 
   val parameters = args.foldLeft[Map[String,String]](Map()) {
     case (map,par) =>
@@ -73,13 +73,14 @@ object UpdaterService extends App {
 
   val sdIndex: String = parameters("sdIndex")
   val decsIndex: String = parameters("decsIndex")
+  val oneWordDecsIndexPath: String = parameters("oneWordDecsIndexPath")
   val topIndex: String = parameters("topIndex")
 
   val op: String = if (parameters.contains("start")) "start"
                    else if (parameters.contains("stop")) "stop"
                    else ""
 
-  val sim: SimDocsSearch = new SimDocsSearch(sdIndex, decsIndex)
+  val sim: SimDocsSearch = new SimDocsSearch(sdIndex, decsIndex, oneWordDecsIndexPath)
   val top: TopIndex = new TopIndex(sim, topIndex)
   val upds: UpdaterService = new UpdaterService(top)
 

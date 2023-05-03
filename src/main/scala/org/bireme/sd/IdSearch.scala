@@ -17,8 +17,8 @@ object IdSearch extends App {
   }
   if (args.length != 3) usage()
 
-  val store: MVStore = MVStore.open(args(0))
-  val allDocIds: MVMap[String, Long] = store.openMap(args(1))
+  private val store: MVStore = MVStore.open(args(0))
+  private val allDocIds: MVMap[String, Long] = store.openMap(args(1))
 
   println("Contains: " + Option(allDocIds.get(args(2))).isEmpty)
 

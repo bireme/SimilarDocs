@@ -22,6 +22,7 @@ object TopIndexTestService extends App {
       "\n\t-sdIndexPath=<path>         : documents Lucene index path" +
       "\n\t-topIndexPath=<path>        : top Lucene index path" +
       "\n\t-decsIndexPath=<path>       : decs Lucene index path" +
+      "\n\t-oneWordDecsIndexPath=<path>: path to the Lucene DeCS index" +
       "\n\t-psId=<id>                  : personal service identification (user)" +
       "\n\t\n--- and one of the following options: ---\n" +
       "\n\t-addProfile=<name>=<sentence> : add user profile" +
@@ -44,13 +45,14 @@ object TopIndexTestService extends App {
   val sdIndexPath = parameters("sdIndexPath")
   val topIndexPath = parameters("topIndexPath")
   val decsIndexPath = parameters("decsIndexPath")
+  val oneWordDecsIndexPath = parameters("oneWordDecsIndexPath")
   val psId = parameters("psId")
   val addProfile = parameters.get("addProfile")
   val delProfile = parameters.get("deleteProfile")
   val getSimDocs = parameters.get("getSimDocs")
   val cleanSimDocs = parameters.contains("cleanSimDocs")
   val showProfiles = parameters.contains("showProfiles")
-  val simDocs = new SimDocsSearch(sdIndexPath, decsIndexPath)
+  val simDocs = new SimDocsSearch(sdIndexPath, decsIndexPath, oneWordDecsIndexPath)
   val topIndex = new TopIndex(simDocs, topIndexPath)
   addProfile match {
     case Some(profile) =>

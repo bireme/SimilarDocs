@@ -40,23 +40,24 @@ import scala.concurrent.Future
 class TopIndex(simSearch: SimDocsSearch,
                topIndexPath: String) {
   require(simSearch != null)
-  require((topIndexPath != null) && (!topIndexPath.trim.isEmpty))
+  require((topIndexPath != null) && topIndexPath.trim.nonEmpty)
 
   val idFldName = "id"                  // Profile identifier
   val userFldName = "user"              // Personal service user id
   val nameFldName = "prof_name"         // Profile name
   val contentFldName = "prof_content"   // Profile content
-  val creationFldName = "creation_time" // Profile creation time
-  val updateFldName = "update_time"     // Profile update time
-  val sdIdFldName = "sd_id"             // Similar document Lucene doc id
 
-  val deltaTime: Long =  1000 * 60 * 60 * 2 // 2 hours // 8 hours
-  val formatter: DateFormat = new SimpleDateFormat("yyyyMMdd")
+  private val creationFldName = "creation_time" // Profile creation time
+  private val updateFldName = "update_time"     // Profile update time
+  private val sdIdFldName = "sd_id"             // Similar document Lucene doc id
 
-  val lcAnalyzer: LowerCaseAnalyzer = new LowerCaseAnalyzer(true)
-  val ngAnalyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
-  val topDirectory: FSDirectory = FSDirectory.open(Paths.get(topIndexPath))
-  val topWriter: IndexWriter =  new IndexWriter(topDirectory, new IndexWriterConfig(lcAnalyzer).
+  private val deltaTime: Long =  1000 * 60 * 60 * 2 // 2 hours // 8 hours
+  private val formatter: DateFormat = new SimpleDateFormat("yyyyMMdd")
+
+  private val lcAnalyzer: LowerCaseAnalyzer = new LowerCaseAnalyzer(true)
+  private val ngAnalyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
+  private val topDirectory: FSDirectory = FSDirectory.open(Paths.get(topIndexPath))
+  private val topWriter: IndexWriter =  new IndexWriter(topDirectory, new IndexWriterConfig(lcAnalyzer).
                                   setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND))
   topWriter.commit()
 
@@ -91,9 +92,9 @@ class TopIndex(simSearch: SimDocsSearch,
   def addProfile(user: String,
                  name: String,
                  content: String): Unit = {
-    require((user != null) && (!user.trim.isEmpty))
-    require((name != null) && (!name.trim.isEmpty))
-    require((content != null) && (!content.trim.isEmpty))
+    require((user != null) && user.trim.nonEmpty)
+    require((name != null) && name.trim.nonEmpty)
+    require((content != null) && content.trim.nonEmpty)
 
     val tuser: String = user.trim()
     val tname: String = name.trim()
@@ -144,7 +145,7 @@ class TopIndex(simSearch: SimDocsSearch,
   private def addProfile(doc: Document,
                          content: String): Unit = {
     require(doc != null)
-    require((content != null) && (!content.trim.isEmpty))
+    require((content != null) && content.trim.nonEmpty)
 
     val newContent: String = Tools.strongUniformString(content)
     val oldContent: String = doc.get(contentFldName)
@@ -168,7 +169,7 @@ class TopIndex(simSearch: SimDocsSearch,
     * @param user personal services document identifier
     */
   def deleteProfiles(user: String): Unit = {
-    require((user != null) && (!user.trim.isEmpty))
+    require((user != null) && user.trim.nonEmpty)
 
     topWriter.deleteDocuments(new Term(userFldName, user.trim()))
     topWriter.commit()
@@ -183,8 +184,8 @@ class TopIndex(simSearch: SimDocsSearch,
     */
   def deleteProfile(user: String,
                     name: String): Unit = {
-    require((user != null) && (!user.trim.isEmpty))
-    require((name != null) && (!name.trim.isEmpty))
+    require((user != null) && user.trim.nonEmpty)
+    require((name != null) && name.trim.nonEmpty)
 
     val tuser: String = user.trim()
     val tname: String = name.trim()
@@ -209,7 +210,7 @@ class TopIndex(simSearch: SimDocsSearch,
   /**
     * @return a collection of users from all personal services documents
     */
-  def getUsers: Set[String] = {
+  private def getUsers: Set[String] = {
     val docIter: DocumentIterator = new DocumentIterator(DirectoryReader.open(topWriter), Some(Set("user")))
 
     docIter.foldLeft(Set[String]()) {
@@ -230,7 +231,7 @@ class TopIndex(simSearch: SimDocsSearch,
     *         can have more than one occurrence
     */
   def getProfilesXml(user: String): String = {
-    require((user != null) && (!user.trim.isEmpty))
+    require((user != null) && user.trim.nonEmpty)
 
     val head: String = """<?xml version="1.0" encoding="UTF-8"?><profiles>"""
 
@@ -257,8 +258,8 @@ class TopIndex(simSearch: SimDocsSearch,
     * @return a collection of profiles: name -> (content, update date, ids). Profiles can not
     *         have more than one occurrence
     */
-  def getProfiles(user: String): Map[String, (String, String, List[String])] = {
-    require((user != null) && (!user.trim.isEmpty))
+  private def getProfiles(user: String): Map[String, (String, String, List[String])] = {
+    require((user != null) && user.trim.nonEmpty)
 
     val tUser: String = user.trim()
 
@@ -286,8 +287,8 @@ class TopIndex(simSearch: SimDocsSearch,
     */
   def getProfile(user: String,
                  profile: String): Option[(String, String, List[String])] = {
-    require((user != null) && (!user.trim.isEmpty))
-    require((profile != null) && (!profile.trim.isEmpty))
+    require((user != null) && user.trim.nonEmpty)
+    require((profile != null) && profile.trim.nonEmpty)
 
     getDocuments(Map(userFldName -> user.trim, nameFldName -> profile.trim)).flatMap {
       _.headOption.map {
@@ -322,7 +323,7 @@ class TopIndex(simSearch: SimDocsSearch,
                     beginDate: Option[Long],
                     sources: Option[Set[String]] = Conf.sources,
                     instances: Option[Set[String]] = Conf.instances): String = {
-    require((psId != null) && (!psId.trim.isEmpty))
+    require((psId != null) && psId.trim.nonEmpty)
     require(profiles != null)
     require(outFields != null)
 
@@ -371,7 +372,7 @@ class TopIndex(simSearch: SimDocsSearch,
                  beginDate: Option[Long],
                  sources: Option[Set[String]],
                  instances: Option[Set[String]]): List[Map[String,List[String]]] = {
-    require((user != null) && (!user.trim.isEmpty))
+    require((user != null) && user.trim.nonEmpty)
     require(names != null)
     require(outFlds != null)
     require(maxDocs > 0)
@@ -493,7 +494,7 @@ class TopIndex(simSearch: SimDocsSearch,
     require(fields != null)
 
     if (fields.isEmpty) { // put all fields
-      val doc = searcher.doc(id)
+      val doc = searcher.storedFields().document(id) // searcher.doc(id)
 
       doc.getFields().asScala.foldLeft[Map[String,List[String]]] (Map()) {
         case  (map, field) =>
@@ -505,7 +506,7 @@ class TopIndex(simSearch: SimDocsSearch,
           }
       }
     } else {
-      val doc: Document = searcher.doc(id, fields.asJava)
+      val doc: Document = searcher.storedFields().document(id, fields.asJava) // searcher.doc(id, fields.asJava)
 
       fields.foldLeft[Map[String,List[String]]] (Map()) {
         case  (map, field) =>
@@ -541,7 +542,10 @@ class TopIndex(simSearch: SimDocsSearch,
     val result: Option[List[Document]] = docs.totalHits.value match {
       case 0 => None
       case _ => docs.scoreDocs.foldLeft[Option[List[Document]]] (Some(List[Document]())) {
-        case (slst, sdoc) => slst.map(_ :+ topSearcher.doc(sdoc.doc))
+        case (slst, sdoc) =>
+          val doc: Document = topSearcher.storedFields().document(sdoc.doc)
+          if (Option(doc.get(idFldName)).getOrElse("").isEmpty) slst
+          else slst.map(_ :+ doc)
       }
     }
 
@@ -570,7 +574,7 @@ class TopIndex(simSearch: SimDocsSearch,
     val result: Option[List[Document]] = docs.totalHits.value match {
       case 0 => None
       case _ => docs.scoreDocs.foldLeft[Option[List[Document]]] (Some(List[Document]())) {
-        case (slst, sdoc) => slst.map(_ :+ topSearcher.doc(sdoc.doc))
+        case (slst, sdoc) => slst.map(_ :+ topSearcher.storedFields.document(sdoc.doc))  // topSearcher.doc(sdoc.doc))
       }
     }
 
@@ -600,7 +604,7 @@ class TopIndex(simSearch: SimDocsSearch,
     (0 until totalHits).foreach {
       pos =>
         val scoreDoc: ScoreDoc = topDocs.scoreDocs(pos)
-        val doc: Document = topSearcher.doc(scoreDoc.doc)
+        val doc: Document = topSearcher.storedFields().document(scoreDoc.doc) // topSearcher.doc(scoreDoc.doc)
         updateSimilarDocs(doc, maxDocs, sources, instances, autoCommit = false)
     }
 
@@ -653,7 +657,7 @@ class TopIndex(simSearch: SimDocsSearch,
     // Update 'update time' field
     // val retSet = if (topDocs.totalHits.value == 0) None else { Lucene 8.0.0
     val retSet: Option[Document] = if (topDocs.totalHits.value == 0) None else {
-      val doc: Document = topSearcher.doc(topDocs.scoreDocs(0).doc)
+      val doc: Document = topSearcher.storedFields().document(topDocs.scoreDocs(0).doc) // topSearcher.doc(topDocs.scoreDocs(0).doc)
       val ndoc: Document = updateSimilarDocs(doc, maxDocs, sources, instances)
       Some(ndoc)
     }
@@ -780,7 +784,7 @@ class TopIndex(simSearch: SimDocsSearch,
     // Update 'update time' field
     topDocs.scoreDocs.foreach {
       scoreDoc =>
-        val doc: Document = topSearcher.doc(scoreDoc.doc)
+        val doc: Document = topSearcher.storedFields().document(scoreDoc.doc) // topSearcher.doc(scoreDoc.doc)
         val ndoc: Document = new Document()
 
         // Include 'id' field
@@ -821,7 +825,8 @@ object TopIndex extends App {
   private def usage(): Unit = {
     Console.err.println("usage: TopIndex" +
       "\n\t-sdIndex=<sdIndexPath> - lucene Index where the similar document will be searched" +
-      "\n\t-decsIndex=<decsIndexPath> - lucene Index where the one word decs synonyms document will be searched" +
+      "\n\t-decsIndex=<decsIndexPath> - lucene Index where DeCS terms present in a document will be found (DeCSHighlighter)" +
+      "\n\t-oneWordDecsIndex=<oneWordDecsIndexPath> - lucene Index where DeCS synonyms will be found and used to find similar documents (SimilarDocs)" +
       "\n\t-topIndex=<topIndexPath> - lucene Index where the user profiles are stored" +
       "\n\t-psId=<psId> - personal service identifier" +
       "\n\t-profiles=<prof1>,<prof2>,...,<prof> - user profiles used to search the documents" +
@@ -857,6 +862,7 @@ object TopIndex extends App {
 
   val sdIndexPath: String = parameters("sdIndex")
   val decsIndexPath: String = parameters("decsIndex")
+  val oneWordDecsIndex: String = parameters("oneWordDecsIndex")
   val topIndexPath: String = parameters("topIndex")
   val psId: String = parameters("psId")
   val profiles: Set[String] = parameters("profiles").split(" *, *").toSet
@@ -871,7 +877,7 @@ object TopIndex extends App {
   val beginDate: Option[Long] = if (considerDate) {
     Some(Tools.getIahxModificationTime - Tools.daysToTime(Conf.excludeDays + Conf.numDays))
   } else None
-  val search: SimDocsSearch = new SimDocsSearch(sdIndexPath, decsIndexPath)
+  val search: SimDocsSearch = new SimDocsSearch(sdIndexPath, decsIndexPath, oneWordDecsIndex)
   val topIndex: TopIndex = new TopIndex(search, topIndexPath)
   if (parameters.contains("preprocess")) preProcess(topIndex, maxDocs, sources, instances)
   else topIndex.resetUpdateTime(psId, profiles)

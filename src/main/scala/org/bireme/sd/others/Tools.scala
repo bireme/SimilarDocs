@@ -31,7 +31,7 @@ object Tools {
     * @param is the input stream to be converted
     * @return an output byte array
     */
-   def inputStream2Array(is: InputStream): Option[Array[Byte]] = {
+  private def inputStream2Array(is: InputStream): Option[Array[Byte]] = {
     Try {
       val bos = new ByteArrayOutputStream()
       val buffer = Array.ofDim[Byte](2048)
@@ -58,7 +58,7 @@ object Tools {
     * @param urls input url string
     * @return the output input stream
     */
-  def url2InputStream(urls: String): Option[InputStream] = {
+  private def url2InputStream(urls: String): Option[InputStream] = {
     Try {
       val url: URL = new URL(urls)
       url.getProtocol match {
@@ -184,8 +184,8 @@ object Tools {
      uri.toURL.toString  // Do not treat # in the URLpath
   }
 
-  def urlEncode(urls: String,
-                encod: String = "utf-8"): String = {
+  private def urlEncode(urls: String,
+                        encod: String = "utf-8"): String = {
     val url = new URL(URLDecoder.decode(urls, encod))
     val protocol = url.getProtocol
     val authority = url.getAuthority
@@ -198,15 +198,15 @@ object Tools {
     protocol + "://" + authority + path + query2 + fragment2
   }
 
-  def encodePath(path: String,
-                 encod: String): String = {
+  private def encodePath(path: String,
+                         encod: String): String = {
     val split = path.split("/", 100)
 
     split.map(URLEncoder.encode(_, encod)).map(_.replace("+", "%20")).mkString("/")
   }
 
-  def encodeQuery(query: String,
-                  encod: String): String = { // xxx=yyy&www=zzz
+  private def encodeQuery(query: String,
+                          encod: String): String = { // xxx=yyy&www=zzz
     def encodeQueryPart(part: String): String = {  // xxx=yyy
       val split = part.split("=")
       if (split.length != 2) throw new IllegalArgumentException(part)
@@ -219,8 +219,8 @@ object Tools {
     amp.map(encodeQueryPart).mkString("&")
   }
 
-  def encodeFragment(fragment: String,
-                     encod: String): String = {
+  private def encodeFragment(fragment: String,
+                             encod: String): String = {
     URLEncoder.encode(fragment, encod).replace("+", "%20")
   }
 

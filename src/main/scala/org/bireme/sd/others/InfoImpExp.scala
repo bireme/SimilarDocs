@@ -5,7 +5,7 @@ import play.api.libs.json.{JsArray, JsObject, JsString, JsValue, Json}
 import scala.util.Try
 
 object InfoImpExp {
-  type Info = Map[String, Set[String]]
+  private type Info = Map[String, Set[String]]
 
   /**
    * Converts a map of type "[id, info]" into a string with json format

@@ -121,7 +121,7 @@ object Tools {
     * @return the iahx index document modification date in miliseconds
     */
   def getIahxModificationTime: Long = {
-    val iahx: String = "http://basalto02.bireme.br:8986/solr5/admin/cores?action=STATUS"
+    val iahx: String = "http://iahx-idx02.bireme.br:8986/solr5/admin/cores?action=STATUS" //"http://basalto02.bireme.br:8986/solr5/admin/cores?action=STATUS"
     val regex: Regex = "(?<=lastModified\">)([^<]+)".r
     val df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'") // 2019-10-06T19:09:52.79Z
 
@@ -151,7 +151,7 @@ object Tools {
     * @param days number of days to be converted
     * @return number of converted miliseconds
     */
-  def daysToTime(days: Int): Long = (days * 24 * 60 * 60 * 1000).toLong
+  def daysToTime(days: Int): Long = days.toLong * 24 * 60 * 60 * 1000
 
   /**
     * Convert time in milisecongs into days

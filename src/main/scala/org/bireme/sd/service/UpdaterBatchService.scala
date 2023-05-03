@@ -20,7 +20,8 @@ object UpdaterBatchService extends App {
     Console.err.println("usage: UpdateBatchService:\n" +
       "\n\t-sdIndexPath=<path>     : documents Lucene index path" +
       "\n\t-topIndexPath=<path>    : top indexes directory path" +
-      "\n\t-decsIndexPath=<path>   : decs indexes directory path"
+      "\n\t-decsIndexPath=<path>   : decs indexes directory path" +
+      "\n\t-oneWordDecsIndexPath=<path>: path to the Lucene DeCS index"
     )
     System.exit(1)
   }
@@ -35,7 +36,8 @@ object UpdaterBatchService extends App {
   val topIndexPath = parameters("topIndexPath")
   val sdIndexPath = parameters("sdIndexPath")
   val decsIndexPath = parameters("decsIndexPath")
-  val sdSearcher = new SimDocsSearch(sdIndexPath, decsIndexPath)
+  val oneWordDecsIndexPath = parameters("oneWordDecsIndexPath")
+  val sdSearcher = new SimDocsSearch(sdIndexPath, decsIndexPath, oneWordDecsIndexPath)
 
   update(sdSearcher, topIndexPath)
   sdSearcher.close()

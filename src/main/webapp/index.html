@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <title>Similar Documents Service</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body>
+        <h1>SDService</h1>
+        <div>This service takes sets of words stored into multiple profiles
+of a Personal Service (PS) record and looks for similar documents (via ngrams)
+in a database, for example, LILACS+MEDLINE.</div>
+        <div></div>
+        <h2>Services:</h2>
+
+        <h3>Add profile</h3>
+        <div>Add PS service profile words</div>
+        <br/>
+        <div>Syntax: <b>SDService?psId=&lt;psId&gt;&amp;addProfile=&lt;id&gt;&amp;sentence=&lt;sentence&gt;</b></div>
+        <br/>
+        <div><b>psId:</b> personal service record identifier</div>
+        <div><b>id:</b> profile name</div>
+        <div><b>sentence:</b> a sentence with the words stored in the profile</div>
+        <br/>
+        <div>Example: SDService?psId=Joao Doria&amp;addProfile=books&amp;sentence=my preferences are: romance, adventure, scifi</div>
+        <br/>
+        <div>Possible return values:<br/>
+        &nbsp;&nbsp;&lt;result&gt;OK&lt;/result&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'psId' parameter&lt;/ERROR&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'addProfile' parameter&lt;/ERROR&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'sentence' parameter&lt;/ERROR&gt;</div>
+
+        <h3>Delete profile</h3>
+        <div>Delete in this service a PS record profile</div>
+        <br/>
+        <div>Syntax: <b>SDService?psId=&lt;id&gt;&amp;deleteProfile=&lt;id&gt;</b></div>
+        <br/>
+        <div><b>psId:</b> personal service record identifier</div>
+        <div><b>id:</b> profile identifier</div>
+        <br/>
+        <div>Example: SDService?psId=Joao Doria&amp;deleteProfile=books</div>
+        <br/>
+        <div>Possible return values:<br/>
+        &nbsp;&nbsp;&lt;result&gt;OK&lt;/result&gt;<br/>
+        &nbsp;&nbsp;&lt;result&gt;FAILED&lt;/result&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'psId' parameter&lt;/ERROR&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'deleteProfile' parameter&lt;/ERROR&gt;</div>
+
+        <h3>Get similar documents</h3>
+        <div>Retrieve documents having most of words stored in a set of profiles</div>
+        <br/>
+        <div>Syntax: <b>SDService?psId=&lt;id&gt;&amp;getSimDocs=&lt;profile&gt;,..,&lt;profile&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;considerDate=]</b></div>
+        <br/>
+        <div><b>psId:</b> personal service record identifier</div>
+        <div><b>getSimDocs:</b> set of profile identifiers</div>
+        <div><b>outFields:</b> tags of similar doc field to be outputed. If no fields were specified all fields will be outputed. Optional parameter.</div>
+        <div><b>considerDate:</b> if present, will only return documents that are younger than default number of days. Optional parameter.</div>
+        <br/>
+        <div>Example: SDService?psId=Joao Doria&amp;getSimDocs=books,cars,hobbies&amp;outFields=id,date,name&amp;considerDate=</div>
+        <br/>
+        <div>Possible return values:<br/>
+        &nbsp;&nbsp;&lt;documents&gt;...&lt;/documents&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'psId' parameter&lt;/ERROR&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'getSimDocs' parameter&lt;/ERROR&gt;</div>
+        
+        <h3>Adhoc similar documents</h3>
+        <div>Retrieve documents having most of words present in an input string</div>
+        <br/>
+        <div>Syntax: <b>SDService?adhocSimilarDocs=&lt;text&gt;[&amp;outFields=&lt;field&gt;,...,&lt;field&gt;][&amp;maxDocs=&lt;num&gt;][&amp;sources=&lt;src&gt;,...,&lt;src&gt;][&amp;instances=&lt;inst&gt;,...,&lt;inst&gt;][&amp;lastDays=&lt;number_of_days&gt;][&amp;explain=&lt;bool&gt;][&amp;ignoreUpdateDate=&lt;bool&gt;]</b></div>
+        <br/>
+        <div><b>adhocSimilarDocs:</b> words to be used to look for similar documents</div>
+        <div><b>outFields:</b> tags of similar doc field to be outputed. If no fields were specified all fields will be outputed. Optional parameter.</div>
+        <div><b>maxDocs:</b> if present, indicate the maximum number of outputed similar documents. Optional parameter.</div> 
+        <div><b>sources:</b> if present, return only documents whose 'db' field are equal to some source specified in this parameter. If no source was specified, the retrieved documents will not be filtered by 'db' field. Optional parameter.</div>
+        <div><b>instances:</b> if present, return only documents whose 'instance' field are equal to some instance specified in this parameter. If no instance was specified, the retrieved documents will not be filtered by 'instance' field. Optional parameter.</div>
+        <div><b>lastDays:</b> if present, show only documents that are younger than 'number_of_days' days. Optional parameter.</div>
+        <div><b>explain:</b> if present or if true, show the origin document ngrams, the similar document ngrams and the common ngrams. Optional parameter.</div>
+        <div><b>ignoreUpdateDate</b> if present of if true, show the most similar documents do not considering the entry date of them</div>
+        <br/>
+        <div>Example: SDService?adhocSimilarDocs=books,cars,hobbies&sources=LILACS,LIS&lastDays=7</div>
+        <br/>
+        <div>Possible return values:<br/>
+        &nbsp;&nbsp;&lt;documents&gt;...&lt;/documents&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'adhocSimDocs' parameter&lt;/ERROR&gt;</div>
+
+        <h3>Show users</h3>
+        <div>Show all users from the PS</div>
+        <br/>
+        <div>Syntax: <b>SDService?showUsers=</b></div>
+        <br/>
+        <div>Example: SDService?showUsers=</div>
+        <br/>
+        <div>Possible return value:<br/>
+        &nbsp;&nbsp;&lt;users&gt;...&lt;/users&gt;</div>
+        
+        <h3>Show profiles</h3>
+        <div>Show all profiles and respective words of a PS record</div>
+        <br/>
+        <div>Syntax: <b>SDService?psId=&lt;psId&gt;&amp;showProfiles=</b></div>
+        <br/>
+        <div><b>psId:</b> personal service record identifier</div>
+        <br/>
+        <div>Example: SDService?psId=Joao Doria&amp;showProfiles=</div>
+        <br/>
+        <div>Possible return values:<br/>
+        &nbsp;&nbsp;&lt;profiles&gt;...&lt;/profiles&gt;<br/>
+        &nbsp;&nbsp;&lt;ERRROR&gt;missing 'psId' parameter&lt;/ERROR&gt;</div>
+    </body>
+</html>

@@ -45,9 +45,9 @@ object ShowNewDocIds extends App {
     * @param maxDocs maximum number of document ids to be returned
     * @return a list of document (identifier,entrance_date)
     */
-  def getNewDocsIds(indexName: String,
-                    days: Int,
-                    maxDocs: Int): Seq[(String,String)] = {
+  private def getNewDocsIds(indexName: String,
+                            days: Int,
+                            maxDocs: Int): Seq[(String,String)] = {
     require (indexName != null)
     require (days > 0)
     require (maxDocs > 0)
@@ -68,7 +68,7 @@ object ShowNewDocIds extends App {
     val ids: Seq[(String, String)] = searcher.search(query, maxDocs).scoreDocs.
                                          foldLeft[Seq[(String,String)]](Seq()) {
       case (seq,sd) =>
-        val doc: Document = reader.document(sd.doc, Set("id", "entrance_date").asJava)
+        val doc: Document = reader.storedFields().document(sd.doc, Set("id", "entrance_date").asJava) //reader.document(sd.doc, Set("id", "entrance_date").asJava)
         val id: String = doc.get("id")
         val entrance_date: String = doc.get("entrance_date")
         if (id == null) seq else seq :+ ((id, entrance_date))

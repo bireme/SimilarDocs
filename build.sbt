@@ -1,18 +1,11 @@
 lazy val commonSettings = Seq(
   organization := "br.bireme",
-  version := "5.0.0",
-  scalaVersion := "2.13.6", //"2.13.5", //"2.13.3", // "2.12.9",  // casbah congelado
-  /*scalacOptions ++= Seq(
-    "-encoding", "utf8",
-    "-deprecation",
-    "-unchecked",
-    "-Xlint",
-    "-feature",
-    "-Ywarn-unused"
-  )*/
+  version := "5.5.0",
+  scalaVersion := "2.13.10" //"2.13.6"
+)
 
-  // See https://sanj.ink/posts/2019-06-14-scalac-2.13-options-and-flags.html
-  Compile / scalacOptions ++= Seq(
+// See https://sanj.ink/posts/2019-06-14-scalac-2.13-options-and-flags.html
+scalacOptions ++= Seq(
     "-Wdead-code",
     "-Wextra-implicit",
     "-Wnumeric-widen",
@@ -43,7 +36,6 @@ lazy val commonSettings = Seq(
     "-Xlint:type-parameter-shadow",  // A local type parameter shadows a type already in scope.
     "-deprecation", // Warning and location for usages of deprecated APIs.
     "-encoding", "utf-8" // Specify character encoding used by source files.
-  )
 )
 
 lazy val root = (project in file(".")).
@@ -52,26 +44,22 @@ lazy val root = (project in file(".")).
     name := "SimilarDocs"
   )
 
-lazy val SDService = (project in file("./SDService")).
-  settings(commonSettings: _*).
-  settings(
-    name := "SDService"
-  )
-
-val luceneVersion = "8.9.0" //"8.7.0"
-val akkaVersion =  "2.6.15" //"2.6.10"
-val httpClientVersion = "4.5.13" //"4.5.12"
-val scalajHttpVersion = "2.4.2" //"2.4.1"
-val scalaTestVersion = "3.2.9" //"3.2.3"
-val mongodbDriverVersion = "4.3.0" //"4.2.3"
-//val hairyfotrVersion = "0.1.17"
-val h2DatabaseVersion = "1.4.200" //"1.4.199"
-val gsonVersion = "2.8.7" //"2.8.6"
-val playJsonVersion = "2.9.2" //"2.8.1"
+val jakartaServletApiVersion = "6.0.0"
+val luceneVersion = "9.5.0" //"8.9.0" //"8.7.0"
+val akkaVersion =  "2.8.0" //"2.6.15"
+val httpClientVersion = "4.5.14" //"4.5.13"
+val scalajHttpVersion = "2.4.2"
+val scalaTestVersion = "3.2.15" //"3.2.9"
+val mongodbDriverVersion = "4.9.1" //"4.3.0"
+val h2DatabaseVersion = "2.1.214" //"1.4.200"
+val gsonVersion = "2.10.1" //"2.8.7"
+val playJsonVersion = "2.9.4" //"2.9.2"
 
 libraryDependencies ++= Seq(
+  "jakarta.servlet" % "jakarta.servlet-api" % jakartaServletApiVersion % "provided",
   "org.apache.lucene" % "lucene-core" % luceneVersion,
-  "org.apache.lucene" % "lucene-analyzers-common" % luceneVersion,
+  //"org.apache.lucene" % "lucene-analyzers-common" % luceneVersion,
+  "org.apache.lucene" % "lucene-analysis-common" % luceneVersion,
   "org.apache.lucene" % "lucene-queryparser" % luceneVersion,
   "org.apache.lucene" % "lucene-queries" % luceneVersion,
   "org.apache.lucene" % "lucene-backward-codecs" % luceneVersion,
@@ -93,21 +81,16 @@ assembly / test := {}
 Test / logBuffered := false
 trapExit :=  false  // To allow System.exit() without an exception (TestIndex.scala)
 
-//addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % hairyfotrVersion)
-
-/*assemblyMergeStrategy in assembly := {
-  //case PathList("META-INF", xs @ _*) => MergeStrategy.discard
-  case PathList("META-INF", xs @ _*) =>
-    (xs map {_.toLowerCase}) match {
-      case ("manifest.mf" :: Nil) => MergeStrategy.discard
-      case _ => MergeStrategy.last
-    }
-  case x => MergeStrategy.first
-}*/
-
-assembly / assemblyMergeStrategy := {
+/*assembly / assemblyMergeStrategy := {
   case "module-info.class" => MergeStrategy.discard
   case x =>
     val oldStrategy = (assembly / assemblyMergeStrategy).value
     oldStrategy(x)
+}*/
+
+assembly / assemblyMergeStrategy := {
+  case PathList("META-INF", _*) => MergeStrategy.discard
+  case _                        => MergeStrategy.first
 }
+
+enablePlugins(JettyPlugin)

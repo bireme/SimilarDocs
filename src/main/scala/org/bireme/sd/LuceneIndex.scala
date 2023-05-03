@@ -47,18 +47,18 @@ object LuceneIndex extends App {
       map + ((split(0).substring(1), split(1)))
   }
 
-  val indexPath = args(0)
-  val decsIndexPath = args(1)
-  val xmlDir = args(2)
-  val xmlFileFilter = parameters.getOrElse("xmlFileFilter", ".+\\.xml")
-  val sIdxFields = parameters.getOrElse("indexedFields", "")
-  val fldIdxNames = if (sIdxFields.isEmpty) Set[String]()
-                    else sIdxFields.split(" *, *").toSet
-  val sStrdFields = parameters.getOrElse("storedFields", "")
-  val fldStoredNames = (if (sStrdFields.isEmpty) Set[String]()
-                        else sStrdFields.split(" *, *").toSet) + "id"
-  val decsDir = parameters.getOrElse("decs", "")
-  val encoding = parameters.getOrElse("encoding", "ISO-8859-1")
+  private val indexPath = args(0)
+  private val decsIndexPath = args(1)
+  private val xmlDir = args(2)
+  private val xmlFileFilter = parameters.getOrElse("xmlFileFilter", ".+\\.xml")
+  private val sIdxFields = parameters.getOrElse("indexedFields", "")
+  private val fldIdxNames = if (sIdxFields.isEmpty) Set[String]()
+                            else sIdxFields.split(" *, *").toSet
+  private val sStrdFields = parameters.getOrElse("storedFields", "")
+  private val fldStoredNames = (if (sStrdFields.isEmpty) Set[String]()
+                                else sStrdFields.split(" *, *").toSet) + "id"
+  private val decsDir = parameters.getOrElse("decs", "")
+  private val encoding = parameters.getOrElse("encoding", "ISO-8859-1")
 
   index()
 

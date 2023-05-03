@@ -32,7 +32,7 @@ object ShowDocs extends App {
 
   if (args.length < 1) usage()
 
-  val docNum = if (args.length == 1) "" else args(1)
+  private val docNum = if (args.length == 1) "" else args(1)
   showDocument(args(0), docNum)
 
   /**
@@ -41,8 +41,8 @@ object ShowDocs extends App {
     * @param indexName Lucene index path
     * @param docNum Lucene document number
     */
-  def showDocument(indexName: String,
-                   docNum: String): Unit = {
+  private def showDocument(indexName: String,
+                           docNum: String): Unit = {
     val directory: FSDirectory = FSDirectory.open(new File(indexName).toPath)
     val ireader: DirectoryReader = DirectoryReader.open(directory)
     //val liveDocs: Bits = MultiFields.getLiveDocs(ireader) // Lucene version before 8.0.0
@@ -64,7 +64,7 @@ object ShowDocs extends App {
   private def showDoc(ireader: IndexReader,
                       docNum: Int,
                       liveDocs: Bits): Unit = {
-    val doc: Document = ireader.document(docNum)
+    val doc: Document = ireader.storedFields().document(docNum) //ireader.document(docNum)
     val active: Boolean = (liveDocs == null) || liveDocs.get(docNum)
     val header: String = if (active) s" id=$docNum " else s" id=$docNum  [DELETED] "
 

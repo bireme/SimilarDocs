@@ -31,14 +31,14 @@ import scala.util.control.NonFatal
 import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 
-// http://basalto02.bireme.br:8986/solr5/admin.html#/
-// http://basalto02.bireme.br:8986/solr5/admin/cores?action=STATUS
+// http://iahx-idx02.bireme.br:8986/solr5/admin.html#/
+// http://iahx-idx02.bireme.br:8986/solr5/admin/cores?action=STATUS
 // grep -Po "(?<=lastModified\">[^<]+"
 
 case class Finishing()
 
 class LuceneIndexMain(indexPath: String,
-                      decsIndexPath: String,
+                      OneWordDecsIndexPath: String,
                       modifiedIndexPath: String,
                       xmlDir: String,
                       xmlFileFilter: String,
@@ -48,32 +48,32 @@ class LuceneIndexMain(indexPath: String,
                       fullIndexing: Boolean) extends Actor with ActorLogging {
   context.system.eventStream.setLogLevel(Logging.InfoLevel)
 
-  val idxWorkers = Runtime.getRuntime.availableProcessors() // Number of actors to run concurrently
-  val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
-  val indexPathTrim: String = indexPath.trim
-  val indexPath1: String = if (indexPathTrim.endsWith("/")) indexPathTrim.substring(0, indexPathTrim.length - 1)
-                           else indexPathTrim
-  val indexPath2: Path = new File(indexPath1).toPath
-  val directory: FSDirectory = FSDirectory.open(indexPath2)
-  val config: IndexWriterConfig = new IndexWriterConfig(analyzer)
+  private val idxWorkers = Runtime.getRuntime.availableProcessors() // Number of actors to run concurrently
+  private val analyzer: Analyzer = new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size)
+  private val indexPathTrim: String = indexPath.trim
+  private val indexPath1: String = if (indexPathTrim.endsWith("/")) indexPathTrim.substring(0, indexPathTrim.length - 1)
+                                   else indexPathTrim
+  private val indexPath2: Path = new File(indexPath1).toPath
+  private val directory: FSDirectory = FSDirectory.open(indexPath2)
+  private val config: IndexWriterConfig = new IndexWriterConfig(analyzer)
   if (fullIndexing) config.setOpenMode(IndexWriterConfig.OpenMode.CREATE)
   else config.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
-  val indexWriter: IndexWriter = new IndexWriter(directory, config)
+  private val indexWriter: IndexWriter = new IndexWriter(directory, config)
 
-  val modFile = new File(modifiedIndexPath)
+  private val modFile = new File(modifiedIndexPath)
   if (!modFile.exists()) modFile.mkdirs()
   if (fullIndexing) new File(modFile, "docLastModified.db").delete()
 
-  val docLastModified: MVStore = new MVStore.Builder().fileName(s"$modifiedIndexPath/docLastModified.db")
+  private val docLastModified: MVStore = new MVStore.Builder().fileName(s"$modifiedIndexPath/docLastModified.db")
     .compress().open()
-  val lastModifiedDoc: MVMap[String, Long] = docLastModified.openMap("modDoc")
+  private val lastModifiedDoc: MVMap[String, Long] = docLastModified.openMap("modDoc")
   if (fullIndexing) lastModifiedDoc.clear()
 
   // Only index documents which are older than that date
-  val endDate: Long = Tools.getIahxModificationTime - Tools.daysToTime(excludeDays)
+  private val endDate: Long = Tools.getIahxModificationTime - Tools.daysToTime(excludeDays)
 
-  val routerIdx: Router = createActors()
-  var activeIdx: Int = idxWorkers
+  private val routerIdx: Router = createActors()
+  private var activeIdx: Int = idxWorkers
 
   // Create similar docs index
   createSimDocsIndex(xmlDir)
@@ -83,7 +83,7 @@ class LuceneIndexMain(indexPath: String,
 
 
   private def createActors(): Router = {
-    val decsMap: Map[Int, Set[String]] = getDescriptors(decsIndexPath)
+    val decsMap: Map[Int, Set[String]] = getDescriptors(OneWordDecsIndexPath)
 
     val routees: Vector[ActorRefRoutee] = Vector.fill(idxWorkers) {
       val r: ActorRef = context.actorOf(Props(classOf[LuceneIndexActor], indexWriter,
@@ -141,7 +141,7 @@ class LuceneIndexMain(indexPath: String,
     * @return a map where the keys are the decs code (its mfn) and the values, the
     *         the descriptors in English, Spanish and Portuguese
     */
-  def getDescriptors(decsIndexPath: String): Map[Int, Set[String]] = {
+  private def getDescriptors(decsIndexPath: String): Map[Int, Set[String]] = {
     val directory: FSDirectory = FSDirectory.open(new File(decsIndexPath).toPath)
     val ireader: DirectoryReader = DirectoryReader.open(directory)
     val isearcher: IndexSearcher = new IndexSearcher(ireader)
@@ -149,7 +149,7 @@ class LuceneIndexMain(indexPath: String,
     val hits: Array[ScoreDoc] = isearcher.search(query, Integer.MAX_VALUE).scoreDocs
     val descriptors: Map[Int, Set[String]] = hits.foldLeft(Map[Int, Set[String]]()) {
       case (map, hit) =>
-        val doc: Document = ireader.document(hit.doc)
+        val doc: Document = ireader.storedFields().document(hit.doc) //ireader.document(hit.doc)
         val id: Int = doc.get("id").toInt
         val descr: Set[String] = doc.getValues("descriptor").toSet
         map + (id -> descr)
@@ -166,17 +166,9 @@ class LuceneIndexActor(indexWriter: IndexWriter,
                        decsMap: Map[Int,Set[String]],
                        lastModifiedDoc: MVMap[String, Long],
                        endDate: Long) extends Actor with ActorLogging {
-  val regexp: Regex = """\^d\d+""".r
-  val checkXml: CheckXml = new CheckXml()
-  val fieldsIndexNames: Set[String] = if ((fldIdxNames == null) || fldIdxNames.isEmpty) Conf.idxFldNames
-                         else fldIdxNames
-  val fldMap: Map[String, Float] = fieldsIndexNames.foldLeft[Map[String,Float]](Map[String,Float]()) {
-    case (map,fname) =>
-      val split = fname.split(" *: *", 2)
-      if (split.length == 1) map + ((split(0), 1f))
-      else map + ((split(0), split(1).toFloat))
-  }
-  val formatter: DateFormat = new SimpleDateFormat("yyyyMMdd")
+  private val regexp: Regex = """\^d\d+""".r
+  private val checkXml: CheckXml = new CheckXml()
+  private val formatter: DateFormat = new SimpleDateFormat("yyyyMMdd")
 
   def receive: PartialFunction[Any, Unit] = {
     case (fname:String, encoding:String) =>
@@ -320,7 +312,7 @@ object LuceneIndexAkka extends App {
     Console.err.println("usage: LuceneIndexAkka" +
       "\n\t-sdIndex=<path> - the name+path to the lucene index of similar documents to be created" +
       "\n\t-idIndex=<path> - the name+path index of already indexed/stored documents to be used or created" +
-      "\n\t-decsIndex=<path> - the name+path to the lucene index of DeCS descriptors to be used" +
+      "\n\t-oneWordIndexPath=<path> - the name+path to the lucene index of DeCS descriptors to be used" +
       "\n\t-xml=<path> - directory of xml files used to create the index" +
       "\n\t[-xmlFileFilter=<regExp>] - regular expression used to filter xml files" +
       "\n\t[-indexedFields=<field1>,...,<fieldN>] - xml doc fields to be indexed and stored" +
@@ -332,30 +324,30 @@ object LuceneIndexAkka extends App {
 
   if (args.length < 4) usage()
 
-  val parameters = args.foldLeft[Map[String,String]](Map()) {
+  private val parameters = args.foldLeft[Map[String,String]](Map()) {
     case (map,par) =>
       val split = par.split(" *= *", 2)
       if (split.length == 1) map + ((split(0).substring(2), ""))
       else map + ((split(0).substring(1), split(1)))
   }
 
-  val sdIndex = parameters("sdIndex")
-  val decsIndex = parameters("decsIndex")
-  val idIndex = parameters("idIndex")
-  val xml = parameters("xml")
-  val xmlFileFilter = parameters.getOrElse("xmlFileFilter", ".+\\.xml")
-  val sIdxFields = parameters.getOrElse("indexedFields", "")
-  val fldIdxNames = if (sIdxFields.isEmpty) Conf.idxFldNames
-                     else sIdxFields.split(" *, *").toSet
-  val storedFields = parameters.getOrElse("storedFields", "")
-  val fldStrdNames = if (storedFields.isEmpty) Set[String]()
-                      else storedFields.split(" *, *").toSet
-  val encoding = parameters.getOrElse("encoding", "ISO-8859-1")
-  val fullIndexing = parameters.contains("fullIndexing")
+  private val sdIndex = parameters("sdIndex")
+  private val oneWordIndexPath = parameters("oneWordIndexPath")
+  private val idIndex = parameters("idIndex")
+  private val xml = parameters("xml")
+  private val xmlFileFilter = parameters.getOrElse("xmlFileFilter", ".+\\.xml")
+  private val sIdxFields = parameters.getOrElse("indexedFields", "")
+  private val fldIdxNames = if (sIdxFields.isEmpty) Conf.idxFldNames
+                            else sIdxFields.split(" *, *").toSet
+  private val storedFields = parameters.getOrElse("storedFields", "")
+  private val fldStrdNames = if (storedFields.isEmpty) Set[String]()
+                             else storedFields.split(" *, *").toSet
+  private val encoding = parameters.getOrElse("encoding", "ISO-8859-1")
+  private val fullIndexing = parameters.contains("fullIndexing")
 
-  val system: ActorSystem = ActorSystem("Main")
+  private val system: ActorSystem = ActorSystem("Main")
   try {
-    val props: Props = Props(classOf[LuceneIndexMain], sdIndex, decsIndex, idIndex,
+    val props: Props = Props(classOf[LuceneIndexMain], sdIndex, oneWordIndexPath, idIndex,
                       xml, xmlFileFilter, fldIdxNames, fldStrdNames, encoding, fullIndexing)
     system.actorOf(props, "app")
   } catch {

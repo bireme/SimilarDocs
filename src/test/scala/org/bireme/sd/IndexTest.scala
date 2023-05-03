@@ -67,7 +67,7 @@ object IndexTest extends App {
 
     topDocs.scoreDocs.foreach {
       scoreDoc =>
-        val doc = ireader.document(scoreDoc.doc)
+        val doc = ireader.storedFields().document(scoreDoc.doc) // ireader.document(scoreDoc.doc)
         doc.getFields().asScala.map(_.stringValue())
     }
 

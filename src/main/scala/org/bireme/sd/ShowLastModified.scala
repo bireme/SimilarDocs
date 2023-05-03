@@ -25,8 +25,8 @@ object ShowLastModified extends App {
 
   if (args.length != 2) usage()
 
-  val fileLastModified: MVStore = new MVStore.Builder().fileName(args(0)).compress().readOnly().open()
-  val lastModifiedFile: MVMap[String, Long] = fileLastModified.openMap(args(1))
+  private val fileLastModified: MVStore = new MVStore.Builder().fileName(args(0)).compress().readOnly().open()
+  private val lastModifiedFile: MVMap[String, Long] = fileLastModified.openMap(args(1))
 
   lastModifiedFile.entrySet().asScala.foreach {
     entry: util.Map.Entry[String, Long] => println(s"key[${entry.getKey}]=${entry.getValue}")
