@@ -8,14 +8,14 @@
         <param-name>TOP_INDEX_PATH</param-name>
         <param-value>/home/javaapps/sbt-projects/SimilarDocs/indexes/topIndex</param-value>
     </context-param>
-        <param-name>ONE_WORD_INDEX_PATH</param-name>
+    <context-param>
+        <param-name>ONE_WORD_DECS_INDEX_PATH</param-name>
         <param-value>/home/javaapps/sbt-projects/SimilarDocs/indexes/decsIndex</param-value>
     </context-param>
     <context-param>
         <param-name>DECS_INDEX_PATH</param-name>
         <param-value>/home/javaapps/sbt-projects/SimilarDocs/decs/decs</param-value>
     </context-param>
-    <context-param>
     <servlet>
         <servlet-name>SDService</servlet-name>
         <servlet-class>org.bireme.sds.SDService</servlet-class>
@@ -29,4 +29,7 @@
             30
         </session-timeout>
     </session-config>
+    <welcome-file-list>
+        <welcome-file>index.html</welcome-file>
+    </welcome-file-list>
 </web-app>
