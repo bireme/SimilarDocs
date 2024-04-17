@@ -18,6 +18,8 @@ object SiteOk extends App {
     val statusCode: Int = response.getStatusLine.getStatusCode
 
     httpClient.close()
+
+    println(s"statusCode=$statusCode")
     if (statusCode == 200) 1 else 0
   }
 
