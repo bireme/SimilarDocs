@@ -93,4 +93,4 @@ assembly / assemblyMergeStrategy := {
   case _                        => MergeStrategy.first
 }
 
-enablePlugins(JettyPlugin)
+//enablePlugins(JettyPlugin)
