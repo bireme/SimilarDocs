@@ -81,6 +81,8 @@ assembly / test := {}
 Test / logBuffered := false
 trapExit :=  false  // To allow System.exit() without an exception (TestIndex.scala)
 
+enablePlugins(JettyPlugin)
+
 /*assembly / assemblyMergeStrategy := {
   case "module-info.class" => MergeStrategy.discard
   case x =>
