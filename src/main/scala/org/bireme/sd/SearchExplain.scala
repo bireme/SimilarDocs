@@ -9,12 +9,11 @@
 package org.bireme.sd
 
 import java.io.File
-
 import org.apache.lucene.analysis.core.KeywordAnalyzer
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.queryparser.classic.QueryParser
-import org.apache.lucene.search.{IndexSearcher, Query, ScoreDoc, TopDocs, TotalHitCountCollector, TotalHits}
+import org.apache.lucene.search.{IndexSearcher, Query, ScoreDoc, TopDocs, TotalHitCountCollectorManager, TotalHits}
 import org.apache.lucene.store.FSDirectory
 import org.bireme.sd.service.Conf
 
@@ -98,23 +97,22 @@ object SearchExplain extends App {
   }
 
   private def getTotalHits(text: String): Int = {
-    val collector = new TotalHitCountCollector()
+    val manager = new TotalHitCountCollectorManager()
     val analyzer = new KeywordAnalyzer()
     val mqParser = new QueryParser(Conf.indexedField, analyzer)
     val query = mqParser.parse(text)
 
-    searcher.search(query, collector)
-    collector.getTotalHits
+    searcher.search(query, manager)
   }
 
   private def getWordTotalHits(text: String): Int = {
-    val collector = new TotalHitCountCollector()
+    val manager = new TotalHitCountCollectorManager()
     val analyzer = new NGramAnalyzer(NGSize.ngram_min_size,
                                      NGSize.ngram_max_size)
     val mqParser = new QueryParser(Conf.indexedField, analyzer)
     val query = mqParser.parse(text)
-    searcher.search(query, collector)
-    collector.getTotalHits
+
+    searcher.search(query, manager)
   }
 
   private def getSentenceTotalHits(text: String,

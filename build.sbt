@@ -1,7 +1,7 @@
 lazy val commonSettings = Seq(
   organization := "br.bireme",
   version := "5.5.0",
-  scalaVersion := "2.13.10" //"2.13.6"
+  scalaVersion := "2.13.13" //"2.13.6"
 )
 
 // See https://sanj.ink/posts/2019-06-14-scalac-2.13-options-and-flags.html
@@ -45,15 +45,15 @@ lazy val root = (project in file(".")).
   )
 
 val jakartaServletApiVersion = "6.0.0"
-val luceneVersion = "9.5.0" //"8.9.0" //"8.7.0"
-val akkaVersion =  "2.8.0" //"2.6.15"
+val luceneVersion = "9.10.0" //"9.5.0"
+val akkaVersion =  "2.8.5" //"2.8.0"
 val httpClientVersion = "4.5.14" //"4.5.13"
 val scalajHttpVersion = "2.4.2"
-val scalaTestVersion = "3.2.15" //"3.2.9"
-val mongodbDriverVersion = "4.9.1" //"4.3.0"
-val h2DatabaseVersion = "2.1.214" //"1.4.200"
+val scalaTestVersion = "3.2.18" //"3.2.15"
+val mongodbDriverVersion = "5.0.1" //"4.9.1"
+val h2DatabaseVersion = "2.2.224" //"2.1.214"
 val gsonVersion = "2.10.1" //"2.8.7"
-val playJsonVersion = "2.9.4" //"2.9.2"
+val playJsonVersion = "2.10.4" //"2.9.4"
 
 libraryDependencies ++= Seq(
   "jakarta.servlet" % "jakarta.servlet-api" % jakartaServletApiVersion % "provided",
@@ -81,6 +81,8 @@ assembly / test := {}
 Test / logBuffered := false
 trapExit :=  false  // To allow System.exit() without an exception (TestIndex.scala)
 
+enablePlugins(JettyPlugin)
+
 /*assembly / assemblyMergeStrategy := {
   case "module-info.class" => MergeStrategy.discard
   case x =>
@@ -93,4 +95,4 @@ assembly / assemblyMergeStrategy := {
   case _                        => MergeStrategy.first
 }
 
-enablePlugins(JettyPlugin)
+//enablePlugins(JettyPlugin)
