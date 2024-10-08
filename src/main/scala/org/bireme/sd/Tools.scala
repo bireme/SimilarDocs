@@ -130,17 +130,19 @@ object Tools {
       val httpget: HttpGet = new HttpGet(iahx)
       val response: CloseableHttpResponse = httpclient.execute(httpget)
 
-      response.getStatusLine.getStatusCode match {
-        case 200 => Option(EntityUtils.toString(response.getEntity)).flatMap {
-          line =>
-            regex.findFirstMatchIn(line).map {
-              mat => df.parse(mat.group(1)).getTime
-            }
+      Option(response.getStatusLine).flatMap {
+        _.getStatusCode match {
+          case 200 => Option(EntityUtils.toString(response.getEntity)).flatMap {
+            line =>
+              regex.findFirstMatchIn(line).map {
+                mat => df.parse(mat.group(1)).getTime
+              }
+          }
+          case _ => None
         }
-        case _ => None
       }
     } match {
-      case Success(value) => value.get
+      case Success(value) => value.getOrElse(new Date().getTime)
       case Failure(_) => new Date().getTime
     }
   }

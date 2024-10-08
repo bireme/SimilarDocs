@@ -31,7 +31,7 @@ object UpdateProfiles extends App {
     System.exit(1)
   }
 
-  if (args.length != 5) usage()
+  if (args.length != 6) usage()
 
   val parameters = args.foldLeft[Map[String,String]](Map()) {
     case (map,par) =>
