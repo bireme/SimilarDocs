@@ -1,7 +1,7 @@
 lazy val commonSettings = Seq(
   organization := "br.bireme",
   version := "5.5.0",
-  scalaVersion := "2.13.13" //"2.13.6"
+  scalaVersion := "2.13.18" //"2.13.6"
 )
 
 // See https://sanj.ink/posts/2019-06-14-scalac-2.13-options-and-flags.html
@@ -44,16 +44,16 @@ lazy val root = (project in file(".")).
     name := "SimilarDocs"
   )
 
-val jakartaServletApiVersion = "6.0.0"
+val jakartaServletApiVersion = "6.1.0"
 val luceneVersion = "9.10.0" //"9.5.0"
-val akkaVersion =  "2.8.5" //"2.8.0"
+val akkaVersion =  "2.8.8" //"2.8.0"
 val httpClientVersion = "4.5.14" //"4.5.13"
 val scalajHttpVersion = "2.4.2"
-val scalaTestVersion = "3.2.18" //"3.2.15"
-val mongodbDriverVersion = "5.0.1" //"4.9.1"
-val h2DatabaseVersion = "2.2.224" //"2.1.214"
-val gsonVersion = "2.10.1" //"2.8.7"
-val playJsonVersion = "2.10.4" //"2.9.4"
+val scalaTestVersion = "3.2.19" //"3.2.15"
+val mongodbDriverVersion = "5.6.2" //"4.9.1"
+val h2DatabaseVersion = "2.4.240" //"2.1.214"
+val gsonVersion = "2.13.2" //"2.8.7"
+val playJsonVersion = "2.10.8" //"2.9.4"
 
 libraryDependencies ++= Seq(
   "jakarta.servlet" % "jakarta.servlet-api" % jakartaServletApiVersion % "provided",

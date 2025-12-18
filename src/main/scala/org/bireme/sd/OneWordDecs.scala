@@ -165,7 +165,7 @@ object OneWordDecsCreate extends App {
   private def usage(): Unit = {
     Console.println("usage: OneWordDecsCreate <decsDir> <decsIndex>")
     Console.println("\t<decsDir> - Isis database path having DeCS records")
-    Console.println("\t<decsIndex> - Lucene index with DeCS descritors/synonyms")
+    Console.println("\t<decsIndex> - Lucene index with DeCS descriptors/synonyms")
     System.exit(1)
   }
 

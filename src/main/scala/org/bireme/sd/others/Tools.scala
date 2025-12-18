@@ -60,7 +60,7 @@ object Tools {
     */
   private def url2InputStream(urls: String): Option[InputStream] = {
     Try {
-      val url: URL = new URL(urls)
+      val url: URL = new URI(urls).toURL
       url.getProtocol match {
         case "http" | "https" => getHttpInputStream(urls)
         case "ftp" => url.openStream()
@@ -88,7 +88,7 @@ object Tools {
   @scala.annotation.tailrec
   private def getHttpInputStream(urls: String): InputStream = {
     val timeout = 4 * 60 * 1000
-    val url: URL = new URL(urlEncode(urls))
+    val url: URL = new URI(urlEncode(urls)).toURL
     val conn: HttpURLConnection = url.openConnection().asInstanceOf[HttpURLConnection]
 
     conn.setConnectTimeout(timeout)
@@ -104,7 +104,7 @@ object Tools {
         if (location2.equals(original)) {
           throw new Exception("invalid redirection")
         }
-        val next: URL = new URL(url, location2)  // Deal with relative URLs
+        val next: URL = new URI(urls).resolve(location2).toURL // Deal with relative URLs
         val url2: String = next.toExternalForm
         getHttpInputStream(url2)
       case _ => conn.getInputStream
@@ -177,8 +177,8 @@ object Tools {
     * @return the encoded url
     */
   def urlEncode0(surl: String): String = {
-    val url = new URL(URLDecoder.decode(surl, "utf-8"))     // To avoid double encoding
-    val uri = new URI(url.getProtocol, url.getUserInfo, url.getHost,
+    val url: URL = new URI(URLDecoder.decode(surl, "utf-8")).toURL // To avoid double encoding
+    val uri: URI = new URI(url.getProtocol, url.getUserInfo, url.getHost,
                       url.getPort, url.getPath, url.getQuery, url.getRef)
     //url.getPort, URLEncoder.encode(url.getPath, "utf-8"), url.getQuery, url.getRef)
      uri.toURL.toString  // Do not treat # in the URLpath
@@ -186,14 +186,14 @@ object Tools {
 
   private def urlEncode(urls: String,
                         encod: String = "utf-8"): String = {
-    val url = new URL(URLDecoder.decode(urls, encod))
-    val protocol = url.getProtocol
-    val authority = url.getAuthority
-    val path = encodePath(url.getPath, encod)
-    val query = url.getQuery
-    val query2 = if (query == null) "" else s"?${encodeQuery(query, encod)}"
-    val fragment = url.getRef
-    val fragment2 = if (fragment == null) "" else s"#${encodeFragment(fragment, encod)}"
+    val url: URL = new URI(URLDecoder.decode(urls, encod)).toURL
+    val protocol: String = url.getProtocol
+    val authority: String = url.getAuthority
+    val path: String = encodePath(url.getPath, encod)
+    val query: String = url.getQuery
+    val query2: String = if (query == null) "" else s"?${encodeQuery(query, encod)}"
+    val fragment: String = url.getRef
+    val fragment2: String = if (fragment == null) "" else s"#${encodeFragment(fragment, encod)}"
 
     protocol + "://" + authority + path + query2 + fragment2
   }
