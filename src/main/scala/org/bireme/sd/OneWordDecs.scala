@@ -143,10 +143,10 @@ object OneWordDecs {
                               highlighter: Highlighter,
                               conf: Config): Set[String] = {
 
-    val (_,_, descripts: Seq[String]) = highlighter.highlight("", "", inText, conf)
+    val (_,_, descripts: Seq[(String,_,_)]) = highlighter.highlight("", "", inText, conf)
 
     descripts.foldLeft(mutable.Set[String]()) {
-      case (set, descr) =>
+      case (set, (descr,_,_)) =>
         val query: TermQuery = new TermQuery(new Term("descriptor", descr))
         val topDocs: TopDocs = decsSearcher.search(query, 1)
 

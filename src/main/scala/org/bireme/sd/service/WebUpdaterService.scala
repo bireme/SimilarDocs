@@ -1,51 +1,78 @@
-/*=========================================================================
-
-    SimilarDocs © Pan American Health Organization, 2018.
-    See License at: https://github.com/bireme/SimilarDocs/blob/master/LICENSE.txt
-
-  ==========================================================================*/
-
 package org.bireme.sd.service
 
-import scalaj.http.{Http, HttpResponse}
+import sttp.client4.*
+import sttp.client4.httpclient.HttpClientSyncBackend
+import sttp.model.Uri
 
-import scala.util.{Failure, Success, Try}
+import java.net.http.HttpClient
+import java.time.Duration
 
-object WebUpdaterService extends App {
-  private def usage(): Unit = {
+import scala.annotation.tailrec
+import scala.concurrent.duration.*
+import scala.util.{Try, Success, Failure}
+
+object WebUpdaterService:
+
+  private def usage(): Unit =
     System.err.println("usage: WebUpdaterService <SimDocs url>")
     System.exit(1)
-  }
 
-  if (args.length != 1) usage()
+  @main def run(args: String*): Unit =
+    if args.length != 1 then usage()
+    updateOneDocument(args.head)
 
-  updateOneDocument(args(0))
+  @tailrec
+  def updateOneDocument(url: String): Unit =
+    // Parse da URL + cria request GET com query param updateOneProfile=true
+    val requestTry: Try[Request[Either[String, String]]] =
+      Uri.parse(url).left.map(new IllegalArgumentException(_)).toTry.map { baseUri =>
+        basicRequest
+          .get(baseUri.addParam("updateOneProfile", "true"))
+          .readTimeout(500000.millis)
+      }
 
-
-  @scala.annotation.tailrec
-  def updateOneDocument(url: String): Unit = {
-    val response: Try[HttpResponse[String]] = Try (Http(url).timeout(connTimeoutMs = 10000, readTimeoutMs = 500000)
-                                                  .param("updateOneProfile","true").asString)
-    response match {
-      case Success(resp) =>
-        if (resp.code == 200) {
-          val body: String = resp.body
-          if (body.startsWith("<finished/>")) {
-            println(s"[WebUpdaterService] All documents were updated")
-          } else if (body.contains("maintenance_mode")) {
-            println("[WebUpdaterService] Waiting maintenance mode to finished")
-            Thread.sleep(5 * 60 * 1000)
-            updateOneDocument(url)
-          } else if (body.startsWith("<doc")) {
-            val msg = body.substring(1, body.length - 3)
-            println(s"[WebUpdaterService] Updated [$msg]")
-            updateOneDocument(url)
-          } else println(s"[WebUpdaterService] Unknown message error: [$body]")
-        } else println(s"[WebUpdaterService] SimilarDocs service error: ${resp.code}")
-      case Failure(exception) =>
-        println(s"[WebUpdaterService] Exception:${exception.getMessage}")
+    requestTry match
+      case Failure(e) =>
+        println(s"[WebUpdaterService] Exception:${e.getMessage}")
         updateOneDocument(url)
-    }
-  }
-}
 
+      case Success(request) =>
+        // Backend com connect timeout similar ao connTimeoutMs = 10000
+        val httpClient =
+          HttpClient
+            .newBuilder()
+            .connectTimeout(Duration.ofMillis(10000))
+            .build()
+
+        val backend = HttpClientSyncBackend.usingClient(httpClient)
+
+        val responseTry: Try[Response[Either[String, String]]] =
+          Try(request.send(backend))
+
+        responseTry match
+          case Success(resp) =>
+            if resp.code.code == 200 then
+              val body: String = resp.body.fold(identity, identity)
+
+              if body.startsWith("<finished/>") then
+                println("[WebUpdaterService] All documents were updated")
+
+              else if body.contains("maintenance_mode") then
+                println("[WebUpdaterService] Waiting maintenance mode to finished")
+                Thread.sleep(5L * 60L * 1000L)
+                updateOneDocument(url)
+
+              else if body.startsWith("<doc") then
+                // Mantém o mesmo “substring(1, length-3)” do código original
+                val msg = body.substring(1, body.length - 3)
+                println(s"[WebUpdaterService] Updated [$msg]")
+                updateOneDocument(url)
+
+              else
+                println(s"[WebUpdaterService] Unknown message error: [$body]")
+            else
+              println(s"[WebUpdaterService] SimilarDocs service error: ${resp.code.code}")
+
+          case Failure(exception) =>
+            println(s"[WebUpdaterService] Exception:${exception.getMessage}")
+            updateOneDocument(url)

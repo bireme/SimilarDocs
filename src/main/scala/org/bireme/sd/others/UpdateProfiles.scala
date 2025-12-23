@@ -7,7 +7,6 @@
 
 package org.bireme.sd.others
 
-import org.apache.lucene.document.Document
 import org.bireme.sd.SimDocsSearch
 import org.bireme.sd.service.TopIndex
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
@@ -103,7 +102,7 @@ object UpdateProfiles extends App {
                              topIndex: TopIndex,
                              profName: String): Option[String] = {
     topIndex.getDocuments(Map(topIndex.userFldName -> userName, topIndex.nameFldName -> profName)).flatMap {
-      docList: List[Document] => // Profile associated to the document id was found
+      docList => // Profile associated to the document id was found
         docList.headOption.flatMap(doc => Option(doc.get(topIndex.contentFldName)))
     }
   }

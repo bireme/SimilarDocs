@@ -7,8 +7,6 @@
 
 package org.bireme.sd
 
-import java.util
-
 import org.h2.mvstore.{MVMap, MVStore}
 
 //import scala.collection.JavaConverters._
@@ -29,6 +27,6 @@ object ShowLastModified extends App {
   private val lastModifiedFile: MVMap[String, Long] = fileLastModified.openMap(args(1))
 
   lastModifiedFile.entrySet().asScala.foreach {
-    entry: util.Map.Entry[String, Long] => println(s"key[${entry.getKey}]=${entry.getValue}")
+    entry => println(s"key[${entry.getKey}]=${entry.getValue}")
   }
 }

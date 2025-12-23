@@ -5,27 +5,27 @@
 
   ==========================================================================*/
 
-
 package org.bireme.sd
 
 import com.google.gson.{GsonBuilder, JsonParser}
-import java.io.{File, StringWriter}
+import java.io.File
 import java.nio.charset.Charset
 import java.nio.file.{Files, Paths}
 import java.text.SimpleDateFormat
 import java.util.{Calendar, Date, GregorianCalendar, TimeZone}
 
-import org.mongodb.scala.bson.collection.immutable.Document
-import org.mongodb.scala.{FindObservable, MongoClient, MongoCollection, MongoDatabase}
+// Java sync driver imports
+import com.mongodb.client.{FindIterable, MongoClient, MongoClients, MongoCollection, MongoDatabase}
+import org.bson.Document
 
 /** Export all documents from a MongoDb collection to a file
-*
-* @param host MongoDb server host
-* @param port MongoDb server port
-*
-* @author Heitor Barbieri
-* date: 20170824
-*/
+  *
+  * @param host MongoDb server host
+  * @param port MongoDb server port
+  *
+  * @author Heitor Barbieri
+  * date: 20170824
+  */
 class MongoDbExport(host: String,
                     port: Int = 27017) {
 
@@ -50,29 +50,38 @@ class MongoDbExport(host: String,
     require(collection != null)
     require(outFile != null)
 
-    val mongoClient: MongoClient = MongoClient(s"mongodb://$host:$port")
+    val mongoClient: MongoClient = MongoClients.create(s"mongodb://$host:$port")
     val dbase: MongoDatabase = mongoClient.getDatabase(dataBase)
     val coll: MongoCollection[Document] = dbase.getCollection(collection)
-    val docs: FindObservable[Document] = beginDate match {
+
+    val docs: FindIterable[Document] = beginDate match {
       case Some(begDate) =>
-        val timestamp: Document = if (endDate.isDefined) Document("$gte" -> begDate, "$lt" -> endDate.get)
-                        else Document("$gte" -> begDate)
-        val query: Document = Document("timestamp" -> timestamp)
+        val timestamp: Document =
+          endDate match {
+            case Some(ed) => new Document("$gte", begDate).append("$lt", ed)
+            case None     => new Document("$gte", begDate)
+          }
+        val query: Document = new Document("timestamp", timestamp)
         coll.find(query)
-      case None => coll.find()
+      case None =>
+        coll.find()
     }
 
-    val writer = Files.newBufferedWriter(Paths.get(outFile),
-                                         Charset.forName("utf-8"))
+    val writer = Files.newBufferedWriter(
+      Paths.get(outFile),
+      Charset.forName("utf-8")
+    )
+
     val gson = new GsonBuilder().setPrettyPrinting().create()
     var first = true
 
     writer.write("{\"docs\": [\n")
 
-    docs.foreach {
-      doc =>
-        val writer = new StringWriter()
-        val docStr: String  = doc.toString
+    val it = docs.iterator()
+    try {
+      while (it.hasNext) {
+        val doc: Document = it.next()
+        val docStr: String = doc.toJson() // no driver Java, use toJson()
         val jsonStr: String =
           if (prettyPrint) gson.toJson(JsonParser.parseString(docStr))
           else docStr
@@ -81,6 +90,9 @@ class MongoDbExport(host: String,
         else writer.write(",\n")
 
         writer.write(jsonStr)
+      }
+    } finally {
+      it.close() // fecha o cursor
     }
 
     writer.write("\n]}")
@@ -112,24 +124,25 @@ class MongoDbExport(host: String,
 object MongoDbExport extends App {
   private def usage(): Unit = {
     Console.err.println("usage: MongoDbExport" +
-    "\n\t-host=<host> - MongoDB host"+
-    "\n\t-dbase=<database> - MongoDB database name" +
-    "\n\t-coll=<collection> - MongoDB collection name" +
-    "\n\t-outFileDir=<dir> - diretory into which the output file will be written" +
-    "\n\t[-port=<port>] - MongoDB server port" +
-    "\n\t[--exportAll] - if presente all log documents will be exported if not only the ones created yesterday" +
-    "\n\t[--prettyPrint] - the json exported documents will be formatted (pretty print)")
+      "\n\t-host=<host> - MongoDB host" +
+      "\n\t-dbase=<database> - MongoDB database name" +
+      "\n\t-coll=<collection> - MongoDB collection name" +
+      "\n\t-outFileDir=<dir> - diretory into which the output file will be written" +
+      "\n\t[-port=<port>] - MongoDB server port" +
+      "\n\t[--exportAll] - if presente all log documents will be exported if not only the ones created yesterday" +
+      "\n\t[--prettyPrint] - the json exported documents will be formatted (pretty print)")
     System.exit(1)
   }
 
   if (args.length < 3) usage()
 
-  private val parameters = args.foldLeft[Map[String,String]](Map()) {
-    case (map,par) =>
+  private val parameters = args.foldLeft[Map[String, String]](Map()) {
+    case (map, par) =>
       val split = par.split(" *= *", 2)
       if (split.size == 1) map + ((split(0).substring(2), ""))
       else map + ((split(0).substring(1), split(1)))
   }
+
   private val host = parameters("host")
   private val dbase = parameters("dbase")
   private val coll = parameters("coll")
@@ -138,10 +151,13 @@ object MongoDbExport extends App {
   private val exportAll = parameters.contains("exportAll")
   private val prettyPrint = parameters.contains("prettyPrint")
   private val mongoExp = new MongoDbExport(host, port)
+
   private val (yesterday, today) = mongoExp.getYesterdayDate
   private val format = new SimpleDateFormat("yyyyMMdd")
-  private val outFileName = if (exportAll) s"begin_${format.format(today)}.json"
+  private val outFileName =
+    if (exportAll) s"begin_${format.format(today)}.json"
     else s"${format.format(yesterday)}.json"
+
   private val outFile = new File(outFileDir, outFileName).getPath
 
   if (exportAll)
