@@ -56,40 +56,42 @@ class UpdaterService(topDocs: TopIndex) {
   }
 }
 
-object UpdaterService extends App {
+object UpdaterService {
   private def usage(): Unit = {
     System.err.println("usage: UpdaterService -sdIndex=<path> -decsIndex=<path> -oneWordDecsIndexPath=<path> -topIndex=<path> (--start|--stop)")
     System.exit(1)
   }
 
-  if (args.length != 5) usage()
+  def main(args: Array[String]): Unit = {
+    if (args.length != 5) usage()
 
-  val parameters = args.foldLeft[Map[String,String]](Map()) {
-    case (map,par) =>
-      val split = par.split(" *= *", 2)
-      if (split.length == 2) map + ((split(0).substring(1), split(1)))
-      else map + ((split(0).substring(2), ""))
+    val parameters = args.foldLeft[Map[String, String]](Map()) {
+      case (map, par) =>
+        val split = par.split(" *= *", 2)
+        if (split.length == 2) map + ((split(0).substring(1), split(1)))
+        else map + ((split(0).substring(2), ""))
+    }
+
+    val sdIndex: String = parameters("sdIndex")
+    val decsIndex: String = parameters("decsIndex")
+    val oneWordDecsIndexPath: String = parameters("oneWordDecsIndexPath")
+    val topIndex: String = parameters("topIndex")
+
+    val op: String = if (parameters.contains("start")) "start"
+    else if (parameters.contains("stop")) "stop"
+    else ""
+
+    val sim: SimDocsSearch = new SimDocsSearch(sdIndex, decsIndex, oneWordDecsIndexPath)
+    val top: TopIndex = new TopIndex(sim, topIndex)
+    val upds: UpdaterService = new UpdaterService(top)
+
+    op match {
+      case "start" => upds.start()
+      case "stop" => upds.stop()
+      case _ => usage()
+    }
+
+    top.close()
+    sim.close()
   }
-
-  val sdIndex: String = parameters("sdIndex")
-  val decsIndex: String = parameters("decsIndex")
-  val oneWordDecsIndexPath: String = parameters("oneWordDecsIndexPath")
-  val topIndex: String = parameters("topIndex")
-
-  val op: String = if (parameters.contains("start")) "start"
-                   else if (parameters.contains("stop")) "stop"
-                   else ""
-
-  val sim: SimDocsSearch = new SimDocsSearch(sdIndex, decsIndex, oneWordDecsIndexPath)
-  val top: TopIndex = new TopIndex(sim, topIndex)
-  val upds: UpdaterService = new UpdaterService(top)
-
-  op match {
-    case "start" => upds.start()
-    case "stop" => upds.stop()
-    case _ => usage()
-  }
-
-  top.close()
-  sim.close()
 }

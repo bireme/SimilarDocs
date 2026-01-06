@@ -54,16 +54,18 @@ class CheckXml {
   }
 }
 
-object CheckXml extends App {
+object CheckXml {
   private def usage(): Unit = {
     Console.err.println("usage: CheckXml <filename>")
     System.exit(1)
   }
 
-  if (args.length != 1) usage()
+  def main(args:Array[String]): Unit = {
+    if (args.length != 1) usage()
 
-  (new CheckXml).check(args(0)) match {
-    case Some(msg) => println(s"[${args(0)}] ERROR: $msg")
-    case None => println(s"[${args(0)}] - OK")
+    (new CheckXml).check(args(0)) match {
+      case Some(msg) => println(s"[${args(0)}] ERROR: $msg")
+      case None => println(s"[${args(0)}] - OK")
+    }
   }
 }

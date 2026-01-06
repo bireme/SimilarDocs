@@ -15,7 +15,7 @@ import org.bireme.sd.SimDocsSearch
 * author: Heitor Barbieri
 * date: 20170110
 */
-object UpdaterBatchService extends App {
+object UpdaterBatchService {
   private def usage(): Unit = {
     Console.err.println("usage: UpdateBatchService:\n" +
       "\n\t-sdIndexPath=<path>     : documents Lucene index path" +
@@ -25,22 +25,25 @@ object UpdaterBatchService extends App {
     )
     System.exit(1)
   }
-  if (args.length != 3) usage()
+  
+  def main(args: Array[String]): Unit = {
+    if (args.length != 3) usage()
 
-  val parameters = args.foldLeft[Map[String,String]](Map()) {
-    case (map,par) =>
-      val split = par.split(" *= *", 2)
-      if (split.length == 2) map + ((split(0).substring(1), split(1)))
-      else map + ((split(0).substring(2), ""))
+    val parameters = args.foldLeft[Map[String, String]](Map()) {
+      case (map, par) =>
+        val split = par.split(" *= *", 2)
+        if (split.length == 2) map + ((split(0).substring(1), split(1)))
+        else map + ((split(0).substring(2), ""))
+    }
+    val topIndexPath = parameters("topIndexPath")
+    val sdIndexPath = parameters("sdIndexPath")
+    val decsIndexPath = parameters("decsIndexPath")
+    val oneWordDecsIndexPath = parameters("oneWordDecsIndexPath")
+    val sdSearcher = new SimDocsSearch(sdIndexPath, decsIndexPath, oneWordDecsIndexPath)
+
+    update(sdSearcher, topIndexPath)
+    sdSearcher.close()
   }
-  val topIndexPath = parameters("topIndexPath")
-  val sdIndexPath = parameters("sdIndexPath")
-  val decsIndexPath = parameters("decsIndexPath")
-  val oneWordDecsIndexPath = parameters("oneWordDecsIndexPath")
-  val sdSearcher = new SimDocsSearch(sdIndexPath, decsIndexPath, oneWordDecsIndexPath)
-
-  update(sdSearcher, topIndexPath)
-  sdSearcher.close()
 
   def update(sdSearcher: SimDocsSearch,
              topIndexPath: String): Unit = {

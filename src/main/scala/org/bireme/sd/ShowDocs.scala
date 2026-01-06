@@ -24,16 +24,18 @@ import scala.jdk.CollectionConverters._
   * date: 20170320
   *
 */
-object ShowDocs extends App {
+object ShowDocs {
   private def usage(): Unit = {
     Console.err.println("usage: ShowDocs <indexName> [<doc number>]")
     System.exit(1)
   }
+  
+  def main(args: Array[String]): Unit = {
+    if (args.length < 1) usage()
 
-  if (args.length < 1) usage()
-
-  private val docNum = if (args.length == 1) "" else args(1)
-  showDocument(args(0), docNum)
+    val docNum = if (args.length == 1) "" else args(1)
+    showDocument(args(0), docNum)
+  }
 
   /**
     * Shows a Lucene index document

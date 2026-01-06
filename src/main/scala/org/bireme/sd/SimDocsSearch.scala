@@ -596,66 +596,68 @@ class SimDocsSearch(val sdIndexPath: String,
   }
 }
 
-object SimDocsSearch extends App {
+object SimDocsSearch {
   private def usage(): Unit = {
     Console.err.println("usage: SimDocsSearch" +
-    "\n\t-sdIndex=<sdIndexPath> - lucene Index where the similar document will be searched" +
-    "\n\t-decsIndex=<decsIndexPath> - lucene Index where DeCS terms present in a document will be found (DeCSHighlighter)" +
-    "\n\t-oneWordDecsIndex=<oneWordDecsIndexPath> - lucene Index where DeCS synonyms will be found and used to find similar documents (SimilarDocs)" +
-    "\n\t-text=<str> - text used to look for similar documents" +
-    "\n\t[<-outFields=<field>,<field>,...,<field>] - document fields used will be show in the output" +
-    "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
-    "\n\t[-minNGrams=<num>] - minimum number of common ngrams retrieved to consider returning a document field text" +
-    "\n\t[-sources=<src1>,<src2>,...,<src>] - return only docs that have the value of their field 'db' equal to <srci>" +
-    "\n\t[-instances=<inst1>,<inst2>,...,<inst>] - return only docs that have the value of their field 'instance' equal to <insti>" +
-    "\n\t[-lastDays=<num>] - return only docs that are younger than 'lastDays' days compared to update_date flag" +
-    "\n\t[--splitTime] - if present, split the period of time to look for similar docs")
+      "\n\t-sdIndex=<sdIndexPath> - lucene Index where the similar document will be searched" +
+      "\n\t-decsIndex=<decsIndexPath> - lucene Index where DeCS terms present in a document will be found (DeCSHighlighter)" +
+      "\n\t-oneWordDecsIndex=<oneWordDecsIndexPath> - lucene Index where DeCS synonyms will be found and used to find similar documents (SimilarDocs)" +
+      "\n\t-text=<str> - text used to look for similar documents" +
+      "\n\t[<-outFields=<field>,<field>,...,<field>] - document fields used will be show in the output" +
+      "\n\t[-maxDocs=<num>] - maximum number of retrieved similar documents" +
+      "\n\t[-minNGrams=<num>] - minimum number of common ngrams retrieved to consider returning a document field text" +
+      "\n\t[-sources=<src1>,<src2>,...,<src>] - return only docs that have the value of their field 'db' equal to <srci>" +
+      "\n\t[-instances=<inst1>,<inst2>,...,<inst>] - return only docs that have the value of their field 'instance' equal to <insti>" +
+      "\n\t[-lastDays=<num>] - return only docs that are younger than 'lastDays' days compared to update_date flag" +
+      "\n\t[--splitTime] - if present, split the period of time to look for similar docs")
     System.exit(1)
   }
 
-  if (args.length < 4) usage()
+  def main(args: Array[String]): Unit = {
+    if (args.length < 4) usage()
 
-  println("Starting search ...")
+    println("Starting search ...")
 
-  private val startTime: Long = new Date().getTime
-  private val parameters = args.foldLeft[Map[String,String]](Map()) {
-    case (map,par) =>
-      val split = par.split(" *= *", 2)
-      if (split.length == 1) map + ((split(0).substring(2), ""))
-      else map + ((split(0).substring(1), split(1)))
+    val startTime: Long = new Date().getTime
+    val parameters = args.foldLeft[Map[String, String]](Map()) {
+      case (map, par) =>
+        val split = par.split(" *= *", 2)
+        if (split.length == 1) map + ((split(0).substring(2), ""))
+        else map + ((split(0).substring(1), split(1)))
+    }
+    val sdIndex: String = parameters("sdIndex")
+    val decsIndex: String = parameters("decsIndex")
+    val oneWorldDecsIndex: String = parameters("oneWordDecsIndex")
+    val text: String = parameters("text")
+    val outFields: Set[String] = parameters.get("outFields") match {
+      case Some(sFields) => sFields.split(" *, *").toSet
+      case None => Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs", "id", "db", "update_date") //service.Conf.idxFldNames
+    }
+    val maxDocs: Int = parameters.getOrElse("maxDocs", "10").toInt
+    val minNGrams: Int = parameters.getOrElse("minNGrams", Conf.minNGrams.toString).toInt
+    val sources: Option[Set[String]] = parameters.get("sources").map(_.split(" *, *").toSet)
+    val instances: Option[Set[String]] = parameters.get("instances").map(_.split(" *, *").toSet)
+    val lastDays: Option[Int] = parameters.get("lastDays").map(_.toInt)
+    val splitTime: Boolean = parameters.contains("splitTime")
+    val search: SimDocsSearch = new SimDocsSearch(sdIndex, decsIndex, oneWorldDecsIndex)
+    //val maxWords: Int = search.maxWords
+
+    val docs: List[(Int, Map[String, List[String]], Float, Set[String])] =
+      search.search(text, outFields, maxDocs, minNGrams, sources, instances, lastDays, splitTime)
+    docs.foreach {
+      case (id, doc, score, _) =>
+        val (set_original, set_similar, set_common) = search.getCommonNGrams(text, search.loadDoc(id, service.Conf.idxFldNames))
+
+        println("\n------------------------------------------------------")
+        println(s"score: $score")
+        print(s"original ngrams[${set_original.size}]: ${set_original.mkString(", ")}")
+        print(s"\nsimilar ngrams[${set_similar.size}]: ${set_similar.mkString(", ")}")
+        print(s"\ncommon ngrams[${set_common.size}]: ${set_common.mkString(", ")}")
+        println("\n")
+        doc.foreach { case (tag, list) => list.foreach(content => println(s"[$tag]: $content")) }
+    }
+
+    search.close()
+    println(s"Elapsed time2: ${new Date().getTime - startTime}")
   }
-  private val sdIndex: String = parameters("sdIndex")
-  private val decsIndex: String = parameters("decsIndex")
-  private val oneWorldDecsIndex: String = parameters("oneWordDecsIndex")
-  private val text: String = parameters("text")
-  private val outFields: Set[String] = parameters.get("outFields") match {
-    case Some(sFields) => sFields.split(" *, *").toSet
-    case None => Set("ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs", "id", "db", "update_date")//service.Conf.idxFldNames
-  }
-  private val maxDocs: Int = parameters.getOrElse("maxDocs", "10").toInt
-  private val minNGrams: Int = parameters.getOrElse("minNGrams", Conf.minNGrams.toString).toInt
-  private val sources: Option[Set[String]] = parameters.get("sources").map(_.split(" *, *").toSet)
-  private val instances: Option[Set[String]] = parameters.get("instances").map(_.split(" *, *").toSet)
-  private val lastDays: Option[Int] = parameters.get("lastDays").map(_.toInt)
-  private val splitTime: Boolean = parameters.contains("splitTime")
-  private val search: SimDocsSearch = new SimDocsSearch(sdIndex, decsIndex, oneWorldDecsIndex)
-  //private val maxWords: Int = search.maxWords
-
-  private val docs: List[(Int, Map[String, List[String]], Float, Set[String])] =
-    search.search(text, outFields, maxDocs, minNGrams, sources, instances, lastDays, splitTime)
-  docs.foreach {
-    case (id, doc, score, _) =>
-      val (set_original, set_similar, set_common) = search.getCommonNGrams(text, search.loadDoc(id, service.Conf.idxFldNames))
-
-      println("\n------------------------------------------------------")
-      println(s"score: $score")
-      print(s"original ngrams[${set_original.size}]: ${set_original.mkString(", ")}")
-      print(s"\nsimilar ngrams[${set_similar.size}]: ${set_similar.mkString(", ")}")
-      print(s"\ncommon ngrams[${set_common.size}]: ${set_common.mkString(", ")}")
-      println("\n")
-      doc.foreach { case (tag,list) => list.foreach(content => println(s"[$tag]: $content")) }
-  }
-
-  search.close()
-  println(s"Elapsed time2: ${new Date().getTime - startTime}")
 }

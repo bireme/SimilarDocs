@@ -64,23 +64,25 @@ class DocumentIterator(ireader: IndexReader,
   }
 }
 
-object DocumentIterator extends App {
+object DocumentIterator {
   private def usage(): Unit = {
     System.err.println("usage: DocumentIterator -index=<path> [-fields=<field>,...,<field>]")
     System.exit(1)
   }
 
-  if (args.length < 1) usage()
+  def main(args: Array[String]): Unit = {
+    if (args.length < 1) usage()
 
-  val parameters = args.foldLeft[Map[String,String]](Map()) {
-    case (map,par) =>
-      val split = par.split(" *= *", 2)
-      map + ((split(0).substring(1), split(1)))
+    val parameters = args.foldLeft[Map[String, String]](Map()) {
+      case (map, par) =>
+        val split = par.split(" *= *", 2)
+        map + ((split(0).substring(1), split(1)))
+    }
+
+    val directory: FSDirectory = FSDirectory.open(new File(parameters("index")).toPath)
+    val ireader: DirectoryReader = DirectoryReader.open(directory)
+    val fields: Option[Set[String]] = parameters.get("fields").map(_.split(" *, *").toSet)
+
+    new DocumentIterator(ireader, fields).foreach(field => println(s"field=$field"))
   }
-
-  val directory: FSDirectory = FSDirectory.open(new File(parameters("index")).toPath)
-  val ireader: DirectoryReader = DirectoryReader.open(directory)
-  val fields: Option[Set[String]] = parameters.get("fields").map(_.split(" *, *").toSet)
-
-  new DocumentIterator(ireader, fields).foreach(field => println(s"field=$field"))
 }

@@ -821,7 +821,7 @@ class TopIndex(simSearch: SimDocsSearch,
   }
 }
 
-object TopIndex extends App {
+object TopIndex {
   private def usage(): Unit = {
     Console.err.println("usage: TopIndex" +
       "\n\t-sdIndex=<sdIndexPath> - lucene Index where the similar document will be searched" +
@@ -851,41 +851,43 @@ object TopIndex extends App {
     println(s"Elapsed time: ${end - init}ms")
   }
 
-  if (args.length < 5) usage()
+  def main(args: Array[String]): Unit = {
+    if (args.length < 5) usage()
 
-  val parameters = args.foldLeft[Map[String,String]](Map()) {
-    case (map,par) =>
-      val split = par.split(" *= *", 2)
-      if (split.length == 1) map + ((split(0).substring(2), ""))
-      else map + ((split(0).substring(1), split(1)))
-  }
+    val parameters = args.foldLeft[Map[String, String]](Map()) {
+      case (map, par) =>
+        val split = par.split(" *= *", 2)
+        if (split.length == 1) map + ((split(0).substring(2), ""))
+        else map + ((split(0).substring(1), split(1)))
+    }
 
-  val sdIndexPath: String = parameters("sdIndex")
-  val decsIndexPath: String = parameters("decsIndex")
-  val oneWordDecsIndex: String = parameters("oneWordDecsIndex")
-  val topIndexPath: String = parameters("topIndex")
-  val psId: String = parameters("psId")
-  val profiles: Set[String] = parameters("profiles").split(" *, *").toSet
-  val outFields: Set[String] = parameters.get("outFields") match {
-    case Some(sFields) => sFields.split(" *, *").toSet
-    case None => Set("id", "ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs", "update_date")//service.Conf.idxFldNames
-  }
-  val maxDocs: Int = Conf.maxDocs
-  val sources: Option[Set[String]] = Conf.sources
-  val instances: Option[Set[String]] = Conf.instances
-  val considerDate = parameters.contains("considerDate")
-  val beginDate: Option[Long] = if (considerDate) {
-    Some(Tools.getIahxModificationTime - Tools.daysToTime(Conf.excludeDays + Conf.numDays))
-  } else None
-  val search: SimDocsSearch = new SimDocsSearch(sdIndexPath, decsIndexPath, oneWordDecsIndex)
-  val topIndex: TopIndex = new TopIndex(search, topIndexPath)
-  if (parameters.contains("preprocess")) preProcess(topIndex, maxDocs, sources, instances)
-  else topIndex.resetUpdateTime(psId, profiles)
-  val result: String = topIndex.getSimDocsXml(psId, profiles, outFields, maxDocs, beginDate, sources, instances)
-  topIndex.close()
+    val sdIndexPath: String = parameters("sdIndex")
+    val decsIndexPath: String = parameters("decsIndex")
+    val oneWordDecsIndex: String = parameters("oneWordDecsIndex")
+    val topIndexPath: String = parameters("topIndex")
+    val psId: String = parameters("psId")
+    val profiles: Set[String] = parameters("profiles").split(" *, *").toSet
+    val outFields: Set[String] = parameters.get("outFields") match {
+      case Some(sFields) => sFields.split(" *, *").toSet
+      case None => Set("id", "ti", "ti_pt", "ti_en", "ti_es", "ab", "ab_pt", "ab_en", "ab_es", "decs", "update_date") //service.Conf.idxFldNames
+    }
+    val maxDocs: Int = Conf.maxDocs
+    val sources: Option[Set[String]] = Conf.sources
+    val instances: Option[Set[String]] = Conf.instances
+    val considerDate = parameters.contains("considerDate")
+    val beginDate: Option[Long] = if (considerDate) {
+      Some(Tools.getIahxModificationTime - Tools.daysToTime(Conf.excludeDays + Conf.numDays))
+    } else None
+    val search: SimDocsSearch = new SimDocsSearch(sdIndexPath, decsIndexPath, oneWordDecsIndex)
+    val topIndex: TopIndex = new TopIndex(search, topIndexPath)
+    if (parameters.contains("preprocess")) preProcess(topIndex, maxDocs, sources, instances)
+    else topIndex.resetUpdateTime(psId, profiles)
+    val result: String = topIndex.getSimDocsXml(psId, profiles, outFields, maxDocs, beginDate, sources, instances)
+    topIndex.close()
 
-  /*val xml = XML.loadString("<a>Alana<b><c>Beth</c><d>Catie</d></b></a>")
+    /*val xml = XML.loadString("<a>Alana<b><c>Beth</c><d>Catie</d></b></a>")
   val formatted = new PrettyPrinter(150, 4).format(xml)
   print(formatted)*/
-  println(s"result=$result")
+    println(s"result=$result")
+  }
 }

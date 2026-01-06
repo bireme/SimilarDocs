@@ -221,13 +221,15 @@ object Tools {
   }
 }
 
-object ToolsApp extends App {
+object ToolsApp {
   private def usage(): Unit = {
     Console.err.println("usage: ToolsApp <indexName> <fieldName>")
     System.exit(1)
   }
 
-  if (args.length != 2) usage()
+  def main(args: Array[String]): Unit = {
+    if (args.length != 2) usage()
 
-  Tools.showTerms(args(0), args(1))
+    Tools.showTerms(args(0), args(1))
+  }
 }

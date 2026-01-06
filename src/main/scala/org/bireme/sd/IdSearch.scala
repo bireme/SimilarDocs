@@ -10,17 +10,20 @@ package org.bireme.sd
 import org.h2.mvstore.{MVMap, MVStore}
 
 
-object IdSearch extends App {
+object IdSearch {
   private def usage(): Unit = {
     Console.err.println("usage: IdSearch <mapDBFilePath> <tableName> <id>")
     System.exit(1)
   }
-  if (args.length != 3) usage()
 
-  private val store: MVStore = MVStore.open(args(0))
-  private val allDocIds: MVMap[String, Long] = store.openMap(args(1))
+  def main(args:Array[String]): Unit = {
+    if (args.length != 3) usage()
 
-  println("Contains: " + Option(allDocIds.get(args(2))).isEmpty)
+    val store: MVStore = MVStore.open(args(0))
+    val allDocIds: MVMap[String, Long] = store.openMap(args(1))
 
-  store.close()
+    println("Contains: " + Option(allDocIds.get(args(2))).isEmpty)
+
+    store.close()
+  }
 }

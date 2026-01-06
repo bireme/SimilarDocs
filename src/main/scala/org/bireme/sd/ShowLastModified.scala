@@ -15,18 +15,20 @@ import scala.jdk.CollectionConverters._
 /**
 * Show the records of the MapDB database / table modFile
   */
-object ShowLastModified extends App {
+object ShowLastModified {
   private def usage(): Unit = {
     System.err.println("usage ShowLastModified <dbPath> <table>")
     System.exit(1)
   }
 
-  if (args.length != 2) usage()
+  def main(args: Array[String]): Unit = {
+    if (args.length != 2) usage()
 
-  private val fileLastModified: MVStore = new MVStore.Builder().fileName(args(0)).compress().readOnly().open()
-  private val lastModifiedFile: MVMap[String, Long] = fileLastModified.openMap(args(1))
+    val fileLastModified: MVStore = new MVStore.Builder().fileName(args(0)).compress().readOnly().open()
+    val lastModifiedFile: MVMap[String, Long] = fileLastModified.openMap(args(1))
 
-  lastModifiedFile.entrySet().asScala.foreach {
-    entry => println(s"key[${entry.getKey}]=${entry.getValue}")
+    lastModifiedFile.entrySet().asScala.foreach {
+      entry => println(s"key[${entry.getKey}]=${entry.getValue}")
+    }
   }
 }

@@ -8,25 +8,27 @@ import org.apache.lucene.search.{IndexSearcher, Query}
 import org.apache.lucene.store.FSDirectory
 import org.bireme.sd.service.Conf
 
-object LuceneSearch extends App {
+object LuceneSearch {
   private def usage(): Unit = {
     System.err.println("usage: LuceneSearch <indexPath> <bool>")
     System.exit(1)
   }
 
-  if (args.length != 2) usage()
+  def main(args: Array[String]): Unit = {
+    if (args.length != 2) usage()
 
-  private val sdDirectory: FSDirectory = FSDirectory.open(new File(args(0)).toPath)
-  private val dirReader: DirectoryReader = DirectoryReader.open(sdDirectory)
-  private val searcher = new IndexSearcher(dirReader)
+    val sdDirectory: FSDirectory = FSDirectory.open(new File(args(0)).toPath)
+    val dirReader: DirectoryReader = DirectoryReader.open(sdDirectory)
+    val searcher = new IndexSearcher(dirReader)
 
-  private val qParser: QueryParser = new QueryParser(Conf.indexedField, new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size))
-  private val query: Query = qParser.parse(args(1))
+    val qParser: QueryParser = new QueryParser(Conf.indexedField, new NGramAnalyzer(NGSize.ngram_min_size, NGSize.ngram_max_size))
+    val query: Query = qParser.parse(args(1))
 
-  searcher.search(query, 20).scoreDocs.foreach {
-    scoreDoc => println(s"doc=${scoreDoc.doc} score=${scoreDoc.score}")
+    searcher.search(query, 20).scoreDocs.foreach {
+      scoreDoc => println(s"doc=${scoreDoc.doc} score=${scoreDoc.score}")
+    }
+
+    dirReader.close()
+    sdDirectory.close()
   }
-
-  dirReader.close()
-  sdDirectory.close()
 }

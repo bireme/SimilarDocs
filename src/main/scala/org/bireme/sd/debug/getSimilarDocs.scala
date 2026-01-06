@@ -6,16 +6,18 @@ import org.bireme.sd.service.{Conf, TopIndex}
 import java.text.SimpleDateFormat
 import java.util.Date
 
-object getSimilarDocs extends App {
-  val sdIndexPath: String = "/home/javaapps/sbt-projects/SimilarDocs/indexes/sdIndex"
-  val decsIndexPath: String = "/home/javaapps/sbt-projects/SimilarDocs/indexes/decsIndex"
-  val decsPath: String = "/home/javaapps/sbt-projects/SimilarDocs/decs/decs"
-  val topIndexPath: String = "/home/javaapps/sbt-projects/SimilarDocs/indexes/topIndex"
-  val psId: String = "wilsonsmoura@gmail.com"
-  val profiles: Set[String] = Set("Febre Amarela")
+object getSimilarDocs {
+  def main(args: Array[String]): Unit = {
+    val sdIndexPath: String = "/home/javaapps/sbt-projects/SimilarDocs/indexes/sdIndex"
+    val decsIndexPath: String = "/home/javaapps/sbt-projects/SimilarDocs/indexes/decsIndex"
+    val decsPath: String = "/home/javaapps/sbt-projects/SimilarDocs/decs/decs"
+    val topIndexPath: String = "/home/javaapps/sbt-projects/SimilarDocs/indexes/topIndex"
+    val psId: String = "wilsonsmoura@gmail.com"
+    val profiles: Set[String] = Set("Febre Amarela")
 
-  println(getSimilar(sdIndexPath, decsPath, decsIndexPath, topIndexPath, psId, profiles,
-    resetAllTimes=true, considerDate=true))
+    println(getSimilar(sdIndexPath, decsPath, decsIndexPath, topIndexPath, psId, profiles,
+      resetAllTimes = true, considerDate = true))
+  }
 
   private def getSimilar(sdIndexPath: String,
                          decsIndexPath: String,

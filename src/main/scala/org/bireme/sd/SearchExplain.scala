@@ -22,68 +22,70 @@ import scala.util.Using
 
 // dengue vacinação na cidade de São Paulo
 
-object SearchExplain extends App {
+object SearchExplain {
   private def usage(): Unit = {
     Console.err.println("usage: SearchExplain <indexPath> <text>")
     System.exit(1)
   }
 
-  if args.length < 2 then usage()
+  def main(args:Array[String]): Unit = {
+    if args.length < 2 then usage()
 
-  private val dir = FSDirectory.open(new File(args(0)).toPath)
+    val dir = FSDirectory.open(new File(args(0)).toPath)
 
-  Using.resource(DirectoryReader.open(dir)) { reader =>
-    val searcher = new IndexSearcher(reader)
-    val stored: StoredFields = searcher.storedFields()
+    Using.resource(DirectoryReader.open(dir)) { reader =>
+      val searcher = new IndexSearcher(reader)
+      val stored: StoredFields = searcher.storedFields()
 
-    val sentence = Tools.uniformString(args(1))
-    val tokens = getTokens(sentence)
-    val words = sentence.trim.split(" +")
+      val sentence = Tools.uniformString(args(1))
+      val tokens = getTokens(sentence)
+      val words = sentence.trim.split(" +")
 
-    println(s"\nSentence:\n${args(1)}")
+      println(s"\nSentence:\n${args(1)}")
 
-    println("\nTokens:")
-    tokens.foreach(tok => print(s"[$tok] "))
+      println("\nTokens:")
+      tokens.foreach(tok => print(s"[$tok] "))
 
-    println("\n\nHits:")
-    val order = tokens.foldLeft[Map[Int, Set[String]]](TreeMap.empty) {
-      case (map, tok) =>
-        val hits = getTotalHits(searcher, tok)
-        val values = map.getOrElse(hits, Set.empty[String])
-        map + (hits -> (values + tok))
-    }
-    order.foreach { case (hits, toks) =>
-      toks.foreach(value => println(s"[$value]: $hits"))
-    }
-
-    println("\nWord Hits:")
-    val worder = words.foldLeft[Map[Int, Set[String]]](TreeMap.empty) {
-      case (map, word) =>
-        val hits = getWordTotalHits(searcher, word)
-        val values = map.getOrElse(hits, Set.empty[String])
-        map + (hits -> (values + word))
-    }
-    worder.foreach { case (hits, ws) =>
-      ws.foreach { value =>
-        val sum = getTokens(value).mkString(" OR ")
-        if sum.isEmpty then println(s"[$value]: $hits")
-        else println(s"[$value]=[$sum]: $hits")
+      println("\n\nHits:")
+      val order = tokens.foldLeft[Map[Int, Set[String]]](TreeMap.empty) {
+        case (map, tok) =>
+          val hits = getTotalHits(searcher, tok)
+          val values = map.getOrElse(hits, Set.empty[String])
+          map + (hits -> (values + tok))
       }
+      order.foreach { case (hits, toks) =>
+        toks.foreach(value => println(s"[$value]: $hits"))
+      }
+
+      println("\nWord Hits:")
+      val worder = words.foldLeft[Map[Int, Set[String]]](TreeMap.empty) {
+        case (map, word) =>
+          val hits = getWordTotalHits(searcher, word)
+          val values = map.getOrElse(hits, Set.empty[String])
+          map + (hits -> (values + word))
+      }
+      worder.foreach { case (hits, ws) =>
+        ws.foreach { value =>
+          val sum = getTokens(value).mkString(" OR ")
+          if sum.isEmpty then println(s"[$value]: $hits")
+          else println(s"[$value]=[$sum]: $hits")
+        }
+      }
+
+      println("\nSentence Query:")
+      println(s"[OR]:  ${getQuery(sentence, useOR = true)}")
+      println(s"[AND]: ${getQuery(sentence, useOR = false)}")
+
+      val OR = getSentenceTotalHits(searcher, stored, sentence, useOR = true)
+      val AND = getSentenceTotalHits(searcher, stored, sentence, useOR = false)
+
+      println("\nSentence Hits:")
+      println(s"[OR]: ${OR._1}")
+      OR._2.foreach { case (doc, id, score) => println(s"\tdoc=$doc id=$id score=$score") }
+
+      println(s"\n[AND]: ${AND._1}")
+      AND._2.foreach { case (doc, id, score) => println(s"\tdoc=$doc id=$id score=$score") }
     }
-
-    println("\nSentence Query:")
-    println(s"[OR]:  ${getQuery(sentence, useOR = true)}")
-    println(s"[AND]: ${getQuery(sentence, useOR = false)}")
-
-    val OR  = getSentenceTotalHits(searcher, stored, sentence, useOR = true)
-    val AND = getSentenceTotalHits(searcher, stored, sentence, useOR = false)
-
-    println("\nSentence Hits:")
-    println(s"[OR]: ${OR._1}")
-    OR._2.foreach { case (doc, id, score) => println(s"\tdoc=$doc id=$id score=$score") }
-
-    println(s"\n[AND]: ${AND._1}")
-    AND._2.foreach { case (doc, id, score) => println(s"\tdoc=$doc id=$id score=$score") }
   }
 
   private def getTokens(text: String): Seq[String] = {

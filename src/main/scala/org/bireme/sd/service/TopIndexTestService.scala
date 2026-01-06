@@ -16,7 +16,7 @@ import org.bireme.sd.{SimDocsSearch, Tools}
   * author: Heitor Barbieri
   * date: 20170110
   */
-object TopIndexTestService extends App {
+object TopIndexTestService {
   private def usage(): Unit = {
     Console.err.println("usage: TopIndexTestService\n" +
       "\n\t-sdIndexPath=<path>         : documents Lucene index path" +
@@ -34,44 +34,46 @@ object TopIndexTestService extends App {
     System.exit(1)
   }
 
-  if (args.length != 5) usage()
+  def main(args: Array[String]): Unit = {
+    if (args.length != 5) usage()
 
-  val parameters = args.foldLeft[Map[String,String]](Map()) {
-    case (map,par) =>
-      val split = par.split(" *= *", 2)
-      if (split.length == 2) map + ((split(0).substring(1), split(1)))
-      else map + ((split(0).substring(2), ""))
-  }
-  val sdIndexPath = parameters("sdIndexPath")
-  val topIndexPath = parameters("topIndexPath")
-  val decsIndexPath = parameters("decsIndexPath")
-  val oneWordDecsIndexPath = parameters("oneWordDecsIndexPath")
-  val psId = parameters("psId")
-  val addProfile = parameters.get("addProfile")
-  val delProfile = parameters.get("deleteProfile")
-  val getSimDocs = parameters.get("getSimDocs")
-  val cleanSimDocs = parameters.contains("cleanSimDocs")
-  val showProfiles = parameters.contains("showProfiles")
-  val simDocs = new SimDocsSearch(sdIndexPath, decsIndexPath, oneWordDecsIndexPath)
-  val topIndex = new TopIndex(simDocs, topIndexPath)
-  addProfile match {
-    case Some(profile) =>
-      val split = profile.trim().split(" *= *", 2)
-      if (split.length != 2) usage()
-      topIndex.addProfile(psId, split(0), split(1))
-    case None => delProfile match {
-      case Some(profId) => topIndex.deleteProfile(psId,profId)
-      case None => getSimDocs match {
-        case Some(fields) =>
-          val beginDate: Option[Long] = Some(Tools.getIahxModificationTime - Tools.daysToTime(Conf.excludeDays + Conf.numDays))
-          println(topIndex.getSimDocsXml(psId,
-                        fields.trim().split(" *, *").toSet, Set(), Conf.maxDocs, beginDate, Conf.sources))
-        case None => if (showProfiles) println(topIndex.getProfilesXml(psId))
-                     else if (cleanSimDocs) topIndex.resetAllTimes()
-                     else usage()
+    val parameters = args.foldLeft[Map[String, String]](Map()) {
+      case (map, par) =>
+        val split = par.split(" *= *", 2)
+        if (split.length == 2) map + ((split(0).substring(1), split(1)))
+        else map + ((split(0).substring(2), ""))
+    }
+    val sdIndexPath = parameters("sdIndexPath")
+    val topIndexPath = parameters("topIndexPath")
+    val decsIndexPath = parameters("decsIndexPath")
+    val oneWordDecsIndexPath = parameters("oneWordDecsIndexPath")
+    val psId = parameters("psId")
+    val addProfile = parameters.get("addProfile")
+    val delProfile = parameters.get("deleteProfile")
+    val getSimDocs = parameters.get("getSimDocs")
+    val cleanSimDocs = parameters.contains("cleanSimDocs")
+    val showProfiles = parameters.contains("showProfiles")
+    val simDocs = new SimDocsSearch(sdIndexPath, decsIndexPath, oneWordDecsIndexPath)
+    val topIndex = new TopIndex(simDocs, topIndexPath)
+    addProfile match {
+      case Some(profile) =>
+        val split = profile.trim().split(" *= *", 2)
+        if (split.length != 2) usage()
+        topIndex.addProfile(psId, split(0), split(1))
+      case None => delProfile match {
+        case Some(profId) => topIndex.deleteProfile(psId, profId)
+        case None => getSimDocs match {
+          case Some(fields) =>
+            val beginDate: Option[Long] = Some(Tools.getIahxModificationTime - Tools.daysToTime(Conf.excludeDays + Conf.numDays))
+            println(topIndex.getSimDocsXml(psId,
+              fields.trim().split(" *, *").toSet, Set(), Conf.maxDocs, beginDate, Conf.sources))
+          case None => if (showProfiles) println(topIndex.getProfilesXml(psId))
+          else if (cleanSimDocs) topIndex.resetAllTimes()
+          else usage()
+        }
       }
     }
+    topIndex.close()
+    simDocs.close()
   }
-  topIndex.close()
-  simDocs.close()
 }

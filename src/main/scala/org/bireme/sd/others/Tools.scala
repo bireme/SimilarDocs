@@ -54,7 +54,7 @@ object Tools {
   }
 
   /**
-    * Convert an url into a input stream
+    * Convert a url into an input stream
     * @param urls input url string
     * @return the output input stream
     */
@@ -75,7 +75,7 @@ object Tools {
   }
 
   /**
-    * Convert an url into a string
+    * Convert a url into a string
     * @param urls input url string
     * @return the output string
     */
@@ -112,7 +112,7 @@ object Tools {
   }
 
   /**
-    * Convert an url into a byte array
+    * Convert a url into a byte array
     * @param urls the input url string
     * @return the output byte array
     */
@@ -225,7 +225,7 @@ object Tools {
   }
 
   /**
-  * Given two info structures (map), combine then into a only one
+  * Given two info structures (map), combine then into an only one
     * @param info1 - first info structure
     * @param info2 - second info structure
     * @return the merged info structure

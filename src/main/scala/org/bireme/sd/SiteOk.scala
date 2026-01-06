@@ -10,7 +10,7 @@ package org.bireme.sd
 import org.apache.http.client.methods.{CloseableHttpResponse, HttpGet}
 import org.apache.http.impl.client.{CloseableHttpClient, HttpClientBuilder}
 
-object SiteOk extends App {
+object SiteOk {
   def isSiteOn(url: String): Int = {
     val get: HttpGet = new HttpGet(url)
     val httpClient: CloseableHttpClient = HttpClientBuilder.create().build()
@@ -27,7 +27,9 @@ object SiteOk extends App {
     System.exit(1)
   }
 
-  if (args.length != 1) usage()
+  def main(args:Array[String]): Unit = {
+    if (args.length != 1) usage()
 
-  System.exit(isSiteOn(args(0)))
+    System.exit(isSiteOn(args(0)))
+  }
 }

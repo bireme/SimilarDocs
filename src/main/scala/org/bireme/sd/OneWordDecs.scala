@@ -161,7 +161,7 @@ object OneWordDecs {
   }
 }
 
-object OneWordDecsCreate extends App {
+object OneWordDecsCreate {
   private def usage(): Unit = {
     Console.println("usage: OneWordDecsCreate <decsDir> <decsIndex>")
     Console.println("\t<decsDir> - Isis database path having DeCS records")
@@ -169,12 +169,14 @@ object OneWordDecsCreate extends App {
     System.exit(1)
   }
 
-  if (args.length != 2) usage()
+  def main(args: Array[String]): Unit = {
+    if (args.length != 2) usage()
 
-  OneWordDecs.createIndex(args(0), args(1))
+    OneWordDecs.createIndex(args(0), args(1))
+  }
 }
 
-object OneWordDecsTest extends App {
+object OneWordDecsTest {
   private def usage(): Unit = {
     Console.println("usage: OneWordDecsTest <decsIndex> <sentence>")
     Console.println("\t<decsIndex> - Lucene index with DeCS descritors/synonyms")
@@ -182,19 +184,21 @@ object OneWordDecsTest extends App {
     System.exit(1)
   }
 
-  if (args.length != 2) usage()
+  def main(args: Array[String]): Unit = {
+    if (args.length != 2) usage()
 
-  private val decsPath: Path = new File(args(0)).toPath
-  private val decsDirectory = FSDirectory.open(decsPath)
-  private val decsReader = DirectoryReader.open(decsDirectory)
-  private val decsSearcher = new IndexSearcher(decsReader)
-  private val highlighter = new Highlighter(args(0))
-  private val outSentence = OneWordDecs.addDecsSynonyms(args(1), decsSearcher, highlighter)
+    val decsPath: Path = new File(args(0)).toPath
+    val decsDirectory = FSDirectory.open(decsPath)
+    val decsReader = DirectoryReader.open(decsDirectory)
+    val decsSearcher = new IndexSearcher(decsReader)
+    val highlighter = new Highlighter(args(0))
+    val outSentence = OneWordDecs.addDecsSynonyms(args(1), decsSearcher, highlighter)
 
-  decsReader.close()
-  decsDirectory.close()
-  highlighter.close()
+    decsReader.close()
+    decsDirectory.close()
+    highlighter.close()
 
-  System.out.println("in:" + args(1))
-  System.out.println("out:" + outSentence)
+    System.out.println("in:" + args(1))
+    System.out.println("out:" + outSentence)
+  }
 }

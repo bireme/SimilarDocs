@@ -22,7 +22,7 @@ import scala.collection.immutable.TreeMap
 /** Application that shows all used ngrams used in original text and in the
   * similar retrieved one
   */
-object ShowUsedNGrams extends App {
+object ShowUsedNGrams {
   private def usage(): Unit = {
     Console.err.println("usage: ShowUsedNGrams" +
       "\n\t<index> - Lucene index path used to look for similar documents" +
@@ -32,13 +32,15 @@ object ShowUsedNGrams extends App {
     System.exit(1)
   }
 
-  if (args.length < 4) usage()
+  def main(args:Array[String]): Unit = {
+    if (args.length < 4) usage()
 
-  val fields = args(1).trim.split(" *, *").toSet
-  val minSize = NGSize.ngram_min_size
-  val maxSize = NGSize.ngram_max_size
+    val fields = args(1).trim.split(" *, *").toSet
+    val minSize = NGSize.ngram_min_size
+    val maxSize = NGSize.ngram_max_size
 
-  show(args(2), args(3), fields, args(0), minSize, maxSize)
+    show(args(2), args(3), fields, args(0), minSize, maxSize)
+  }
 
   def show(text: String,
            similar: String,

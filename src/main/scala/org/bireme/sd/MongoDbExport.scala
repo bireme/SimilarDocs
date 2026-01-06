@@ -121,7 +121,7 @@ class MongoDbExport(host: String,
 
 /** Export all documents from a MongoDb collection to a file
   */
-object MongoDbExport extends App {
+object MongoDbExport {
   private def usage(): Unit = {
     Console.err.println("usage: MongoDbExport" +
       "\n\t-host=<host> - MongoDB host" +
@@ -134,34 +134,36 @@ object MongoDbExport extends App {
     System.exit(1)
   }
 
-  if (args.length < 3) usage()
+  def main(args: Array[String]): Unit = {
+    if (args.length < 3) usage()
 
-  private val parameters = args.foldLeft[Map[String, String]](Map()) {
-    case (map, par) =>
-      val split = par.split(" *= *", 2)
-      if (split.size == 1) map + ((split(0).substring(2), ""))
-      else map + ((split(0).substring(1), split(1)))
+    val parameters = args.foldLeft[Map[String, String]](Map()) {
+      case (map, par) =>
+        val split = par.split(" *= *", 2)
+        if (split.size == 1) map + ((split(0).substring(2), ""))
+        else map + ((split(0).substring(1), split(1)))
+    }
+
+    val host = parameters("host")
+    val dbase = parameters("dbase")
+    val coll = parameters("coll")
+    val outFileDir = parameters("outFileDir")
+    val port = parameters.getOrElse("port", "27017").toInt
+    val exportAll = parameters.contains("exportAll")
+    val prettyPrint = parameters.contains("prettyPrint")
+    val mongoExp = new MongoDbExport(host, port)
+
+    val (yesterday, today) = mongoExp.getYesterdayDate
+    val format = new SimpleDateFormat("yyyyMMdd")
+    val outFileName =
+      if (exportAll) s"begin_${format.format(today)}.json"
+      else s"${format.format(yesterday)}.json"
+
+    val outFile = new File(outFileDir, outFileName).getPath
+
+    if (exportAll)
+      mongoExp.exportDocuments(dbase, coll, None, None, outFile, prettyPrint)
+    else
+      mongoExp.exportDocuments(dbase, coll, Some(yesterday), Some(today), outFile, prettyPrint)
   }
-
-  private val host = parameters("host")
-  private val dbase = parameters("dbase")
-  private val coll = parameters("coll")
-  private val outFileDir = parameters("outFileDir")
-  private val port = parameters.getOrElse("port", "27017").toInt
-  private val exportAll = parameters.contains("exportAll")
-  private val prettyPrint = parameters.contains("prettyPrint")
-  private val mongoExp = new MongoDbExport(host, port)
-
-  private val (yesterday, today) = mongoExp.getYesterdayDate
-  private val format = new SimpleDateFormat("yyyyMMdd")
-  private val outFileName =
-    if (exportAll) s"begin_${format.format(today)}.json"
-    else s"${format.format(yesterday)}.json"
-
-  private val outFile = new File(outFileDir, outFileName).getPath
-
-  if (exportAll)
-    mongoExp.exportDocuments(dbase, coll, None, None, outFile, prettyPrint)
-  else
-    mongoExp.exportDocuments(dbase, coll, Some(yesterday), Some(today), outFile, prettyPrint)
 }

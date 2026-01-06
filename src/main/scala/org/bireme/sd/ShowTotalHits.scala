@@ -19,15 +19,17 @@ import org.apache.lucene.util.BytesRef
 import scala.collection.immutable.TreeMap
 import scala.util.{Failure, Success, Try}
 
-object ShowTotalHits extends App {
+object ShowTotalHits {
   private def usage(): Unit = {
     Console.err.println("usage: ShowTotalHits <indexName>")
     System.exit(1)
   }
 
-  if (args.length < 1) usage()
+  def main(args:Array[String]): Unit = {
+    if (args.length < 1) usage()
 
-  showTotalHits(args(0))
+    showTotalHits(args(0))
+  }
 
   private def showTotalHits(index: String): Unit = {
     Try {

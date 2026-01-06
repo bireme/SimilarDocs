@@ -25,17 +25,19 @@ import scala.jdk.CollectionConverters._
   * date: 20171101
   *
 */
-object ShowNewDocIds extends App {
+object ShowNewDocIds {
   private def usage(): Unit = {
     Console.err.println("usage: ShowNewDocIds <indexName> <days> [<max number of documents>]")
     System.exit(1)
   }
+  
+  def main(args: Array[String]): Unit = {
+    if (args.length < 2) usage()
 
-  if (args.length < 2) usage()
-
-  val maxDocs = if (args.length == 2) 1000 else args(2).toInt
-  getNewDocsIds(args(0), args(1).toInt, maxDocs).
-    foreach(x => println(s"id:${x._1} entrance_date=${x._2}"))
+    val maxDocs = if (args.length == 2) 1000 else args(2).toInt
+    getNewDocsIds(args(0), args(1).toInt, maxDocs).
+      foreach(x => println(s"id:${x._1} entrance_date=${x._2}"))
+  }
 
   /**
     * Shows the ids of Lucene index documents that are younger or equals to 'days'

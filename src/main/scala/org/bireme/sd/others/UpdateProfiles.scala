@@ -15,7 +15,7 @@ import scala.collection.immutable.TreeSet
 import scala.io.{BufferedSource, Source}
 import scala.util.Try
 
-object UpdateProfiles extends App {
+object UpdateProfiles {
   type Info = Map[String, Set[String]]
 
   private def usage(): Unit = {
@@ -30,32 +30,36 @@ object UpdateProfiles extends App {
     System.exit(1)
   }
 
-  if (args.length != 6) usage()
+  def main(args:Array[String]): Unit = {
+    if (args.length != 6) usage()
 
-  val parameters = args.foldLeft[Map[String,String]](Map()) {
-    case (map,par) =>
-      val split = par.split(" *= *", 2)
-      if (split.length == 2) map + ((split(0).substring(1), split(1)))
-      else {usage(); map}
-  }
-  private val userName: String = parameters("userName")
-  private val infoPath: String = parameters("infoPath")
-  private val decsIndexPath: String = parameters("decsIndexPath")
-  private val oneWordDecsIndexPath: String = parameters("oneWordDecsIndexPath")
-  private val topIndexPath: String = parameters("topIndexPath")
-  private val sdIndexPath: String = parameters("sdIndexPath")
+    val parameters = args.foldLeft[Map[String, String]](Map()) {
+      case (map, par) =>
+        val split = par.split(" *= *", 2)
+        if (split.length == 2) map + ((split(0).substring(1), split(1)))
+        else {
+          usage(); map
+        }
+    }
+    val userName: String = parameters("userName")
+    val infoPath: String = parameters("infoPath")
+    val decsIndexPath: String = parameters("decsIndexPath")
+    val oneWordDecsIndexPath: String = parameters("oneWordDecsIndexPath")
+    val topIndexPath: String = parameters("topIndexPath")
+    val sdIndexPath: String = parameters("sdIndexPath")
 
-  private val buff: BufferedSource = Source.fromFile(infoPath, "utf-8")
-  val json: String = buff.getLines().mkString("\n")
-  buff.close()
+    val buff: BufferedSource = Source.fromFile(infoPath, "utf-8")
+    val json: String = buff.getLines().mkString("\n")
+    buff.close()
 
-  json2Map(json) match {
-    case Some(infos) =>
-      val simSearch: SimDocsSearch = new SimDocsSearch(sdIndexPath, decsIndexPath, oneWordDecsIndexPath)
-      val topIndex: TopIndex = new TopIndex(simSearch, topIndexPath)
+    json2Map(json) match {
+      case Some(infos) =>
+        val simSearch: SimDocsSearch = new SimDocsSearch(sdIndexPath, decsIndexPath, oneWordDecsIndexPath)
+        val topIndex: TopIndex = new TopIndex(simSearch, topIndexPath)
 
-      updProfiles(userName, infos, topIndex)
-    case None => System.err.println("Error during the import of info file")
+        updProfiles(userName, infos, topIndex)
+      case None => System.err.println("Error during the import of info file")
+    }
   }
 
   /**

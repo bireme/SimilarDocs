@@ -25,7 +25,7 @@ import scala.jdk.CollectionConverters._
 * @author Heitor Barbieri
 * date: 20170102
 */
-object LuceneIndex extends App {
+object LuceneIndex {
   private def usage(): Unit = {
     Console.err.println("usage: LuceneIndex" +
       "\n\t<indexPath> - the name+path to the lucene index to be created" +
@@ -39,36 +39,45 @@ object LuceneIndex extends App {
     System.exit(1)
   }
 
-  if (args.length < 3) usage()
+  def main(args: Array[String]): Unit = {
+    if (args.length < 3) usage()
 
-  val parameters = args.drop(3).foldLeft[Map[String,String]](Map()) {
-    case (map,par) =>
-      val split = par.split(" *= *", 2)
-      map + ((split(0).substring(1), split(1)))
+    val parameters = args.drop(3).foldLeft[Map[String, String]](Map()) {
+      case (map, par) =>
+        val split = par.split(" *= *", 2)
+        map + ((split(0).substring(1), split(1)))
+    }
+
+    val indexPath: String = args(0)
+    val decsIndexPath: String = args(1)
+    val xmlDir: String = args(2)
+    val xmlFileFilter: String = parameters.getOrElse("xmlFileFilter", ".+\\.xml")
+    val sIdxFields: String = parameters.getOrElse("indexedFields", "")
+    val fldIdxNames: Set[String] = if (sIdxFields.isEmpty) Set[String]()
+    else sIdxFields.split(" *, *").toSet
+    val sStrdFields: String = parameters.getOrElse("storedFields", "")
+    val fldStoredNames: Set[String] = (if (sStrdFields.isEmpty) Set[String]()
+    else sStrdFields.split(" *, *").toSet) + "id"
+    val decsDir: String = parameters.getOrElse("decs", "")
+    val encoding: String = parameters.getOrElse("encoding", "ISO-8859-1")
+
+    index(indexPath, decsIndexPath, xmlDir, xmlFileFilter, decsDir, encoding, fldIdxNames, fldStoredNames)
   }
-
-  private val indexPath = args(0)
-  private val decsIndexPath = args(1)
-  private val xmlDir = args(2)
-  private val xmlFileFilter = parameters.getOrElse("xmlFileFilter", ".+\\.xml")
-  private val sIdxFields = parameters.getOrElse("indexedFields", "")
-  private val fldIdxNames = if (sIdxFields.isEmpty) Set[String]()
-                            else sIdxFields.split(" *, *").toSet
-  private val sStrdFields = parameters.getOrElse("storedFields", "")
-  private val fldStoredNames = (if (sStrdFields.isEmpty) Set[String]()
-                                else sStrdFields.split(" *, *").toSet) + "id"
-  private val decsDir = parameters.getOrElse("decs", "")
-  private val encoding = parameters.getOrElse("encoding", "ISO-8859-1")
-
-  index()
 
   /**
     * Creates a Lucene index from a collection of xml files
     */
-  private def index(): Unit = {
+  private def index(indexPath: String,
+                    decsIndexPath: String,
+                    xmlDir: String,
+                    xmlFileFilter: String,
+                    decsDir: String,
+                    encoding: String,
+                    fldIdxNames: Set[String],
+                    fldStoredNames: Set[String]): Unit = {
     val matcher = Pattern.compile(xmlFileFilter).matcher("")
     val decsMap = if (decsDir.isEmpty) Map[Int,Set[String]]()
-                  else decx2Map()
+                  else decx2Map(decsDir)
 
     val analyzer = new NGramAnalyzer(NGSize.ngram_min_size,
                                      NGSize.ngram_max_size)
@@ -88,7 +97,7 @@ object LuceneIndex extends App {
         if (file.isFile) {
           matcher.reset(file.getName)
           if (matcher.matches)
-            indexFile(writer, file.getPath, decsMap)
+            indexFile(writer, file.getPath, decsMap, encoding, fldIdxNames, fldStoredNames)
         }
     }
 
@@ -104,7 +113,7 @@ object LuceneIndex extends App {
     * @return a map where the keys are the decs code (its mfn) and the values, the
               the descriptors in English, Spanish and Protuguese
     */
-  private def decx2Map(): Map[Int,Set[String]] = {
+  private def decx2Map(decsDir: String): Map[Int,Set[String]] = {
     val mst = MasterFactory.getInstance(decsDir).open()
     val map = mst.iterator().asScala.foldLeft[Map[Int,Set[String]]](Map()) {
       case (map2,rec) =>
@@ -143,13 +152,16 @@ object LuceneIndex extends App {
     */
   private def indexFile(indexWriter: IndexWriter,
                         xmlFile: String,
-                        decsMap: Map[Int,Set[String]]): Unit = {
+                        decsMap: Map[Int,Set[String]],
+                        encoding: String,
+                        fldIdxNames: Set[String],
+                        fldStoredNames: Set[String]): Unit = {
     println(s"Indexing file: $xmlFile")
 
     IahxXmlParser.getElements(xmlFile, encoding, Set()).zipWithIndex.foreach {
       case (map,idx) =>
         if (idx % 5000 == 0) print(".")
-        indexWriter.addDocument(map2doc(map.toMap, decsMap))
+        indexWriter.addDocument(map2doc(map.toMap, decsMap, fldIdxNames, fldStoredNames))
     }
     println()
   }
@@ -162,7 +174,9 @@ object LuceneIndex extends App {
     * @return a lucene document
     */
   private def map2doc(map: Map[String,List[String]],
-                      decsMap: Map[Int,Set[String]]): Document = {
+                      decsMap: Map[Int,Set[String]],
+                      fldIdxNames: Set[String],
+                      fldStoredNames: Set[String]): Document = {
     val regexp = """\^d\d+""".r
     val doc = new Document()
 

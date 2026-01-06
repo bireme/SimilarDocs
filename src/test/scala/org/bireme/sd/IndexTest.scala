@@ -16,7 +16,7 @@ import org.apache.lucene.store.FSDirectory
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
-object IndexTest extends App {
+object IndexTest {
   private def usage(): Unit = {
     Console.err.println("usage: IndexTest\n" +
       "\t\t<indexPath> - path to Lucene index\n" +
@@ -25,29 +25,31 @@ object IndexTest extends App {
     System.exit(0)
   }
 
-  val size = args.length
-  if (size < 2) usage()
+  def main(args:Array[String]): Unit = {
+    val size = args.length
+    if (size < 2) usage()
 
-  val term = if (size > 2) args(2) else "dengue"
+    val term = if (size > 2) args(2) else "dengue"
 
 
-  val hits = Try[Int] {
-    val directory: FSDirectory = FSDirectory.open(new File(args(0)).toPath)
-    val ireader: DirectoryReader = DirectoryReader.open(directory)
-    val hitNum: Int = checkDocs(new Term(args(1), term), ireader)
+    val hits = Try[Int] {
+      val directory: FSDirectory = FSDirectory.open(new File(args(0)).toPath)
+      val ireader: DirectoryReader = DirectoryReader.open(directory)
+      val hitNum: Int = checkDocs(new Term(args(1), term), ireader)
 
-    ireader.close()
-    directory.close()
+      ireader.close()
+      directory.close()
 
-    hitNum
-  } match {
-    case Success(h) => h
-    case Failure(_) => 0
+      hitNum
+    } match {
+      case Success(h) => h
+      case Failure(_) => 0
+    }
+    //println(s"hits=$hits")
+    val retValue = if (hits > 255) 255 else hits
+
+    System.exit(retValue) // Value exit values 8 bits
   }
-//println(s"hits=$hits")
-  val retValue = if (hits > 255) 255 else hits
-
-  System.exit(retValue)  // Value exit values 8 bits
 
   private def checkDocs(term: Term,
                         ireader: IndexReader): Int = {

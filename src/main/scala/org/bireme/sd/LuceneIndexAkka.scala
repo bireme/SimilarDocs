@@ -297,7 +297,7 @@ class LuceneIndexActor(indexWriter: IndexWriter,
   }
 }
 
-object LuceneIndexAkka extends App {
+object LuceneIndexAkka {
 
   /*class Terminator(app: ActorRef) extends Actor with ActorLogging {
     context watch app
@@ -322,44 +322,47 @@ object LuceneIndexAkka extends App {
     System.exit(1)
   }
 
-  if (args.length < 4) usage()
+  def main(args: Array[String]): Unit = {
+    if (args.length < 4) usage()
 
-  private val parameters = args.foldLeft[Map[String,String]](Map()) {
-    case (map,par) =>
-      val split = par.split(" *= *", 2)
-      if (split.length == 1) map + ((split(0).substring(2), ""))
-      else map + ((split(0).substring(1), split(1)))
+    val parameters = args.foldLeft[Map[String, String]](Map()) {
+      case (map, par) =>
+        val split = par.split(" *= *", 2)
+        if (split.length == 1) map + ((split(0).substring(2), ""))
+        else map + ((split(0).substring(1), split(1)))
+    }
+
+    val sdIndex = parameters("sdIndex")
+    val oneWordIndexPath = parameters("oneWordIndexPath")
+    val idIndex = parameters("idIndex")
+    val xml = parameters("xml")
+    val xmlFileFilter = parameters.getOrElse("xmlFileFilter", ".+\\.xml")
+    val sIdxFields = parameters.getOrElse("indexedFields", "")
+    val fldIdxNames = if (sIdxFields.isEmpty) Conf.idxFldNames
+    else sIdxFields.split(" *, *").toSet
+    val storedFields = parameters.getOrElse("storedFields", "")
+    val fldStrdNames = if (storedFields.isEmpty) Set[String]()
+    else storedFields.split(" *, *").toSet
+    val encoding = parameters.getOrElse("encoding", "ISO-8859-1")
+    val fullIndexing = parameters.contains("fullIndexing")
+
+    val system: ActorSystem = ActorSystem("Main")
+    try {
+      val props: Props = Props(classOf[LuceneIndexMain], sdIndex, oneWordIndexPath, idIndex,
+        xml, xmlFileFilter, fldIdxNames, fldStrdNames, encoding, fullIndexing)
+      system.actorOf(props, "app")
+    } catch {
+      case NonFatal(e) =>
+        println("---------------------------------------------------------------")
+        println(s"Application Error: ${e.toString}")
+        println("---------------------------------------------------------------")
+        e.printStackTrace()
+        system.terminate();
+        throw e
+    }
+
+    Await.result(system.whenTerminated, 24.hours)
+
+    println("*** Indexing finished!")
   }
-
-  private val sdIndex = parameters("sdIndex")
-  private val oneWordIndexPath = parameters("oneWordIndexPath")
-  private val idIndex = parameters("idIndex")
-  private val xml = parameters("xml")
-  private val xmlFileFilter = parameters.getOrElse("xmlFileFilter", ".+\\.xml")
-  private val sIdxFields = parameters.getOrElse("indexedFields", "")
-  private val fldIdxNames = if (sIdxFields.isEmpty) Conf.idxFldNames
-                            else sIdxFields.split(" *, *").toSet
-  private val storedFields = parameters.getOrElse("storedFields", "")
-  private val fldStrdNames = if (storedFields.isEmpty) Set[String]()
-                             else storedFields.split(" *, *").toSet
-  private val encoding = parameters.getOrElse("encoding", "ISO-8859-1")
-  private val fullIndexing = parameters.contains("fullIndexing")
-
-  private val system: ActorSystem = ActorSystem("Main")
-  try {
-    val props: Props = Props(classOf[LuceneIndexMain], sdIndex, oneWordIndexPath, idIndex,
-                      xml, xmlFileFilter, fldIdxNames, fldStrdNames, encoding, fullIndexing)
-    system.actorOf(props, "app")
-  } catch {
-    case NonFatal(e) =>
-      println("---------------------------------------------------------------")
-      println(s"Application Error: ${e.toString}")
-      println("---------------------------------------------------------------")
-      e.printStackTrace()
-      system.terminate(); throw e
-  }
-
-  Await.result(system.whenTerminated, 24.hours)
-
-  println("*** Indexing finished!")
 }
