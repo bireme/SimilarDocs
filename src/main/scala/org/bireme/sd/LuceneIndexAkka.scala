@@ -174,9 +174,10 @@ class LuceneIndexActor(indexWriter: IndexWriter,
     case (fname:String, encoding:String) =>
       log.debug(s"[${self.path.name}] received a requisition to index $fname")
       try {
-        checkXml.check(fname) match {
-          case Some(errMess) => log.error(s"skipping document => file:[$fname] - $errMess")
-          case None =>
+        //desabilitando checagem
+        //checkXml.check(fname) match {
+        //  case Some(errMess) => log.error(s"skipping document => file:[$fname] - $errMess")
+        //  case None =>
             IahxXmlParser.getElements(fname, encoding, Set[String]()).zipWithIndex.foreach {
               case (mmap: mutable.Map[String, List[String]], idx) =>
                 Try(createNewDocument(fname, mmap.toMap)) match {
@@ -188,7 +189,7 @@ class LuceneIndexActor(indexWriter: IndexWriter,
                   log.info(s"[$fname] - $idx")
                 }
             }
-        }
+        //}
       } catch {
         case ex: Throwable => log.error(s"skipping file: [$fname] -${ex.toString}")
       }

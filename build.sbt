@@ -48,7 +48,7 @@ libraryDependencies ++= Seq(
   "org.apache.lucene" % "lucene-queryparser" % luceneVersion,
   "org.apache.lucene" % "lucene-queries" % luceneVersion,
   "org.apache.lucene" % "lucene-backward-codecs" % luceneVersion,
-  "org.apache.lucene" % "lucene-codecs" % luceneVersion % Test,
+  "org.apache.lucene" % "lucene-codecs" % luceneVersion,
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
   "org.apache.httpcomponents" % "httpclient" % httpClientVersion,
