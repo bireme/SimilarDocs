@@ -18,13 +18,13 @@ import scala.collection.mutable
   * author: Heitor Barbieri
   * date: 20170102
   *
-  * @param input the input token stream
+  * @param inputTS the input token stream
   * @param minSize the minimum ngram size
   * @param maxSize the maximum ngram size
 */
-class NGramFilter(input: TokenStream,
+class NGramFilter(inputTS: TokenStream,
                   minSize: Int,
-                  maxSize: Int) extends TokenFilter(input) {
+                  maxSize: Int) extends TokenFilter(inputTS) {
   private val termAtt: CharTermAttribute = addAttribute(classOf[CharTermAttribute])
   private val queue: mutable.Queue[String] = new mutable.Queue[String]()
   private val ngrams: mutable.Set[String] = mutable.Set[String]()  // Avoid duplicated ngram in the same field
@@ -58,7 +58,7 @@ class NGramFilter(input: TokenStream,
   private def getHeadToken: Boolean = {
     clearAttributes()
     termAtt.setEmpty()
-    if (queue.nonEmpty) termAtt.append(queue.dequeue())
+    if (queue.nonEmpty) { val _ = termAtt.append(queue.dequeue()) }
     /*println(s"queue=$queue")
     val str = queue.dequeue()
     termAtt.append(str)
@@ -75,7 +75,7 @@ class NGramFilter(input: TokenStream,
     */
   @scala.annotation.tailrec
   private def fillQueue(maxqsize: Int = 1000): Boolean = {
-    if ((queue.size < maxqsize) && input.incrementToken()) {
+    if ((queue.size < maxqsize) && inputTS.incrementToken()) {
       putOneNgram(maxSize, termAtt.buffer(), termAtt.length())
       fillQueue(maxqsize)
     } else queue.nonEmpty

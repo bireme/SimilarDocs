@@ -26,12 +26,12 @@ object getSimilarDocs {
                          psId: String,
                          profiles: Set[String],
                          outFields: Set[String] = Set(),
-                         considerDate: Boolean = false,
-                         resetAllTimes: Boolean = false): String = {
+                         considerDate: Boolean,
+                         resetAllTimes: Boolean): String = {
     val simSearch = new SimDocsSearch(sdIndexPath, decsPath, decsIndexPath)
 
     val topIndex = new TopIndex(simSearch, topIndexPath)
-    if (resetAllTimes) topIndex.resetAllTimes()
+    if (resetAllTimes) { val _ = topIndex.resetAllTimes() }
 
     val beginDate: Option[Long] = if (considerDate) {
       val df = new SimpleDateFormat("yyyy-MM-dd")

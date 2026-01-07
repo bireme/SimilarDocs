@@ -17,9 +17,9 @@ import scala.collection.mutable
   * author: Heitor Barbieri
   * date: 20170102
   *
-  * @param input the input token stream
+  * @param inputTS the input token stream
 */
-class WhitespaceFilter(input: TokenStream) extends TokenFilter(input) {
+class WhitespaceFilter(inputTS: TokenStream) extends TokenFilter(inputTS) {
   private val termAtt: CharTermAttribute = addAttribute(classOf[CharTermAttribute])
   private val queue: mutable.Queue[String] = new mutable.Queue[String]()
 
@@ -68,7 +68,7 @@ class WhitespaceFilter(input: TokenStream) extends TokenFilter(input) {
     def fillQueue(size: Int): Boolean = {
       if (size == 0) true
       else {
-        if (input.incrementToken()) {
+        if (inputTS.incrementToken()) {
           splitAndFill()
           fillQueue(size - queue.size)
         } else queue.nonEmpty

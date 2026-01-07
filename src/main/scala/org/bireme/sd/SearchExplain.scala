@@ -95,7 +95,7 @@ object SearchExplain {
 
     val out = new java.util.ArrayList[String]()
     tokenStream.reset()
-    while tokenStream.incrementToken() do out.add(termAttr.toString)
+    while tokenStream.incrementToken() do { val _ =  out.add(termAttr.toString) }
     tokenStream.end()
     tokenStream.close()
 

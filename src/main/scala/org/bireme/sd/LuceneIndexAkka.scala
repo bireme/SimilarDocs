@@ -61,8 +61,8 @@ class LuceneIndexMain(indexPath: String,
   private val indexWriter: IndexWriter = new IndexWriter(directory, config)
 
   private val modFile = new File(modifiedIndexPath)
-  if (!modFile.exists()) modFile.mkdirs()
-  if (fullIndexing) new File(modFile, "docLastModified.db").delete()
+  if (!modFile.exists()) { val _ = modFile.mkdirs() }
+  if (fullIndexing) { val _ = new File(modFile, "docLastModified.db").delete() }
 
   private val docLastModified: MVStore = new MVStore.Builder().fileName(s"$modifiedIndexPath/docLastModified.db")
     .compress().open()
@@ -167,14 +167,14 @@ class LuceneIndexActor(indexWriter: IndexWriter,
                        lastModifiedDoc: MVMap[String, Long],
                        endDate: Long) extends Actor with ActorLogging {
   private val regexp: Regex = """\^d\d+""".r
-  private val checkXml: CheckXml = new CheckXml()
+  //private val checkXml: CheckXml = new CheckXml()
   private val formatter: DateFormat = new SimpleDateFormat("yyyyMMdd")
 
   def receive: PartialFunction[Any, Unit] = {
     case (fname:String, encoding:String) =>
       log.debug(s"[${self.path.name}] received a requisition to index $fname")
       try {
-        //desabilitando checagem
+        //desabilitando por hora a checagem
         //checkXml.check(fname) match {
         //  case Some(errMess) => log.error(s"skipping document => file:[$fname] - $errMess")
         //  case None =>
@@ -224,11 +224,11 @@ class LuceneIndexActor(indexWriter: IndexWriter,
                         case Some(mdate) =>
                           if (updTimeNew > mdate) {
                             indexWriter.updateDocument(new Term("id", sid), map2docExt(doc)) // update the document in the index
-                            lastModifiedDoc.put(sid, updTimeNew)
+                            val _ = lastModifiedDoc.put(sid, updTimeNew)
                           }
                         case None =>
                           indexWriter.addDocument(map2docExt(doc)) // insert the document into the index
-                          lastModifiedDoc.put(sid, updTimeNew)
+                          val _ = lastModifiedDoc.put(sid, updTimeNew)
                       }
                     }
                   }

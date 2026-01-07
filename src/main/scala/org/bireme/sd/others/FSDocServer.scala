@@ -92,7 +92,7 @@ class FSDocServer(rootDir: File,
     if (file.exists() || infoFile.exists()) 409
     else {
       Try {
-        if (!dir.exists()) dir.mkdir()
+        if (!dir.exists()) { val _ =  dir.mkdir() }
         if (writeDocument(source, file, buffer)) writeDocInfo(infoFile, info.getOrElse(createDocumentInfo(idT)))
         else 500
       } match {
@@ -124,7 +124,7 @@ class FSDocServer(rootDir: File,
           case Some(arr) =>
             if (arr.isEmpty) 500
             else {
-              if (!dir.exists()) dir.mkdir()
+              if (!dir.exists()) { val _ = dir.mkdir() }
               val fos = new FileOutputStream(file)
               fos.write(arr)
               fos.close()

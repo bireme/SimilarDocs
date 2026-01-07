@@ -16,7 +16,7 @@ object InfoImpExp {
   def map2Json(map: Map[String, Info]): String = {
     val map1: Map[String, JsObject] = map.map {
       case (k,v) =>
-        val map2: Map[String, JsValue] = v.map { case (k2,v2) => k2 -> JsArray(v2.map(JsString).toArray) }
+        val map2: Map[String, JsValue] = v.map { case (k2,v2) => k2 -> JsArray(v2.map(JsString.apply).toArray) }
         k -> JsObject(map2)
     }
     Json.stringify(JsObject(map1))

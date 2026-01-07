@@ -20,9 +20,9 @@ import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
   * author: Heitor Barbieri
   * date: 20170102
   *
-  * @param input the input token stream
+  * @param inputTS the input token stream
 */
-class UniformFilter(input: TokenStream) extends TokenFilter(input) {
+class UniformFilter(inputTS: TokenStream) extends TokenFilter(inputTS) {
   val termAtt: CharTermAttribute = addAttribute(classOf[CharTermAttribute])
 
   /**
@@ -40,7 +40,7 @@ class UniformFilter(input: TokenStream) extends TokenFilter(input) {
     * @return true if there is a next token, false otherwise
     */
   override def incrementToken(): Boolean = {
-    if (input.incrementToken()) {
+    if (inputTS.incrementToken()) {
       val str = Tools.uniformString(termAtt.toString)
       clearAttributes()
       termAtt.setEmpty().append(str)

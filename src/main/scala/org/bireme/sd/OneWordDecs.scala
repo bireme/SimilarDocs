@@ -143,7 +143,7 @@ object OneWordDecs {
                               highlighter: Highlighter,
                               conf: Config): Set[String] = {
 
-    val (_,_, descripts: Seq[(String,_,_)]) = highlighter.highlight("", "", inText, conf)
+    val (_,_, descripts: Seq[(String,Int,Double)]) = highlighter.highlight("", "", inText, conf)
 
     descripts.foldLeft(mutable.Set[String]()) {
       case (set, (descr,_,_)) =>

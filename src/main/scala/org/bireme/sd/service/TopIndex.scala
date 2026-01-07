@@ -632,7 +632,7 @@ class TopIndex(simSearch: SimDocsSearch,
         }
         updating = false
         println(s"${new Date} - updating was set to false")
-      }
+      }: Unit
     }
     ()
   }
@@ -717,7 +717,7 @@ class TopIndex(simSearch: SimDocsSearch,
     // Update document
     topWriter.updateDocument(new Term(idFldName, id), ndoc)
     println(s"+++ ${new Date} - updating document id:$id")
-    if (autoCommit) topWriter.commit()
+    if (autoCommit) { val _ = topWriter.commit() }
 
     ndoc
   }
