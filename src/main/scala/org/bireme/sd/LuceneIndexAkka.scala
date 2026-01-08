@@ -97,8 +97,10 @@ class LuceneIndexMain(indexPath: String,
 
   private def createSimDocsIndex(xmlDir: String): Unit = {
     val matcher: Matcher = Pattern.compile(xmlFileFilter).matcher("")
-
-    new File(xmlDir).listFiles().sorted.foreach {
+    val files: Array[File] = new File(xmlDir).listFiles()
+    
+    assert (files != null, s"xmlDir[$xmlDir] does not exist or is not a directory!")
+    files.sorted.foreach {
       file =>
         if (file.isFile) {
           matcher.reset(file.getName)
